@@ -1,0 +1,64 @@
+# 中央: 人間の承認で awaiting_human から進める（reusable workflow）
+
+name: approve
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        description: issue 番号
+        required: true
+        type: string
+      association:
+        description: "コメント投稿者の author_association（C-2 で実際の値を渡す）"
+        required: false
+        default: OWNER
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  approve:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+          ref: claude/issue-${{ inputs.issue }}
+
+      - name: git identity を App の bot にする
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          BOT_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          git config user.name "${SLUG}[bot]"
+          git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
+
+      - id: approve
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: approve
+          dir: agent-work/issue-${{ inputs.issue }}
+          association: ${{ inputs.association }}
+
+      - name: 承認を push（連鎖させる）
+        if: steps.approve.outputs.ok == 'true'
+        run: |
+          set -euo pipefail
+          git commit -am "agent: approved -> ${{ steps.approve.outputs.phase }}"
+          git push
+          echo "### approve: -> ${{ steps.approve.outputs.phase }}" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 承認できなかった理由を出す
+        if: steps.approve.outputs.ok != 'true'
+        run: echo "::warning::${{ steps.approve.outputs.reason }}"

@@ -168,10 +168,15 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 - **完了条件**: ワークフロー本体が `uses:` の並びだけになる
 - 対応: worklist I-4、I-5、A-9、A-10、V-10
 
-### Step B-4: reusable workflow にする（まだ同一リポジトリ）
+### Step B-4: reusable workflow にする
 
 - **学ぶ概念**: `on: workflow_call`、`jobs.<id>.uses`、`needs` と job 間 outputs、reusable workflow の権限の継承
-- **やること**: B-3 のワークフローを `dispatch.yml`（`route` job + `run` job）に分割し、同じリポジトリ内の薄い `agent.yml` から呼ぶ
+- **やること**: 配布先の 343 行を中央の reusable workflow 3 本に移し、ラッパーを 69 行にする
+  - 中央 `.github/workflows/{bootstrap,approve,dispatch}.yml`（`on: workflow_call`）
+  - 配布先はイベントを受けて `jobs.<id>.uses` で呼び分けるだけ。認証は `secrets: inherit`
+  - ダミーエージェントは中央 `dispatch.yml` の `dry_run` 入力で分岐する。**新しい配布先を
+    導入するときトークンを使わず配線を確認できるので、検証用の足場としてだけでなく
+    本番でも役に立つ**（設計書 §9-9「小さな issue で 1 本通す」）
 - **確認**: `route` の outputs が `run` に渡る。`route` が `agent=none` を返したとき `run` が skip される
 - **完了条件**: 呼ぶ側が「イベントを振り分けるだけ」になる
 - **注意**: job を分けた瞬間に「ファイルは job をまたがない」が効いてくる。`route` は状態を読むだけ、`run` が改めて checkout する

@@ -1,0 +1,79 @@
+# 中央: issue を起点に run を作る（reusable workflow）
+#
+# 配布先の薄いラッパーから jobs.<id>.uses で呼ばれる。
+# 認証は secrets: inherit で受け取るため、ここで secrets を宣言しない。
+
+name: bootstrap
+
+on:
+  workflow_call:
+    inputs:
+      issue:
+        description: issue 番号
+        required: true
+        type: string
+      scenario:
+        description: "ダミー実行の振る舞い（dry run のときだけ使う）"
+        required: false
+        default: ""
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  bootstrap:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+
+      - name: git identity を App の bot にする
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          BOT_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          git config user.name "${SLUG}[bot]"
+          git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
+
+      - name: ブランチと state.json を作る（冪等）
+        env:
+          N: ${{ inputs.issue }}
+          SCENARIO: ${{ inputs.scenario }}
+        run: |
+          set -euo pipefail
+          BR="claude/issue-$N"
+          if git ls-remote --exit-code --heads origin "$BR"; then
+            echo "::notice::$BR は既にある（何もしない）"
+            exit 0
+          fi
+          git checkout -b "$BR"
+          D="agent-work/issue-$N"
+          mkdir -p "$D"
+          cat > "$D/state.json" <<EOF
+          {
+            "pipeline_version": 1,
+            "issue": $N,
+            "branch": "$BR",
+            "phase": "planning",
+            "blocked_reason": null,
+            "updated_at": null
+          }
+          EOF
+          # push で起動した job は workflow_dispatch の入力を受け取れないため、
+          # ダミー実行の振る舞いもファイルに書いて渡す
+          if [ -n "$SCENARIO" ]; then echo "$SCENARIO" > "$D/scenario"; fi
+          git add "$D"
+          git commit -m "agent: bootstrap issue #$N"
+          git push -u origin "$BR"   # ← この push で dispatch が起動する
+          echo "### bootstrap: $BR を作成" >> "$GITHUB_STEP_SUMMARY"

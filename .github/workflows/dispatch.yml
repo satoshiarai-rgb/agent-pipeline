@@ -1,0 +1,223 @@
+# 中央: push を受けて次のエージェントを決め、実行して遷移させる（reusable workflow）
+#
+# route ジョブが状態を読んで判断し、run ジョブが実行と遷移を担う。
+# 状態を書くのはこのワークフローだけで、エージェントは書かない（設計書 §7.1）。
+
+name: dispatch
+
+on:
+  workflow_call:
+    inputs:
+      dry_run:
+        description: |
+          true ならエージェントを呼ばず、フェーズごとのダミー成果物を書く。
+          新しい配布先を導入するとき、トークンを使わずに配線を確認できる（設計書 §9-9）。
+        required: false
+        default: false
+        type: boolean
+
+permissions:
+  contents: write
+
+jobs:
+  # ------------------------------------------------- 次に何をするか決める
+  route:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    outputs:
+      action: ${{ steps.route.outputs.action }}
+      agent: ${{ steps.route.outputs.agent }}
+      phase: ${{ steps.route.outputs.phase }}
+      reason: ${{ steps.route.outputs.reason }}
+      model: ${{ steps.route.outputs.model }}
+      max_turns: ${{ steps.route.outputs.max_turns }}
+      tools: ${{ steps.route.outputs.tools }}
+      dir: ${{ steps.dir.outputs.dir }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - id: dir
+        run: |
+          set -euo pipefail
+          # ブランチ名から run のディレクトリを決める（claude/issue-1 -> agent-work/issue-1）
+          echo "dir=agent-work/${GITHUB_REF_NAME#claude/}" >> "$GITHUB_OUTPUT"
+
+      - id: route
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: route
+          dir: ${{ steps.dir.outputs.dir }}
+
+      - name: 判断をサマリーに出す
+        run: |
+          {
+            echo "### route: ${{ steps.route.outputs.action }}"
+            echo "- phase=\`${{ steps.route.outputs.phase }}\`"
+            echo "- reason=\`${{ steps.route.outputs.reason }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
+
+  # --------------------------------------------- エージェント実行と遷移
+  run:
+    needs: route
+    if: needs.route.outputs.action != 'none'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+
+      - uses: actions/checkout@v7
+        with:
+          token: ${{ steps.app.outputs.token }}
+
+      - name: git identity を App の bot にする
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          BOT_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          git config user.name "${SLUG}[bot]"
+          git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
+
+      # ---- 上限超過・版の不一致: blocked にするだけ（連鎖させない）
+      - if: needs.route.outputs.action == 'block'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: block
+          dir: ${{ needs.route.outputs.dir }}
+          reason: ${{ needs.route.outputs.reason }}
+
+      - name: blocked を push
+        if: needs.route.outputs.action == 'block'
+        run: |
+          set -euo pipefail
+          git commit -am "agent: blocked (${{ needs.route.outputs.reason }}) [skip ci]"
+          git push
+
+      # ---- 実行の開始を記録し、[skip ci] を付けて push（再入させない / A-36）
+      - id: start
+        if: needs.route.outputs.action == 'run'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: start
+          dir: ${{ needs.route.outputs.dir }}
+          agent: ${{ needs.route.outputs.agent }}
+          run-id: ${{ github.run_id }}
+          attempt: ${{ github.run_attempt }}
+          model: ${{ needs.route.outputs.model }}
+
+      - name: 開始を push
+        if: needs.route.outputs.action == 'run'
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "agent: start ${{ needs.route.outputs.agent }} [skip ci]"
+          git push
+
+      # ---- ダミー実行（dry run）。本物のエージェントは Step D-1 でここに入る
+      - id: agent
+        if: needs.route.outputs.action == 'run' && inputs.dry_run
+        env:
+          D: ${{ needs.route.outputs.dir }}
+          PHASE: ${{ needs.route.outputs.phase }}
+          AGENT: ${{ needs.route.outputs.agent }}
+        run: |
+          set -euo pipefail
+          SCENARIO=$(cat "$D/scenario" 2>/dev/null || echo happy)
+          verdict=""
+
+          # acceptance.json を書く。heredoc の終端子は run ブロックの基準インデントに置く
+          # （case の内側に書くと字下げが残って heredoc が閉じない）
+          write_acceptance() { # write_acceptance <status> <evidence(JSON 値)>
+          cat > "$D/acceptance.json" <<JSON
+          {
+            "criteria": [
+              {
+                "id": "AC-1",
+                "description": "ダミー",
+                "verification": "manual",
+                "status": "$1",
+                "evidence": $2
+              }
+            ]
+          }
+          JSON
+          }
+
+          # レビュアーの verdict をシナリオで決める
+          review() { # review <kind> <差し戻すか>
+            local kind="$1" want_changes="$2"
+            local n=$(( $(ls "$D/reviews/${kind}-"*.md 2>/dev/null | wc -l) + 1 ))
+            mkdir -p "$D/reviews"
+            verdict=approve
+            [ "$want_changes" = "yes" ] && verdict=request_changes
+            printf -- '---\nverdict: %s\nround: %s\nreviewer: %s\n---\n\nダミーレビュー\n' \
+              "$verdict" "$n" "$AGENT" > "$D/reviews/${kind}-$(printf '%02d' "$n").md"
+          }
+
+          case "$PHASE" in
+            planning)
+              echo "# ダミー計画" > "$D/plan.md"
+              write_acceptance pending null
+              ;;
+            plan_review)
+              done_rounds=$(ls "$D/reviews/plan-"*.md 2>/dev/null | wc -l)
+              want=no
+              [ "$SCENARIO" = "plan-loop" ] && want=yes
+              [ "$SCENARIO" = "plan-changes" ] && [ "$done_rounds" -eq 0 ] && want=yes
+              review plan "$want"
+              ;;
+            developing)
+              mkdir -p dummy-src
+              date -u > "dummy-src/change-${GITHUB_RUN_ID}.txt"
+              write_acceptance passed '"ダミー実行"'
+              ;;
+            dev_review)
+              done_rounds=$(ls "$D/reviews/dev-"*.md 2>/dev/null | wc -l)
+              want=no
+              [ "$SCENARIO" = "dev-changes" ] && [ "$done_rounds" -eq 0 ] && want=yes
+              review dev "$want"
+              ;;
+            completing)
+              echo "# ダミー完了報告" > "$D/completion.md"
+              ;;
+          esac
+          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
+          echo "- dry run: phase=\`$PHASE\` agent=\`$AGENT\` verdict=\`${verdict:-なし}\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # ---- 遷移を決める
+      # 本番は validate-artifacts が成果物を検証して result を決める（構成案 §5.4）。
+      # ここでは step の outcome だけを見る。ok 固定にすると失敗が成功として遷移し、
+      # 原因が state に残らない
+      - id: finish
+        if: always() && needs.route.outputs.action == 'run'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: finish
+          dir: ${{ needs.route.outputs.dir }}
+          record-path: ${{ steps.start.outputs.record_path }}
+          result: ${{ steps.agent.outcome == 'success' && 'ok' || 'agent_failed' }}
+          verdict: ${{ steps.agent.outputs.verdict }}
+          acceptance-passed: ${{ needs.route.outputs.phase == 'completing' }}
+
+      - name: 成果物と遷移を push
+        if: always() && needs.route.outputs.action == 'run'
+        run: |
+          set -euo pipefail
+          MSG="agent: ${{ needs.route.outputs.agent }} -> ${{ steps.finish.outputs.phase }}"
+          # 終端に着いたら HEAD に [skip ci] を付けて連鎖を止める（A-36）
+          if [ "${{ steps.finish.outputs.continue_chain }}" != "true" ]; then
+            MSG="$MSG [skip ci]"
+          fi
+          git add -A
+          git commit -m "$MSG"
+          git push
+          {
+            echo "### finish: ${{ steps.finish.outputs.phase }}"
+            echo "- reason=\`${{ steps.finish.outputs.reason }}\`"
+            echo "- continue_chain=\`${{ steps.finish.outputs.continue_chain }}\`"
+          } >> "$GITHUB_STEP_SUMMARY"
