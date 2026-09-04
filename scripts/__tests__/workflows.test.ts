@@ -15,6 +15,7 @@ import type { AgentName } from "../../src/types.ts";
  * 実際に踏んだ失敗:
  *   - heredoc の終端子のインデント（YAML のブロックスカラーと二重の制約）
  *   - `ls 存在しない | wc -l` が pipefail で失敗し set -e がステップを殺す
+ *   - 式の中の算術（`fromJSON(...) + 10`）で startup failure（run 33902073957）
  */
 const ROOT = join(import.meta.dir, "../..");
 const CENTRAL = join(ROOT, ".github/workflows");
@@ -355,6 +356,25 @@ describe("呼び出し側の権限が中央のワークフローを満たして�
         }
       });
     }
+  }
+});
+
+describe("式の書き方", () => {
+  // 実際に踏んだ失敗（run 33902073957 は startup failure でジョブが 1 つも起動しなかった）。
+  //   (Line: 66, Col: 22): Unexpected symbol: '+' ... fromJSON(...) + 10
+  // GitHub の式には算術演算子が無い。計算はハーネス側で済ませて出力として渡す。
+  // reusable workflow は呼び出し側の式もまとめて検証されるため、片方が壊れると全体が起動しない
+  const files = all.map((wf) => ({ name: wf.name, text: readFileSync(wf.path, "utf8") }));
+
+  for (const { name, text } of files) {
+    test(`${name} の式に算術演算子が無い`, () => {
+      const exprs = [...text.matchAll(/\$\{\{(.+?)\}\}/gs)].map((m) => m[1] as string);
+      for (const e of exprs) {
+        // 文字列リテラルの中（'a-b' や '10 + 20'）は除いてから見る
+        const bare = e.replace(/'[^']*'/g, "''");
+        expect(bare, `${name}: ${e.trim()}`).not.toMatch(/[\w)'\s][+*/](?![*/])|[\w)']\s-\s/);
+      }
+    });
   }
 });
 

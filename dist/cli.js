@@ -108,6 +108,7 @@ function resolveAgent(config, agent) {
     model,
     max_turns: a.max_turns,
     timeout_minutes: a.timeout_minutes,
+    job_timeout_minutes: a.timeout_minutes + 10,
     tools,
     claude_args: claudeArgs({ model, max_turns: a.max_turns, tools })
   };

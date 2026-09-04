@@ -20,6 +20,12 @@ export function resolveAgent(config: Config, agent: AgentName) {
     model,
     max_turns: a.max_turns,
     timeout_minutes: a.timeout_minutes,
+    /**
+     * job のタイムアウト。エージェントの上限 + 10 分で、finalize（検証・遷移・push）の
+     * 時間を確保する。**GitHub の式には算術演算子が無い**ので、加算はここで済ませる
+     * （ワークフローに `+ 10` と書くと startup failure になる。run 33902073957）
+     */
+    job_timeout_minutes: a.timeout_minutes + 10,
     tools,
     claude_args: claudeArgs({ model, max_turns: a.max_turns, tools }),
   };

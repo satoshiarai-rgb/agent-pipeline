@@ -118,6 +118,9 @@ outputs:
   timeout_minutes:
     description: "route: エージェント step の timeout-minutes"
     value: ${{ steps.run.outputs.timeout_minutes }}
+  job_timeout_minutes:
+    description: "route: run job の timeout-minutes（エージェントの上限 + 10 分）"
+    value: ${{ steps.run.outputs.job_timeout_minutes }}
   tools:
     description: "route: --tools に渡す値"
     value: ${{ steps.run.outputs.tools }}

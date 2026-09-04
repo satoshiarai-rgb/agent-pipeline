@@ -21,6 +21,12 @@ describe("resolveAgent", () => {
     expect(resolveAgent(c2, "developer").model).toBe("claude-opus-5");
   });
 
+  test("job のタイムアウトはエージェントの上限 + 10 分（式で加算できないため）", () => {
+    // GitHub の式には算術演算子が無いので、ワークフロー側では計算しない
+    expect(resolveAgent(c, "developer").job_timeout_minutes).toBe(55);
+    expect(resolveAgent(c, "plan-reviewer").job_timeout_minutes).toBe(25);
+  });
+
   test("claude_args は上限とツールをフラグ列にする", () => {
     expect(resolveAgent(c, "developer").claude_args).toBe(
       "--model claude-opus-5 --max-turns 40 --tools Read,Glob,Grep,Write,Edit,Bash",

@@ -33,6 +33,7 @@ jobs:
       max_turns: ${{ steps.route.outputs.max_turns }}
       tools: ${{ steps.route.outputs.tools }}
       timeout_minutes: ${{ steps.route.outputs.timeout_minutes }}
+      job_timeout_minutes: ${{ steps.route.outputs.job_timeout_minutes }}
       claude_args: ${{ steps.route.outputs.claude_args }}
       dir: ${{ steps.dir.outputs.dir }}
     steps:
@@ -63,7 +64,9 @@ jobs:
     needs: route
     if: needs.route.outputs.action != 'none'
     runs-on: ubuntu-latest
-    timeout-minutes: ${{ fromJSON(needs.route.outputs.timeout_minutes || '10') + 10 }}
+    # エージェントの上限 + 10 分。加算はハーネスが済ませている
+    # （GitHub の式には算術演算子が無い）
+    timeout-minutes: ${{ fromJSON(needs.route.outputs.job_timeout_minutes || '30') }}
     steps:
       - uses: actions/create-github-app-token@v3
         id: app
