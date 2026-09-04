@@ -309,7 +309,10 @@ jobs:
           echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
           echo "- ダミー実行: phase=\`$PHASE\` agent=\`$AGENT\` verdict=\`${verdict:-なし}\`" >> "$GITHUB_STEP_SUMMARY"
 
-      # ---- 遷移を決める（本番は validate の結果を渡す。ダミーは常に ok）
+      # ---- 遷移を決める
+      # 本番は validate-artifacts が成果物を検証して result を決める（構成案 §5.4）。
+      # ダミー版は「エージェントの step が成功したか」だけを見る。ここを ok 固定にすると
+      # 失敗が成功として遷移し、原因が state に残らない
       - id: finish
         if: always() && needs.route.outputs.action == 'run'
         uses: satoshiarai-rgb/agent-pipeline@main
@@ -317,7 +320,7 @@ jobs:
           command: finish
           dir: ${{ needs.route.outputs.dir }}
           record-path: ${{ steps.start.outputs.record_path }}
-          result: ok
+          result: ${{ steps.agent.outcome == 'success' && 'ok' || 'agent_failed' }}
           verdict: ${{ steps.agent.outputs.verdict }}
           acceptance-passed: ${{ needs.route.outputs.phase == 'completing' }}
 
