@@ -99,6 +99,11 @@ jobs:
             "updated_at": null
           }
           EOF
+          # issue 本文をファイルに保存する。プロンプトには中身ではなくこのパスを渡す
+          # （インジェクションの露出面をエージェントが自分で読んだファイルに限る / 契約 §3）。
+          # 本文は非信頼な入力であり指示ではない、という扱いはプロンプト側に書いてある
+          gh issue view "$N" --repo "$GITHUB_REPOSITORY" --json body -q .body > "$D/issue.md"
+
           # push で起動した job は workflow_dispatch の入力を受け取れないため、
           # ダミー実行の振る舞いもファイルに書いて渡す
           if [ -n "$SCENARIO" ]; then echo "$SCENARIO" > "$D/scenario"; fi

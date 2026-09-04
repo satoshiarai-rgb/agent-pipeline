@@ -102,13 +102,24 @@ function resolveAgent(config, agent) {
   if (!tools)
     throw new Error(`tool_profiles に ${a.tools} がありません`);
   const isReviewer = agent === "plan-reviewer" || agent === "dev-reviewer";
+  const model = (isReviewer ? config.models.reviewer : null) ?? config.models.default;
   return {
     agent,
-    model: (isReviewer ? config.models.reviewer : null) ?? config.models.default,
+    model,
     max_turns: a.max_turns,
     timeout_minutes: a.timeout_minutes,
-    tools
+    tools,
+    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools })
   };
+}
+function claudeArgs(a) {
+  const denied = a.tools.split(",").includes("Bash") ? [] : ["Bash"];
+  return [
+    `--model ${a.model}`,
+    `--max-turns ${a.max_turns}`,
+    `--tools ${a.tools}`,
+    ...denied.map((d) => `--disallowed-tools ${d}`)
+  ].join(" ");
 }
 
 // src/transitions.ts

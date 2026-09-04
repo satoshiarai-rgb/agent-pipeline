@@ -32,6 +32,8 @@ jobs:
       model: ${{ steps.route.outputs.model }}
       max_turns: ${{ steps.route.outputs.max_turns }}
       tools: ${{ steps.route.outputs.tools }}
+      timeout_minutes: ${{ steps.route.outputs.timeout_minutes }}
+      claude_args: ${{ steps.route.outputs.claude_args }}
       dir: ${{ steps.dir.outputs.dir }}
     steps:
       - uses: actions/checkout@v7
@@ -61,7 +63,7 @@ jobs:
     needs: route
     if: needs.route.outputs.action != 'none'
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: ${{ fromJSON(needs.route.outputs.timeout_minutes || '10') + 10 }}
     steps:
       - uses: actions/create-github-app-token@v3
         id: app
@@ -69,9 +71,13 @@ jobs:
           client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
           private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
 
+      # fetch-depth: 0 は 2 つの理由から必要。
+      # dev-reviewer が差分を git から読む（既定ブランチとの比較に履歴がいる）ことと、
+      # push が rejected されたときの再試行（A-32）のため
       - uses: actions/checkout@v7
         with:
           token: ${{ steps.app.outputs.token }}
+          fetch-depth: 0
 
       - name: git identity を App の bot にする
         env:
@@ -82,6 +88,9 @@ jobs:
           BOT_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
           git config user.name "${SLUG}[bot]"
           git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
+          # origin/HEAD を張る。dev-reviewer は既定ブランチ名を知らないので
+          # `git rev-parse --abbrev-ref origin/HEAD` で引けるようにしておく（main / master を問わない）
+          git remote set-head origin -a
 
       # ---- 上限超過・版の不一致: blocked にするだけ（連鎖させない）
       - if: needs.route.outputs.action == 'block'
@@ -118,8 +127,31 @@ jobs:
           git commit -m "agent: start ${{ needs.route.outputs.agent }} [skip ci]"
           git push
 
-      # ---- ダミー実行（dry run）。本物のエージェントは Step D-1 でここに入る
-      - id: agent
+      # ---- 配布先のツールチェーンを用意する（中央はツールチェーンを知らない / 設計書 §4.2）
+      - name: setup.sh
+        if: needs.route.outputs.action == 'run'
+        run: |
+          set -euo pipefail
+          if [ -f .agent/setup.sh ]; then
+            bash .agent/setup.sh
+          else
+            echo "::notice::.agent/setup.sh が無いので何もしない"
+          fi
+
+      # ---- プロンプトを組み立てる（契約 §2 / §3）
+      # 中央の既定プロンプトは action 自身の展開先（$GITHUB_ACTION_PATH/prompts）から読むため、
+      # 中央リポジトリを別途 checkout しなくてよい
+      - id: compose
+        if: needs.route.outputs.action == 'run'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: compose
+          dir: ${{ needs.route.outputs.dir }}
+          agent: ${{ needs.route.outputs.agent }}
+
+      # ---- ダミー実行（dry run）。トークンを使わずに配線だけを確認する（設計書 §9-9）
+      # 成果物は契約（work/agent-contract.md §4）を満たす形で書く。dry run でも validate を通す
+      - id: dummy
         if: needs.route.outputs.action == 'run' && inputs.dry_run
         env:
           D: ${{ needs.route.outputs.dir }}
@@ -168,7 +200,8 @@ jobs:
 
           case "$PHASE" in
             planning)
-              echo "# ダミー計画" > "$D/plan.md"
+              # 規模判定の節は planner の必須出力。「上限超過」の語が無ければ実装に進む
+              printf '# ダミー計画\n\n## 規模判定\n\n- 変更ファイル数見込み: 1\n- 上限（10）以内: yes\n' > "$D/plan.md"
               write_acceptance pending null
               ;;
             plan_review)
@@ -191,13 +224,61 @@ jobs:
               echo "# ダミー完了報告" > "$D/completion.md"
               ;;
           esac
-          echo "verdict=$verdict" >> "$GITHUB_OUTPUT"
           echo "- dry run: phase=\`$PHASE\` agent=\`$AGENT\` verdict=\`${verdict:-なし}\`" >> "$GITHUB_STEP_SUMMARY"
 
+      # ---- 本物のエージェント実行
+      #
+      # continue-on-error: true と step の timeout-minutes。失敗・タイムアウトでも
+      # validate と finish を必ず通す（state を書かずに終わると run が無音で止まる）。
+      # エージェントには GH_TOKEN を渡さない。GitHub の操作はハーネスが行う（A-25）
+      - id: agent
+        if: needs.route.outputs.action == 'run' && !inputs.dry_run
+        continue-on-error: true
+        timeout-minutes: ${{ fromJSON(needs.route.outputs.timeout_minutes || '10') }}
+        uses: anthropics/claude-code-action/base-action@v1.0.215
+        with:
+          prompt_file: ${{ steps.compose.outputs.prompt_path }}
+          # 上限とツールはハーネスが決める（契約 §5）。組み立ては src/utils/resolve-agent.ts
+          claude_args: ${{ needs.route.outputs.claude_args }}
+          # K-7: Console 取得まではサブスクリプション認証。WIF への差し替え手順は A-29
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
+
+      # ---- 実行の結末と、検証に必要な差分の一覧を集める
+      - id: outcome
+        if: always() && needs.route.outputs.action == 'run'
+        env:
+          DRY: ${{ inputs.dry_run }}
+          DUMMY_OUTCOME: ${{ steps.dummy.outcome }}
+          AGENT_OUTCOME: ${{ steps.agent.outcome }}
+        run: |
+          set -euo pipefail
+          if [ "$DRY" = "true" ]; then O="$DUMMY_OUTCOME"; else O="$AGENT_OUTCOME"; fi
+          [ "$O" = "success" ] || echo "agent_failed=true" >> "$GITHUB_OUTPUT"
+
+          # developer の「差分がある」は agent-work/ を除いたコードの差分で見る
+          # （acceptance.json の更新だけでは実装したことにならない）。
+          # cut -c4- はポーセリン形式の XY を落とす。空白入りのパスでも壊れない
+          CHANGED="$RUNNER_TEMP/changed-files.txt"
+          git -c core.quotePath=false status --porcelain -uall -- . ':!agent-work' \
+            | cut -c4- > "$CHANGED"
+          echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
+          echo "- outcome=\`$O\` 変更ファイル数=\`$(wc -l < "$CHANGED" | tr -d ' ')\`" >> "$GITHUB_STEP_SUMMARY"
+
+      # ---- 成果物が契約を満たすか検証する（契約 §6。ここを通れば状態機械は壊れない / K-16）
+      - id: validate
+        if: always() && needs.route.outputs.action == 'run'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: validate
+          dir: ${{ needs.route.outputs.dir }}
+          agent: ${{ needs.route.outputs.agent }}
+          agent-failed: ${{ steps.outcome.outputs.agent_failed }}
+          execution-file: ${{ steps.agent.outputs.execution_file }}
+          changed-files: ${{ steps.outcome.outputs.changed }}
+
       # ---- 遷移を決める
-      # 本番は validate-artifacts が成果物を検証して result を決める（構成案 §5.4）。
-      # ここでは step の outcome だけを見る。ok 固定にすると失敗が成功として遷移し、
-      # 原因が state に残らない
+      # result は validate が決める。|| の既定値は validate 自体が落ちたときの保険で、
+      # 「state 更新と push は必ず行い blocked にする」という不変条件を守るため
       - id: finish
         if: always() && needs.route.outputs.action == 'run'
         uses: satoshiarai-rgb/agent-pipeline@main
@@ -205,9 +286,13 @@ jobs:
           command: finish
           dir: ${{ needs.route.outputs.dir }}
           record-path: ${{ steps.start.outputs.record_path }}
-          result: ${{ steps.agent.outcome == 'success' && 'ok' || 'agent_failed' }}
-          verdict: ${{ steps.agent.outputs.verdict }}
-          acceptance-passed: ${{ needs.route.outputs.phase == 'completing' }}
+          result: ${{ steps.validate.outputs.result || 'invalid' }}
+          detail: ${{ steps.validate.outputs.detail || 'validate が結果を返さなかった' }}
+          verdict: ${{ steps.validate.outputs.verdict }}
+          oversize: ${{ steps.validate.outputs.oversize }}
+          acceptance-passed: ${{ steps.validate.outputs.acceptance_passed }}
+          api-error-status: ${{ steps.validate.outputs.api_error_status }}
+          session-id: ${{ steps.agent.outputs.session_id }}
 
       - name: 成果物と遷移を push
         if: always() && needs.route.outputs.action == 'run'
