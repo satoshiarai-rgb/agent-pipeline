@@ -1,6 +1,6 @@
 # Step A-1（暫定版）: Claude サブスクリプション認証で Claude を 1 回呼ぶ
 #
-# 置き場所: 検証用リポジトリの .github/workflows/oauth.yml
+# 置き場所: 検証用リポジトリの .github/workflows/check-oauth.yml
 #
 # 前提:
 #   1. ローカルで `claude setup-token` を実行して長期トークンを発行する
@@ -15,7 +15,7 @@
 #   - 実行分はサブスクリプションの使用量として計上される（API 課金ではない）
 #   - Console を用意したら wif.yml に差し替える（worklist.md A-29）
 
-name: oauth-hello
+name: check-oauth
 
 on:
   workflow_dispatch:

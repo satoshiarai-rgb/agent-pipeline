@@ -14,7 +14,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `work/github-actions-architecture.md` | 設計書 §6 を GitHub Actions の実装レベルに落としたもの。設計書との食い違いは同文書 §9 に列挙 |
 | `work/worklist.md` | 残作業の台帳。確定した判断（§0）、文書修正、検証、実装、未決事項 |
 | `work/steps.md` | 段階的な実装手順。Actions の用語解説（§0）とフェーズ A〜E の 15 ステップ |
-| `work/verify/step-a1/wif.yml` | Step A-1 の検証ワークフロー原本。検証用リポジトリにコピーして使う |
+| `work/verify/step-a1/check-wif.yml` | Step A-1 の検証ワークフロー原本。検証用リポジトリにコピーして使う |
 
 作業前に `work/worklist.md`（何を漏らさないか）と `work/steps.md`（どの順で手を動かすか）を読むこと。以下は全体像の要約であり、仕様の正は設計書側にある。
 

@@ -1,6 +1,6 @@
 # Step A-1: WIF で Claude を 1 回呼ぶ
 #
-# 置き場所: 検証用リポジトリの .github/workflows/wif.yml
+# 置き場所: 検証用リポジトリの .github/workflows/check-wif.yml
 #   （このファイルは中央リポジトリ側の原本。検証用リポジトリにコピーして使う）
 #
 # 前提:
@@ -11,7 +11,7 @@
 #
 # このステップでは GitHub App は不要。App トークンが必要になるのは Step B-1 以降。
 
-name: wif-hello
+name: check-wif
 
 on:
   workflow_dispatch:

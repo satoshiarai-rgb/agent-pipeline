@@ -1,6 +1,6 @@
 # Step B-1: push で自分が再起動する連鎖と、その止め方
 #
-# 置き場所: 検証用リポジトリの .github/workflows/loop.yml
+# 置き場所: 検証用リポジトリの .github/workflows/check-loop.yml
 # 前提: Secrets に AGENT_APP_CLIENT_ID と AGENT_APP_PRIVATE_KEY（スモークテストで作った GitHub App）
 #       AGENT_APP_CLIENT_ID は App 設定ページの Client ID（Iv23li... 形式）
 #
@@ -23,7 +23,7 @@
 #                   push が失敗して finalize がまとめて push したときに run が無音で止まる）
 #   outside-paths → agent-work の外だけを変更して push。paths フィルタで起動しないことを確認
 
-name: loop-test
+name: check-loop
 
 on:
   workflow_dispatch:

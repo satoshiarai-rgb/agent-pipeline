@@ -1,6 +1,6 @@
 # Step B-2: 状態機械を GitHub Actions 上で一巡させる（エージェントはダミー）
 #
-# 置き場所: 検証用リポジトリの .github/workflows/dispatch.yml
+# 置き場所: 検証用リポジトリの .github/workflows/check-dispatch.yml
 # 前提:
 #   - Secrets に AGENT_APP_CLIENT_ID / AGENT_APP_PRIVATE_KEY
 #   - 中央リポジトリ（satoshiarai-rgb/agent-pipeline）が push 済みで、
@@ -20,7 +20,7 @@
 #   scenario=plan-changes / dev-changes        → 差し戻しを 1 回挟む
 #   scenario=plan-loop                         → 常に request_changes（ラウンド上限で blocked）
 
-name: dispatch
+name: check-dispatch
 
 on:
   workflow_dispatch:
