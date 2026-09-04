@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import {
   approveRun,
@@ -10,6 +11,7 @@ import {
   requestChangesRun,
   routeRun,
   startRun,
+  validateRun,
 } from "./index.ts";
 import type { AgentName, RunResult, Verdict } from "./types.ts";
 
@@ -28,6 +30,8 @@ commands:
   request-changes  /request-changes による差し戻し  --association --body
   block    phase を blocked にする            --reason
   label    いま付いているべきラベルを返す
+  validate 成果物が契約を満たすか検証し Outcome を返す
+             --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -44,10 +48,14 @@ const { positionals, values } = parseArgs({
     result: { type: "string" },
     verdict: { type: "string" },
     "api-error-status": { type: "string" },
+    detail: { type: "string" },
     oversize: { type: "boolean", default: false },
     "acceptance-passed": { type: "boolean", default: false },
     "session-id": { type: "string" },
     association: { type: "string" },
+    "agent-failed": { type: "boolean", default: false },
+    "execution-file": { type: "string" },
+    "changed-files": { type: "string" },
     body: { type: "string" },
     reason: { type: "string" },
   },
@@ -70,6 +78,7 @@ const outcome = (): Outcome => ({
   oversize: values.oversize,
   acceptance_passed: values["acceptance-passed"],
   api_error_status: values["api-error-status"] ? Number(values["api-error-status"]) : null,
+  detail: values.detail,
 });
 
 const run = () => {
@@ -106,6 +115,18 @@ const run = () => {
       return blockRun({ dir, config, reason: need(values.reason, "reason") });
     case "label":
       return labelRun({ dir, config });
+    case "validate":
+      return validateRun({
+        dir,
+        config,
+        agent: need(values.agent, "agent") as AgentName,
+        agent_failed: values["agent-failed"],
+        execution_file: values["execution-file"] ?? null,
+        // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
+        changed_files: values["changed-files"]
+          ? readFileSync(values["changed-files"], "utf8").split("\n").filter(Boolean)
+          : [],
+      });
     default:
       console.error(`不明なコマンド: ${command ?? "(なし)"}\n\n${USAGE}`);
       return process.exit(2);

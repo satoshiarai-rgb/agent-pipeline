@@ -25,6 +25,8 @@ export interface Outcome {
   acceptance_passed?: boolean;
   /** A-31: 設定ミスとエージェントの失敗を区別するために残す */
   api_error_status?: number | null;
+  /** invalid のとき、何が契約を満たしていないか（人間が原因を追えるように） */
+  detail?: string;
 }
 
 export interface FinishResult {
@@ -73,7 +75,9 @@ function finish(input: {
   if (outcome.result === "api_error") {
     return blocked(`api_error:${outcome.api_error_status ?? "unknown"}`);
   }
-  if (outcome.result === "invalid") return blocked("invalid_artifacts");
+  if (outcome.result === "invalid") {
+    return blocked(outcome.detail ? `invalid_artifacts: ${outcome.detail}` : "invalid_artifacts");
+  }
   if (outcome.result === "agent_failed") return blocked("agent_failed");
   if (outcome.oversize) return blocked("oversize: issue の分割が必要");
 

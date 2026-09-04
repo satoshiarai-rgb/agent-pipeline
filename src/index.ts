@@ -12,6 +12,7 @@ export { labelRun } from "./commands/label.ts";
 export { requestChangesRun } from "./commands/request-changes.ts";
 export { routeRun } from "./commands/route.ts";
 export { startRun } from "./commands/start.ts";
+export { validateRun } from "./commands/validate.ts";
 export type { Config } from "./defaults.ts";
 export { defaults } from "./defaults.ts";
 export type { RouteResult } from "./transitions.ts";

@@ -12,7 +12,7 @@ description: エージェントパイプラインの状態機械を操作する�
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | block | label"
+    description: "start | route | finish | approve | request-changes | block | label | validate"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
@@ -24,9 +24,14 @@ inputs:
   model: { description: "start: モデル（既定は src/defaults.ts の models.default）", required: false }
   # finish
   record-path: { description: "finish: start が返したレコードのパス", required: false }
-  result: { description: "finish: ok | invalid | agent_failed | api_error", required: false }
+  result: { description: "finish: ok | invalid | agent_failed | api_error（validate の出力を渡す）", required: false }
+  # validate
+  agent-failed: { description: "validate: エージェントの step が失敗したなら true", required: false }
+  execution-file: { description: "validate: base-action の実行ログ（api_error の判定 / A-31）", required: false }
+  changed-files: { description: "validate: 変更ファイルの一覧（1 行 1 ファイル）のパス", required: false }
   verdict: { description: "finish: approve | request_changes", required: false }
   api-error-status: { description: "finish: api_error のときの HTTP ステータス", required: false }
+  detail: { description: "finish: invalid のとき、契約を満たさない理由（validate の detail をそのまま渡す）", required: false }
   oversize: { description: "finish: planner の規模判定が上限超過なら true", required: false }
   acceptance-passed: { description: "finish: acceptance.json が全 passed なら true", required: false }
   session-id: { description: "finish: base-action の session_id", required: false }
@@ -37,6 +42,21 @@ inputs:
   reason: { description: "block: blocked_reason に残す理由", required: false }
 
 outputs:
+  detail:
+    description: "validate: 契約を満たさない理由"
+    value: ${{ steps.run.outputs.detail }}
+  oversize:
+    description: "validate: planner の規模判定が上限超過"
+    value: ${{ steps.run.outputs.oversize }}
+  acceptance_passed:
+    description: "validate: acceptance.json が全 passed"
+    value: ${{ steps.run.outputs.acceptance_passed }}
+  api_error_status:
+    description: "validate: API エラーの HTTP ステータス"
+    value: ${{ steps.run.outputs.api_error_status }}
+  verdict:
+    description: "validate: レビューの verdict"
+    value: ${{ steps.run.outputs.verdict }}
   label:
     description: "label: いま issue に付いているべきラベル"
     value: ${{ steps.run.outputs.label }}
@@ -111,4 +131,8 @@ runs:
         CLI_ASSOCIATION: ${{ inputs.association }}
         CLI_BODY: ${{ inputs.body }}
         CLI_REASON: ${{ inputs.reason }}
+        CLI_AGENT_FAILED: ${{ inputs.agent-failed }}
+        CLI_EXECUTION_FILE: ${{ inputs.execution-file }}
+        CLI_CHANGED_FILES: ${{ inputs.changed-files }}
+        CLI_DETAIL: ${{ inputs.detail }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-cli.sh"

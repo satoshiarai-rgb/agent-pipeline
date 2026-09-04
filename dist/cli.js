@@ -1,6 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
+import { readFileSync as readFileSync6 } from "node:fs";
 import { parseArgs } from "node:util";
 
 // src/file/state-file.ts
@@ -298,8 +299,9 @@ function finish(input) {
   if (outcome.result === "api_error") {
     return blocked(`api_error:${outcome.api_error_status ?? "unknown"}`);
   }
-  if (outcome.result === "invalid")
-    return blocked("invalid_artifacts");
+  if (outcome.result === "invalid") {
+    return blocked(outcome.detail ? `invalid_artifacts: ${outcome.detail}` : "invalid_artifacts");
+  }
   if (outcome.result === "agent_failed")
     return blocked("agent_failed");
   if (outcome.oversize)
@@ -358,7 +360,7 @@ function labelRun(input) {
   };
 }
 // src/file/review-file.ts
-import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync as readdirSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync as readdirSync2, readFileSync as readFileSync3, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join3 } from "node:path";
 function renderReview(input) {
   const { verdict, round, reviewer, body } = input;
@@ -387,6 +389,25 @@ function saveReview(input) {
   mkdirSync2(join3(dir, "reviews"), { recursive: true });
   writeFileSync3(path, renderReview({ verdict, round, reviewer, body }));
   return path;
+}
+function latestReviewPath(dir, kind) {
+  const reviews = join3(dir, "reviews");
+  if (!existsSync2(reviews))
+    return null;
+  const files = readdirSync2(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).sort();
+  const last = files.at(-1);
+  return last ? join3(reviews, last) : null;
+}
+function readVerdict(path) {
+  const text = readFileSync3(path, "utf8");
+  const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
+  if (!frontmatter)
+    return null;
+  const line = frontmatter[1].split(/\r?\n/).find((l) => /^verdict:/.test(l.trim()));
+  if (!line)
+    return null;
+  const value = line.split(":")[1]?.trim();
+  return value === "approve" || value === "request_changes" ? value : null;
 }
 
 // src/commands/request-changes.ts
@@ -439,6 +460,147 @@ function startRun(input) {
     started_at: now.toISOString()
   });
   return { record_path: saveRecord(dir, record) };
+}
+// src/commands/validate.ts
+import { existsSync as existsSync4, readFileSync as readFileSync5 } from "node:fs";
+import { join as join5 } from "node:path";
+
+// src/file/acceptance-file.ts
+import { existsSync as existsSync3, readFileSync as readFileSync4 } from "node:fs";
+import { join as join4 } from "node:path";
+function acceptancePath(dir) {
+  return join4(dir, "acceptance.json");
+}
+function readAcceptance(dir) {
+  const raw = parseJson(readFileSync4(acceptancePath(dir), "utf8"), "acceptance.json");
+  if (!Array.isArray(raw?.criteria))
+    throw new Error("acceptance.json に criteria がありません");
+  return raw;
+}
+function acceptanceProblems(file) {
+  const problems = [];
+  if (file.criteria.length === 0)
+    problems.push("criteria が空");
+  const seen = new Set;
+  for (const [i, c] of file.criteria.entries()) {
+    const at = c?.id ? `criteria[${i}] (${c.id})` : `criteria[${i}]`;
+    if (!c?.id)
+      problems.push(`${at}: id が無い`);
+    else if (seen.has(c.id))
+      problems.push(`${at}: id が重複`);
+    else
+      seen.add(c.id);
+    if (!c?.description)
+      problems.push(`${at}: description が無い`);
+    if (c?.verification !== "automated" && c?.verification !== "manual") {
+      problems.push(`${at}: verification は automated か manual`);
+    }
+    if (c?.verification === "automated" && !c?.command) {
+      problems.push(`${at}: verification が automated なら command が必要`);
+    }
+    if (!["pending", "passed", "failed"].includes(c?.status)) {
+      problems.push(`${at}: status は pending / passed / failed`);
+    }
+    if (c?.status === "passed" && !c?.evidence) {
+      problems.push(`${at}: passed にするなら evidence が必要`);
+    }
+  }
+  return problems;
+}
+function allPassed(file) {
+  return file.criteria.length > 0 && file.criteria.every((c) => c.status === "passed");
+}
+function hasAcceptance(dir) {
+  return existsSync3(acceptancePath(dir));
+}
+
+// src/commands/validate.ts
+function validateRun(input) {
+  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
+  const apiError = readApiError(execution_file);
+  if (apiError !== null) {
+    return { result: "api_error", api_error_status: apiError };
+  }
+  if (agent_failed)
+    return { result: "agent_failed" };
+  const invalid = (detail) => ({ result: "invalid", detail });
+  const nonEmpty = (path) => existsSync4(path) && readFileSync5(path, "utf8").trim() !== "";
+  switch (agent) {
+    case "planner": {
+      const plan = join5(dir, "plan.md");
+      if (!nonEmpty(plan))
+        return invalid("plan.md が無いか空");
+      const text = readFileSync5(plan, "utf8");
+      if (!text.includes("## 規模判定"))
+        return invalid("plan.md に ## 規模判定 が無い");
+      if (!hasAcceptance(dir))
+        return invalid("acceptance.json が無い");
+      const problems = acceptanceSchema(dir);
+      if (problems)
+        return invalid(problems);
+      const scale = text.slice(text.indexOf("## 規模判定"));
+      if (scale.includes("上限超過"))
+        return { result: "ok", oversize: true };
+      return { result: "ok" };
+    }
+    case "plan-reviewer":
+    case "dev-reviewer": {
+      const kind = agent === "plan-reviewer" ? "plan" : "dev";
+      const path = latestReviewPath(dir, kind);
+      if (!path)
+        return invalid(`reviews/${kind}-NN.md が無い`);
+      const verdict = readVerdict(path);
+      if (!verdict)
+        return invalid(`${path} の frontmatter に verdict が無い`);
+      return { result: "ok", verdict };
+    }
+    case "developer": {
+      if (changed_files.length === 0)
+        return invalid("差分が無い");
+      const workflows = changed_files.filter((f) => f.startsWith(".github/workflows/"));
+      if (workflows.length > 0) {
+        return invalid(`.github/workflows を変更している: ${workflows.join(", ")}`);
+      }
+      if (!hasAcceptance(dir))
+        return invalid("acceptance.json が無い");
+      const problems = acceptanceSchema(dir);
+      if (problems)
+        return invalid(problems);
+      return { result: "ok" };
+    }
+    case "completion": {
+      if (!nonEmpty(join5(dir, "completion.md")))
+        return invalid("completion.md が無いか空");
+      if (!hasAcceptance(dir))
+        return invalid("acceptance.json が無い");
+      const problems = acceptanceSchema(dir);
+      if (problems)
+        return invalid(problems);
+      return { result: "ok", acceptance_passed: allPassed(readAcceptance(dir)) };
+    }
+  }
+}
+function acceptanceSchema(dir) {
+  let problems;
+  try {
+    problems = acceptanceProblems(readAcceptance(dir));
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+  return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
+}
+function readApiError(path) {
+  if (!path || !existsSync4(path))
+    return null;
+  const events = parseJson(readFileSync5(path, "utf8"), "execution_file");
+  const list = Array.isArray(events) ? events : [events];
+  for (const e of list) {
+    const ev = e;
+    if (ev?.type === "result" && (ev.terminal_reason === "api_error" || ev.api_error_status)) {
+      return ev.api_error_status ?? 0;
+    }
+  }
+  return null;
 }
 // src/defaults.ts
 var defaults = {
@@ -503,6 +665,8 @@ commands:
   request-changes  /request-changes による差し戻し  --association --body
   block    phase を blocked にする            --reason
   label    いま付いているべきラベルを返す
+  validate 成果物が契約を満たすか検証し Outcome を返す
+             --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -518,10 +682,14 @@ var { positionals, values } = parseArgs({
     result: { type: "string" },
     verdict: { type: "string" },
     "api-error-status": { type: "string" },
+    detail: { type: "string" },
     oversize: { type: "boolean", default: false },
     "acceptance-passed": { type: "boolean", default: false },
     "session-id": { type: "string" },
     association: { type: "string" },
+    "agent-failed": { type: "boolean", default: false },
+    "execution-file": { type: "string" },
+    "changed-files": { type: "string" },
     body: { type: "string" },
     reason: { type: "string" }
   }
@@ -542,7 +710,8 @@ var outcome = () => ({
   verdict: values.verdict ?? null,
   oversize: values.oversize,
   acceptance_passed: values["acceptance-passed"],
-  api_error_status: values["api-error-status"] ? Number(values["api-error-status"]) : null
+  api_error_status: values["api-error-status"] ? Number(values["api-error-status"]) : null,
+  detail: values.detail
 });
 var run = () => {
   switch (command) {
@@ -578,6 +747,16 @@ var run = () => {
       return blockRun({ dir, config: defaults, reason: need(values.reason, "reason") });
     case "label":
       return labelRun({ dir, config: defaults });
+    case "validate":
+      return validateRun({
+        dir,
+        config: defaults,
+        agent: need(values.agent, "agent"),
+        agent_failed: values["agent-failed"],
+        execution_file: values["execution-file"] ?? null,
+        changed_files: values["changed-files"] ? readFileSync6(values["changed-files"], "utf8").split(`
+`).filter(Boolean) : []
+      });
     default:
       console.error(`不明なコマンド: ${command ?? "(なし)"}
 
