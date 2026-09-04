@@ -148,13 +148,20 @@ jobs:
           JSON
           }
 
+          # reviews/<kind>-NN.md の数を数える。
+          # ls をパイプに繋ぐと、一致するファイルが無いとき pipefail で失敗し
+          # set -e がステップを殺す。glob の配列で数えれば失敗しない
+          count_reviews() { # count_reviews <kind>
+            local -a files=("$D/reviews/$1-"*.md)
+            if [ -e "${files[0]}" ]; then echo "${#files[@]}"; else echo 0; fi
+          }
+
           # レビュアーの verdict をシナリオで決める
           review() { # review <kind> <差し戻すか>
             local kind="$1" want_changes="$2"
-            local n=$(( $(ls "$D/reviews/${kind}-"*.md 2>/dev/null | wc -l) + 1 ))
+            local n=$(( $(count_reviews "$kind") + 1 ))
             mkdir -p "$D/reviews"
-            verdict=approve
-            [ "$want_changes" = "yes" ] && verdict=request_changes
+            if [ "$want_changes" = "yes" ]; then verdict=request_changes; else verdict=approve; fi
             printf -- '---\nverdict: %s\nround: %s\nreviewer: %s\n---\n\nダミーレビュー\n' \
               "$verdict" "$n" "$AGENT" > "$D/reviews/${kind}-$(printf '%02d' "$n").md"
           }
@@ -165,10 +172,9 @@ jobs:
               write_acceptance pending null
               ;;
             plan_review)
-              done_rounds=$(ls "$D/reviews/plan-"*.md 2>/dev/null | wc -l)
               want=no
-              [ "$SCENARIO" = "plan-loop" ] && want=yes
-              [ "$SCENARIO" = "plan-changes" ] && [ "$done_rounds" -eq 0 ] && want=yes
+              if [ "$SCENARIO" = "plan-loop" ]; then want=yes; fi
+              if [ "$SCENARIO" = "plan-changes" ] && [ "$(count_reviews plan)" -eq 0 ]; then want=yes; fi
               review plan "$want"
               ;;
             developing)
@@ -177,9 +183,8 @@ jobs:
               write_acceptance passed '"ダミー実行"'
               ;;
             dev_review)
-              done_rounds=$(ls "$D/reviews/dev-"*.md 2>/dev/null | wc -l)
               want=no
-              [ "$SCENARIO" = "dev-changes" ] && [ "$done_rounds" -eq 0 ] && want=yes
+              if [ "$SCENARIO" = "dev-changes" ] && [ "$(count_reviews dev)" -eq 0 ]; then want=yes; fi
               review dev "$want"
               ;;
             completing)
