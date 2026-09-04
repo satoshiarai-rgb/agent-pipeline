@@ -49,6 +49,7 @@
 | K-1 | 中央・配布先とも当面は個人アカウント `satoshiarai-rgb` で検証し、後に組織アカウント（`<org>`）へ移す | Secrets / Variables はリポジトリスコープ、`approvers` は `OWNER` / `COLLABORATOR` |
 | K-2 | `verification: manual` の受け入れ条件は developer が `evidence` 付きで `passed` にし、dev-reviewer が妥当性を照合する | completing の「全 passed」条件が成立する。検証の追加が必要（A-3） |
 | K-3 | モデルは生成・レビュー共に `claude-opus-5` | `defaults.yml`、設計書 §5.7 |
+| K-17 | **ラウンド上限は各 3、`total_steps` は 16**（2026-09-05 に 2 / 12 から変更） | 実機の 1 本目（compass-wiki issue #7）で plan_review が 2 ラウンドを使い切り、人間の差し戻しを 1 回入れた時点で次のレビューが blocked になる状態だった。`total_steps` はラウンド上限から到達しうる最悪（planner 3 + plan-reviewer 3 + developer 3 + dev-reviewer 3 + completion 1 = 13）より大きく取る。先に総数で止まると、止まった理由が「どのレビューが収束しなかったか」として残らない — `src/defaults.ts`、設計書 §7.2 |
 | K-4 | **エージェントは `.github/workflows/**` を変更しない。GitHub App に Workflows 権限を付与しない** | 権限の最小化を維持。ワークフロー変更を要する issue はパイプライン対象外 |
 | K-5 | `agent-work/` は main に残す | 設計書 §10.5 で既決 |
 | K-12 | **人間のコマンドは PR 側のコメントでのみ受け付ける。issue 側は無視する** | 人間が見る対象（`plan.md` / `acceptance.json` / レビュー / コード）はすべて draft PR に集まるため。実装も素直で、**PR 番号から `headRefName`（`claude/issue-<n>`）を引けば run のディレクトリが導出できる**（`route` がブランチ名から決めるのと同じ規則）。issue 番号の逆引きは不要。**依存: bootstrap が draft PR を作る必要がある**（設計書 §6.2、現状のダミーは未実装） |

@@ -6,8 +6,19 @@ describe("defaults", () => {
     expect(defaults.pipeline_version).toBe(1);
     expect(defaults.models.default).toBe("claude-opus-5"); // K-3
     expect(defaults.models.reviewer).toBeNull();
-    expect(defaults.limits.total_steps).toBe(12);
+    expect(defaults.limits.plan_review_rounds).toBe(3);
+    expect(defaults.limits.dev_review_rounds).toBe(3);
+    expect(defaults.limits.total_steps).toBe(16);
     expect(defaults.approvers).toEqual(["OWNER", "COLLABORATOR"]); // K-1
+  });
+
+  test("total_steps はラウンド上限から到達しうる最悪より大きい", () => {
+    // 先に総数で止まると「どのレビューが収束しなかったか」が残らない。
+    // 最悪 = (planner + plan-reviewer) * plan_review_rounds
+    //      + (developer + dev-reviewer) * dev_review_rounds + completion 1 回
+    const { plan_review_rounds, dev_review_rounds, total_steps } = defaults.limits;
+    const worst = 2 * plan_review_rounds + 2 * dev_review_rounds + 1;
+    expect(total_steps).toBeGreaterThan(worst);
   });
 
   test("ツールプロファイルは 2 本だけ（A-30）", () => {

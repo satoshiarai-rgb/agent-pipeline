@@ -44,19 +44,22 @@ describe("finishRun: 遷移", () => {
     const dir = makeRun("plan_review");
     const f = runOnce(dir, "plan-reviewer", { result: "ok", verdict: "request_changes" });
     expect(f.phase).toBe("planning");
-    expect(f.reason).toContain("1/2");
+    expect(f.reason).toContain(`1/${c.limits.plan_review_rounds}`);
   });
 
-  test("ラウンド上限は今回の実行を含めて数える（2 回目の差し戻しで blocked）", () => {
+  test("ラウンド上限は今回の実行を含めて数え、上限回目の差し戻しで blocked", () => {
+    const limit = c.limits.plan_review_rounds;
     const dir = makeRun();
-    runOnce(dir, "planner", { result: "ok" });
-    expect(runOnce(dir, "plan-reviewer", { result: "ok", verdict: "request_changes" }).phase).toBe(
-      "planning",
-    );
+    // 上限の 1 つ前までは planning に戻り続ける
+    for (let round = 1; round < limit; round++) {
+      runOnce(dir, "planner", { result: "ok" });
+      const back = runOnce(dir, "plan-reviewer", { result: "ok", verdict: "request_changes" });
+      expect(back.phase, `round ${round}`).toBe("planning");
+    }
     runOnce(dir, "planner", { result: "ok" });
     const f = runOnce(dir, "plan-reviewer", { result: "ok", verdict: "request_changes" });
     expect(f.phase).toBe("blocked");
-    expect(f.blocked_reason).toContain("plan_review_rounds_exceeded: 2/2");
+    expect(f.blocked_reason).toContain(`plan_review_rounds_exceeded: ${limit}/${limit}`);
     expect(f.continue_chain).toBe(false);
     expect(phaseOf(dir).blocked_reason).toContain("plan_review_rounds_exceeded");
   });

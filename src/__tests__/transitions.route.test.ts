@@ -46,10 +46,12 @@ describe("route", () => {
   });
 
   test("total_steps 上限で block を返す", () => {
-    const records = Array.from({ length: 12 }, () => rec("planner"));
+    const records = Array.from({ length: c.limits.total_steps }, () => rec("planner"));
     const r = route({ phase: "planning", records, config: c });
     expect(r.action).toBe("block");
-    expect(r.reason).toContain("total_steps_exceeded: 12/12");
+    expect(r.reason).toContain(
+      `total_steps_exceeded: ${c.limits.total_steps}/${c.limits.total_steps}`,
+    );
   });
 
   test("導出値（total_steps と rounds）を返す", () => {
