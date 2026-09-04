@@ -11,6 +11,7 @@
 #   本番の入口:
 #     issue に agent:go ラベルを付ける → bootstrap（ラベルの付与には write / triage が必要）
 #     draft PR にコメント → /agent approve、/agent request-changes <理由>
+#   dry run の切り替え: gh variable set AGENT_DRY_RUN --body false（未設定ならダミー）
 #   手動起動（シナリオを変えて試すため。C-1 以降も残す）:
 #     op=bootstrap issue=1 scenario=plan-loop
 #     op=approve   issue=1
@@ -66,7 +67,7 @@ jobs:
     with:
       issue: ${{ github.event.issue.number }}
       actor: ${{ github.actor }}
-      scenario: happy # dry run のダミーエージェントの振る舞い
+      scenario: happy # dry run のダミーの振る舞い（本物のエージェントは見ない）
     secrets: inherit
 
   # 手動起動: シナリオを変えて試すため
@@ -102,9 +103,18 @@ jobs:
       issue: ${{ inputs.issue }}
     secrets: inherit
 
+  # push は workflow_dispatch の入力を受け取れないので、リポジトリ変数で呼び分ける。
+  # with: の中では式を使わない（値は literal にして if: で切り替える）
   dispatch:
-    if: github.event_name == 'push'
+    if: github.event_name == 'push' && vars.AGENT_DRY_RUN != 'false'
     uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@main
     with:
-      dry_run: true # エージェントを呼ばずダミー成果物で配線を確認する
+      dry_run: true
+    secrets: inherit
+
+  dispatch-live:
+    if: github.event_name == 'push' && vars.AGENT_DRY_RUN == 'false'
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@main
+    with:
+      dry_run: false
     secrets: inherit

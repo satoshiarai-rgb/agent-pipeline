@@ -259,6 +259,55 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 既定プロンプト 5 本は中央の `prompts/<agent>.md` にある。したがって以下の各ステップでやることは
 「そのエージェントを `dry_run: false` で走らせ、成果物の質を見てプロンプトを直す」ことに絞られる。
 
+### Step D-0: 実機確認の手順（配線 → 本物）
+
+配布先は `satoshiarai-rgb/compass-wiki`。`dry_run` はリポジトリ変数 `AGENT_DRY_RUN` で
+切り替える（未設定なら dry run。`work/verify/check-dispatch.yml` を配布先にコピーしておく）。
+
+**段 1: dry run で 1 周（トークン消費なし）**
+
+```
+gh variable delete AGENT_DRY_RUN --repo satoshiarai-rgb/compass-wiki   # 未設定 = dry run
+gh issue create --repo satoshiarai-rgb/compass-wiki --title "ダミー: D-0 の配線確認" --body "..."
+gh issue edit <n> --repo satoshiarai-rgb/compass-wiki --add-label agent:go
+```
+
+見るところ（I-9d で tail が変わったので、ここまでは同じ経路を通る）:
+
+- bootstrap が `agent-work/issue-<n>/issue.md` を作っている（新しく足した / I-9d）
+- run job の `compose` ステップの出力 `role_prompt` が中央の `prompts/<agent>.md` を指している
+- `outcome` ステップのサマリーに「変更ファイル数」が出ていて、developing のときだけ 1 以上になる
+- `validate` の `result` が `ok`。planning で `invalid` になるならダミーの `plan.md` の
+  `## 規模判定` が届いていない
+- `done` まで進み、ラベルが `agent:done` になり draft PR が ready になる
+
+**段 2: 本物のエージェントで `awaiting_human` まで（planner + plan-reviewer の 2 実行）**
+
+```
+gh variable set AGENT_DRY_RUN --body false --repo satoshiarai-rgb/compass-wiki
+gh issue create --repo satoshiarai-rgb/compass-wiki --title "<小さな実タスク>" --body "..."
+gh issue edit <n> --repo satoshiarai-rgb/compass-wiki --add-label agent:go
+```
+
+承認しなければ `awaiting_human` で止まるので、ここで一度切れる。見るところ:
+
+- `claude_args` が引用ごと壊れずに渡っている（`--tools` の値がそのまま 1 引数になっているか）
+- `execution_file` / `session_id` の出力名が実在する（`runs/*.json` の `session_id` が埋まるか）
+- `plan.md` に `## 規模判定` があり、`acceptance.json` が契約の形になっている
+- `reviews/plan-01.md` の frontmatter に `verdict` がある。本文が次の planner に渡せる粒度か
+- planner が `agent-work/` の外を書き換えていない（読み取り専用プロファイルの確認）
+
+**段 3: 承認して developer 以降（3 実行）**
+
+draft PR に `/agent approve` とコメントする。見るところ:
+
+- `.agent/setup.sh` が無い配布先でも run job が落ちない
+- developer の差分が `agent-work/` の外にある。`acceptance.json` の `passed` に `evidence` がある
+- dev-reviewer が差分を読めている（`git diff origin/HEAD...HEAD` が空でない）
+- completion が `completion.md` を書き、`done` になる
+
+サブスクの 5 時間枠はローカルの Claude Code と共有される（V-13）。段 2 と段 3 は分けて回す。
+
 ### Step D-1: planner だけを本物にする
 
 - **学ぶ概念**: `base-action` への入力、プロンプトの組み立て、成果物の検証
