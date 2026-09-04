@@ -250,6 +250,23 @@ jobs:
           SCENARIO=$(cat "$D/scenario")
           verdict=""
 
+          # acceptance.json を書く。heredoc の終端子は run ブロックの基準インデントに置く
+          # （case の内側に書くと字下げが残って heredoc が閉じない）
+          write_acceptance() { # write_acceptance <status> <evidence(JSON 値)>
+          cat > "$D/acceptance.json" <<JSON
+          {
+            "criteria": [
+              {
+                "id": "AC-1",
+                "description": "ダミー",
+                "verification": "manual",
+                "status": "$1",
+                "evidence": $2
+              }
+            ]
+          }
+          JSON
+          }
           # レビュアーの verdict をシナリオで決める。
           # plan-changes / dev-changes は 1 回だけ差し戻し、plan-loop は常に差し戻す
           review() { # review <kind> <差し戻す条件>
@@ -265,19 +282,7 @@ jobs:
           case "$PHASE" in
             planning)
               echo "# ダミー計画" > "$D/plan.md"
-              cat > "$D/acceptance.json" <<'JSON'
-              {
-                "criteria": [
-                  {
-                    "id": "AC-1",
-                    "description": "ダミー",
-                    "verification": "manual",
-                    "status": "pending",
-                    "evidence": null
-                  }
-                ]
-              }
-              JSON
+              write_acceptance pending null
               ;;
             plan_review)
               first=$([ -d "$D/reviews" ] && ls "$D/reviews/plan-"*.md 2>/dev/null | wc -l || echo 0)
@@ -289,19 +294,7 @@ jobs:
             developing)
               mkdir -p dummy-src
               date -u > "dummy-src/change-${GITHUB_RUN_ID}.txt"
-              cat > "$D/acceptance.json" <<'JSON'
-              {
-                "criteria": [
-                  {
-                    "id": "AC-1",
-                    "description": "ダミー",
-                    "verification": "manual",
-                    "status": "passed",
-                    "evidence": "ダミー実行"
-                  }
-                ]
-              }
-              JSON
+              write_acceptance passed '"ダミー実行"'
               ;;
             dev_review)
               first=$(ls "$D/reviews/dev-"*.md 2>/dev/null | wc -l || echo 0)
