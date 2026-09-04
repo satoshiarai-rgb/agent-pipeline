@@ -1,0 +1,159 @@
+# 中央: PR のコメントで人間の指示を受ける（reusable workflow）
+#
+# 承認と差し戻しは PR 側のコメントでのみ受け付ける（K-12）。
+# 人間が見る対象（plan.md / acceptance.json / reviews / コード）はすべて PR に集まるため。
+#
+# コマンドは名前空間付き（K-13）:
+#   /agent approve
+#   /agent request-changes <理由>
+#
+# コメント本文は人間が書いた任意の文字列なので、シェルには必ず env 経由で渡す
+# （run: の中に ${{ }} で展開するとコマンド注入になる）。
+
+name: comment
+
+on:
+  workflow_call:
+    inputs:
+      pr:
+        description: PR 番号
+        required: true
+        type: string
+      body:
+        description: コメント本文
+        required: true
+        type: string
+      association:
+        description: コメント投稿者の author_association
+        required: true
+        type: string
+
+permissions:
+  contents: write
+  pull-requests: write
+
+jobs:
+  comment:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/create-github-app-token@v3
+        id: app
+        with:
+          client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
+          private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+
+      - name: コマンドと run のディレクトリを取り出す
+        id: parse
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          BODY: ${{ inputs.body }}
+          PR: ${{ inputs.pr }}
+        run: |
+          set -euo pipefail
+          # 1 行目だけをコマンドとして読む（本文の続きは理由として使う）
+          FIRST=$(printf '%s' "$BODY" | head -1)
+          CMD=$(printf '%s' "$FIRST" | awk '{print $2}')
+          # /agent <command> の後ろ全部を理由とする（改行も含む）
+          REASON=$(printf '%s' "$BODY" | sed -E '1s@^/agent[[:space:]]+[a-z-]+[[:space:]]*@@')
+
+          # PR のブランチから run のディレクトリを決める（route と同じ規則 / K-12）
+          BR=$(gh pr view "$PR" --json headRefName -q .headRefName)
+          case "$BR" in
+            claude/*) ;;
+            *)
+              echo "::warning::$BR はパイプラインのブランチではない"
+              echo "command=none" >> "$GITHUB_OUTPUT"
+              exit 0
+              ;;
+          esac
+
+          # 差し戻しは理由が無いと planner が何を直すか分からないまま再走する（設計書 §3.2）
+          if [ "$CMD" = "request-changes" ] && [ -z "$(printf '%s' "$REASON" | tr -d '[:space:]')" ]; then
+            echo "::warning::理由が空の request-changes は受け付けない"
+            echo "command=no-reason" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          echo "command=$CMD" >> "$GITHUB_OUTPUT"
+          echo "branch=$BR" >> "$GITHUB_OUTPUT"
+          echo "dir=agent-work/${BR#claude/}" >> "$GITHUB_OUTPUT"
+          {
+            echo "reason<<REASON_EOF"
+            printf '%s\n' "$REASON"
+            echo "REASON_EOF"
+          } >> "$GITHUB_OUTPUT"
+
+      - uses: actions/checkout@v7
+        if: steps.parse.outputs.command == 'approve' || steps.parse.outputs.command == 'request-changes'
+        with:
+          token: ${{ steps.app.outputs.token }}
+          ref: ${{ steps.parse.outputs.branch }}
+
+      - name: git identity を App の bot にする
+        if: steps.parse.outputs.command == 'approve' || steps.parse.outputs.command == 'request-changes'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          SLUG: ${{ steps.app.outputs.app-slug }}
+        run: |
+          set -euo pipefail
+          BOT_ID=$(gh api "/users/${SLUG}[bot]" --jq .id)
+          git config user.name "${SLUG}[bot]"
+          git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
+
+      # ---- /agent approve
+      - id: approve
+        if: steps.parse.outputs.command == 'approve'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: approve
+          dir: ${{ steps.parse.outputs.dir }}
+          association: ${{ inputs.association }}
+
+      # ---- /agent request-changes <理由>
+      - id: request_changes
+        if: steps.parse.outputs.command == 'request-changes'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: request-changes
+          dir: ${{ steps.parse.outputs.dir }}
+          association: ${{ inputs.association }}
+          body: ${{ steps.parse.outputs.reason }}
+
+      - name: 遷移を push して PR に結果を返す
+        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ inputs.pr }}
+          CMD: ${{ steps.parse.outputs.command }}
+          PHASE: ${{ steps.approve.outputs.phase || steps.request_changes.outputs.phase }}
+        run: |
+          set -euo pipefail
+          git add -A
+          git commit -m "agent: $CMD -> $PHASE"
+          git push
+          gh pr comment "$PR" --body "\`/agent $CMD\` を受け付けました。次のフェーズは \`$PHASE\` です。"
+
+      - name: 受け付けられなかった理由を PR に返す
+        if: |
+          steps.parse.outputs.command != 'none' &&
+          steps.approve.outputs.ok != 'true' &&
+          steps.request_changes.outputs.ok != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          PR: ${{ inputs.pr }}
+          CMD: ${{ steps.parse.outputs.command }}
+          REASON: ${{ steps.approve.outputs.reason || steps.request_changes.outputs.reason }}
+        run: |
+          set -euo pipefail
+          case "$CMD" in
+            no-reason)
+              gh pr comment "$PR" --body "差し戻すときは理由を書いてください: \`/agent request-changes <理由>\`。理由はレビューとして残り、次の計画に反映されます。"
+              ;;
+            approve | request-changes)
+              gh pr comment "$PR" --body "コマンドを受け付けませんでした: \`$REASON\`"
+              ;;
+            *)
+              gh pr comment "$PR" --body "\`$CMD\` は知らないコマンドです。使えるのは \`/agent approve\` と \`/agent request-changes <理由>\` です。"
+              ;;
+          esac

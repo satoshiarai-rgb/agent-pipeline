@@ -10,11 +10,12 @@
 # 使い方:
 #   本番の入口:
 #     issue に agent:go ラベルを付ける → bootstrap（ラベルの付与には write / triage が必要）
+#     draft PR にコメント → /agent approve、/agent request-changes <理由>
 #   手動起動（シナリオを変えて試すため。C-1 以降も残す）:
 #     op=bootstrap issue=1 scenario=plan-loop
 #     op=approve   issue=1
 #
-# C-2 で PR コメント（/agent approve、/agent request-changes）を入口に足す。
+# C-3 でラベルの射影（agent:planning など）と PR の ready 化を足す。
 
 name: check-dispatch
 
@@ -36,6 +37,8 @@ on:
         options: [happy, plan-changes, dev-changes, plan-loop]
   issues:
     types: [labeled]
+  issue_comment:
+    types: [created]
   push:
     branches: ["claude/**"]
     paths: ["agent-work/**"]
@@ -69,7 +72,23 @@ jobs:
       scenario: ${{ inputs.scenario }}
     secrets: inherit
 
-  approve:
+  # 本番の入口: PR のコメントで承認・差し戻しを受ける（K-12 / K-13）
+  # issue 側のコメントは pull_request == null で弾く。bot も無視する（A-37）
+  comment:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      github.event.comment.user.type != 'Bot' &&
+      startsWith(github.event.comment.body, '/agent ')
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/comment.yml@main
+    with:
+      pr: ${{ github.event.issue.number }}
+      body: ${{ github.event.comment.body }}
+      association: ${{ github.event.comment.author_association }}
+    secrets: inherit
+
+  # 手動起動: PR を作らずに承認だけ試すため
+  approve-manual:
     if: github.event_name == 'workflow_dispatch' && inputs.op == 'approve'
     uses: satoshiarai-rgb/agent-pipeline/.github/workflows/approve.yml@main
     with:
