@@ -13,6 +13,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `work/agent-pipeline-design.md` | 設計書 v1.0。仕様の正 |
 | `work/github-actions-architecture.md` | 設計書 §6 を GitHub Actions の実装レベルに落としたもの。設計書との食い違いは同文書 §9 に列挙 |
 | `work/worklist.md` | 残作業の台帳。確定した判断（§0）、文書修正、検証、実装、未決事項 |
+| `work/agent-contract.md` | **エージェントの入力と出力の契約。** プロンプトは配布先で差し替えられるが、この契約を満たさない出力は `blocked` になる |
 | `work/steps.md` | 段階的な実装手順。Actions の用語解説（§0）とフェーズ A〜E の 15 ステップ |
 | `work/verify/step-a1/check-wif.yml` | Step A-1 の検証ワークフロー原本。検証用リポジトリにコピーして使う |
 
@@ -22,6 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 `work/worklist.md` §0 が正。特に振る舞いに影響するもの:
 
+- **プロンプトは配布先で差し替えられる（`.agent/prompts/<agent>.md`）。中央は既定を提供する。** 契約（入力と出力）は `work/agent-contract.md` にあり、`validate` が強制する
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
 - **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない
 - モデルは生成・レビュー共に `claude-opus-5`
