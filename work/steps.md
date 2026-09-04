@@ -191,7 +191,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 - **完了条件**: ワークフロー本体が `uses:` の並びだけになる
 - 対応: worklist I-4、I-5、A-9、A-10、V-10
 
-### Step B-4: reusable workflow にする
+### Step B-4: reusable workflow にする ✅ 完了（2026-09-04）
 
 - **学ぶ概念**: `on: workflow_call`、`jobs.<id>.uses`、`needs` と job 間 outputs、reusable workflow の権限の継承
 - **やること**: 配布先の 343 行を中央の reusable workflow 3 本に移し、ラッパーを 69 行にする
@@ -201,7 +201,11 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
     導入するときトークンを使わず配線を確認できるので、検証用の足場としてだけでなく
     本番でも役に立つ**（設計書 §9-9「小さな issue で 1 本通す」）
 - **確認**: `route` の outputs が `run` に渡る。`route` が `agent=none` を返したとき `run` が skip される
-- **完了条件**: 呼ぶ側が「イベントを振り分けるだけ」になる
+- **完了条件**: 呼ぶ側が「イベントを振り分けるだけ」になる → **達成**（配布先 69 行 / 中央 366 行）
+  - `bootstrap` → `awaiting_human` → 承認 → `done` まで、B-2 の 343 行版と同じ挙動で完走
+  - **`secrets: inherit` で App の認証情報が中央の reusable workflow に渡ることを確認**（設計書 §8 の前提）
+  - `route` → `run` の job outputs が reusable workflow の内部で渡ることを確認
+  - 効果が早速出た: `pipefail` の修正を中央だけに入れ、配布先を触らずに反映できた
 - **注意**: job を分けた瞬間に「ファイルは job をまたがない」が効いてくる。`route` は状態を読むだけ、`run` が改めて checkout する
 - 対応: worklist I-6
 

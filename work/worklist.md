@@ -115,7 +115,9 @@
 
 ### 中央リポジトリ作成後
 
-- [ ] V-7: 別リポジトリの reusable workflow を `uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@v1` で呼ぶ経路を確認する。**個人アカウント内に配布先役の検証用リポジトリを 1 つ用意して行う**（K-6）。private の場合、個人アカウントでは org の「Accessible from repositories in the organization」に相当する設定が無く、private リポジトリの reusable workflow は他リポジトリから参照できない。中央を public にするか、検証中は同一リポジトリ内で完結させるかの判断が必要 — スモーク §未確認 3、構成案 §8.1
+- [x] V-7: **別リポジトリの reusable workflow を `uses:` で呼べることを確認した（2026-09-04、Step B-4）**。中央を public にしたため個人アカウントでも参照できる（private のままでは org の「Accessible from repositories」に相当する設定が無く参照できない）。`jobs.<id>.uses` で bootstrap / approve / dispatch の 3 本を呼び分ける形で動作
+- [x] V-8: **`secrets: inherit` で配布先のリポジトリ Secrets が中央の reusable workflow に渡ることを確認した（2026-09-04）**。App トークンでの push が全フェーズで成功。設計書 §8「配布先ごとに Secrets を設定しない」の前提が成立
+- [ ] V-7b: 別リポジトリの reusable workflow を `uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@v1` で呼ぶ経路を確認する。**個人アカウント内に配布先役の検証用リポジトリを 1 つ用意して行う**（K-6）。private の場合、個人アカウントでは org の「Accessible from repositories in the organization」に相当する設定が無く、private リポジトリの reusable workflow は他リポジトリから参照できない。中央を public にするか、検証中は同一リポジトリ内で完結させるかの判断が必要 — スモーク §未確認 3、構成案 §8.1
 - [ ] V-8: `secrets: inherit` で配布先のリポジトリ Secrets が中央の reusable workflow に渡ることを確認する（V-7 と同時）。App は検証用の 2 リポジトリ両方にインストールする
 - [ ] V-9: reusable workflow 内で取得した OIDC トークンの `job_workflow_ref` の実値を確認し、V-1 で確定した CEL 条件と一致することを確かめる — スモーク §未確認 4
 - [ ] V-11: **（Console 取得後に延期）** CEL `condition` から `job_workflow_ref` を参照できるかを実機で確認する。ルールを 1 本作り、reusable workflow 経由の交換が成功するか / `condition` を偽にしたときに拒否されるかを見る。案B の採否はこの結果次第（A-27） — V-1
