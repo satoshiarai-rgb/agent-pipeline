@@ -23,6 +23,17 @@
 - 本番経路: `dispatch.yml` の `run` job が `compose` → `base-action` → `validate` → `finish` を通す。
   `dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）
 
+**dry run の一巡は実機で確認済み（2026-09-05、issue #5）**。planner → plan-reviewer →
+`awaiting_human` → PR コメント `/agent approve` → developer → dev-reviewer → completion → `done`。
+5 つの実行レコードすべてが `result: ok`、`compose` は中央の既定プロンプトを解決し、
+`validate` は 5 フェーズすべてで `ok`、`issue.md` も作られた。`dispatch-live` は skip され二重起動なし。
+
+**段 2（本物のエージェント）の 1 回目は `blocked` で止まった（issue #7）**。原因はハーネス側で、
+`--tools` だけではツールを使える状態にするだけで書き込みの許可にならず、planner が
+`permission_denials_count: 3` で `plan.md` を書けなかった（A-24 を実機で確定。`--allowed-tools` を
+足して修正済み）。あわせて `session_id` / `execution_file` の出力名が実在することと、
+`claude_args` が壊れずに渡ることを確認した。契約違反が `blocked_reason` に残る経路も本番で効いた。
+
 **次の一手**: フェーズ D。`dry_run: false` で小さな issue を 1 本通し、planner から順に成果物の質を見る
 （配線は I-9d で繋がっているので、ここからの失敗は「プロンプトの質」と、実行時にしか分からない
 入出力名の食い違いに限定される）。先に `dry_run: true` を 1 周させて validate 込みの tail を確認する。
@@ -75,7 +86,7 @@
 - [ ] A-12: `bootstrap.yml` の `gh pr create --body "...\n\n..."` を `--body-file` に変更する。bash のダブルクォート内では `\n` がリテラルとして入る — 構成案 §4.1
 - [ ] A-13: **PR 側のコメントだけを受け付ける（K-12）。** 配布先の `if` を `github.event.issue.pull_request != null` にし、中央の `approve.yml` は PR 番号から `headRefName` を引いて run のディレクトリを導出する（`agent-work/${branch#claude/}`）。issue 側のコメントは無視する。以前の記述: `issue_comment` は PR でも発火し、そのとき `github.event.issue.number` は PR 番号になるため、`approve.yml` の `ref: claude/issue-<number>` が存在しないブランチを引いてジョブが落ちる。PR 経由の `/approve` を受け付けるなら PR 番号 → issue の逆引きを実装する（どちらを採るか要決定、Q-1） — 構成案 §3 / §4.3
 - [ ] A-14: stale 検知の巡回を追加する。`run` job が job タイムアウトで落ちると `finalize` が走らず、`last_run.finished_at` が `null` のまま誰も push しないため run が無音で停止する。中央に `stale.yml`（`schedule` 起動、`started_at` が閾値超過かつ `finished_at` が null の run を `blocked` にしてコメント）を追加し、配布先 `agent.yml` から呼ぶ — 構成案 §4.2、設計書 §6.4 手順 4
-- [ ] A-15: 構成案 §10-2 の懸念を削除する。step / job の `timeout-minutes` は `needs` を含む式を許すため、固定値への丸めは不要（V-10 で実機確認する）
+- [ ] A-15: 構成案 §10-2 の懸念を削除する。step / job の `timeout-minutes` は `needs` を含む式を許すため、固定値への丸めは不要（V-10 / V-10b で実機確認済み）。**あわせて「式の中で計算しない」を明記する** — GitHub の式に算術演算子は無く、`fromJSON(...) + 10` は reusable workflow の呼び出し側もろとも startup failure にする。計算はハーネスの出力（`job_timeout_minutes`）で渡す
 - [ ] A-16: 設計書 §5.1 から `state.yml` の `pr` フィールドを削除し、PR 番号は `gh pr list --head` で導出すると書き換える。構成案 §9 で決めた内容の設計書側への反映 — 構成案 §9
 - [ ] A-17: 設計書 §4.1 の `run.yml` を廃止し、`dispatch.yml` の `run` job + composite 構成に置き換える。構成案 §9 の反映 — 構成案 §9
 
@@ -88,7 +99,7 @@
 - [ ] A-21: `blocked` からの復旧時に `total_steps` / `rounds` をどう扱うか決める。上限で止まった run は `phase` を戻すだけでは即再 blocked になる — 設計書 §7.2
 - [ ] A-22: コミットメッセージ形式の所有者を決める。ハーネスが `agent: <agent> -> <phase>` で固定するのか、`conventions.md` の規約に従わせるのか — 構成案 §5.5、設計書 §5.8
 - [ ] A-23: プロンプトと成果物の記述言語を明記する（日本語を既定とする想定） — 設計書 §4.1
-- [ ] A-24: ツール制限の指定を整理する（**前回の指摘を訂正**）。`--allowedTools` は「確認を求めずに実行してよいツール」の列挙だが、**action の非対話実行では既定の権限モードにより、許可されていないツールは拒否される**ため、実質的に付与リストとして機能する（公式ドキュメントも「必要なツールを `--allowedTools` か `permissions.allow` で付与するまで Claude はシェルにも GitHub API にもアクセスできない」と明記）。したがって構成案 §6 の `allowed_tools` の方針自体は妥当。**加えて** planner / plan-reviewer には `--disallowed-tools "Bash"` を明示して二重に塞ぐ（付与漏れではなく明示的な拒否にする） — V-3、構成案 §6
+- [x] A-24: **実機で確定した（2026-09-05）。ツールの指定は 3 つの役割に分かれる。** `--tools` は使える状態にするか、`--allowed-tools` は確認を求めずに実行してよいか、`--disallowed-tools` は明示的な拒否。**`--tools` だけでは足りない**: planner に `--tools Read,Glob,Grep,Write` のみを渡した実行（compass-wiki issue #7）は 14 ターン動いた末に `permission_denials_count: 3` で `plan.md` を書けず `invalid` になった。ハーネスは同じ集合を `--tools` と `--allowed-tools` の両方に渡し、Bash を持たないプロファイルには `--disallowed-tools Bash` を重ねる（`src/utils/resolve-agent.ts`）。以前の記述: ツール制限の指定を整理する（**前回の指摘を訂正**）。`--allowedTools` は「確認を求めずに実行してよいツール」の列挙だが、**action の非対話実行では既定の権限モードにより、許可されていないツールは拒否される**ため、実質的に付与リストとして機能する（公式ドキュメントも「必要なツールを `--allowedTools` か `permissions.allow` で付与するまで Claude はシェルにも GitHub API にもアクセスできない」と明記）。したがって構成案 §6 の `allowed_tools` の方針自体は妥当。**加えて** planner / plan-reviewer には `--disallowed-tools "Bash"` を明示して二重に塞ぐ（付与漏れではなく明示的な拒否にする） — V-3、構成案 §6
 - [ ] A-25: `base-action` に `github_token` 入力が無い前提を書く。`gh` を使う処理はすべてハーネス step 側で `GH_TOKEN` を渡して行い、**エージェント step には `GH_TOKEN` を渡さない**（エージェントが GitHub を直接操作できないようにし、露出面を減らす） — V-2、構成案 §1-3
 - [ ] A-26: `anthropic_oidc_audience` に `https://api.anthropic.com` を設定し、ルールの `match.audience` と一致させる。あわせて `ANTHROPIC_API_KEY` が job の環境に存在しないことを保証する（API キーは federation より優先され、静かに上書きする） — V-1
 - [ ] A-29: **Console 取得後の認証差し替えチェックリスト**を用意する（K-7）。(1) `claude_code_oauth_token` 入力を `anthropic_federation_rule_id` / `anthropic_organization_id` / `anthropic_service_account_id` に置き換える (2) workflow に `id-token: write` を追加する（**caller 側**に必要） (3) `CLAUDE_CODE_OAUTH_TOKEN` Secret を削除する（残っていると federation より優先され、action は警告して素通りする） (4) 識別子は Secrets ではなく Variables に置く (5) Step A-1 / A-2 を `wif.yml` で再実行する — K-7、設計書 §2.1
@@ -157,7 +168,8 @@
   - 副産物: action は Claude セッションの env から `ACTIONS_ID_TOKEN_REQUEST_URL` / `ACTIONS_ID_TOKEN_REQUEST_TOKEN` を削除する（`base-action/src/parse-sdk-options.ts`）。**エージェント自身は新しい OIDC トークンを発行できない**ため、露出面はその分小さい
   - 残るのは実機 1 回の確認のみ（Step A-2）。**上限時間の再設計は不要**になった
 - [x] V-10: **composite action から `$GITHUB_ACTION_PATH` でリポジトリの他ファイルに到達できることを実機で確認した（2026-09-04）**。`action.yml` をリポジトリのルートに置く形にしたため `$GITHUB_ACTION_PATH` がリポジトリ root を指し、`dist/cli.js` に直接届く（階層を数える必要がない）。step / job の `timeout-minutes` に式が使えることも Step B-2 の実行で確認済み
-- [ ] V-10b: composite action から `$GITHUB_ACTION_PATH/../../..` で中央リポジトリの他ファイルに到達できることを確認する（A-10 で修正したパスで）。あわせて step / job の `timeout-minutes` に式が使えることを確認する — スモーク §未確認 5、構成案 §10-2 / §10-5
+- [x] V-10b: **中央の他ファイルに action の展開先から到達できることを実機で確認した（2026-09-05）。** `compose` の出力 `role_prompt` が `/home/runner/work/_actions/satoshiarai-rgb/agent-pipeline/main/prompts/developer.md` を指した。`action.yml` をリポジトリ root に置いたので `$GITHUB_ACTION_PATH` がリポジトリ root で、`prompts/` にも `dist/` にも階層を数えずに届く（A-10 の `../../..` は不要）。**中央を別途 checkout せずにプロンプトを読める**
+  - あわせて step / job の `timeout-minutes` に `needs` を含む式が使えることも確認した（`fromJSON(needs.route.outputs.job_timeout_minutes)`）。ただし**式に算術演算子は無い**（`+ 10` は startup failure。4df31ce で加算をハーネスに移した）
 
 ---
 
@@ -232,7 +244,7 @@
 - [x] Q-1: **決定（K-12）。PR 側のコメントのみを受け付ける。** issue テンプレートと draft PR 本文に、承認・差し戻しは PR 側で行うことと使えるコマンドを書く
 - [x] Q-2: **決定（K-14）。同一 issue の 2 周目は行わず、新しい issue を起票する。** bootstrap の冪等な no-op をそのまま仕様とする
 - [ ] Q-3: `pipeline_version` はメジャーのみで、配布先は移動タグ `@v1` を参照する。v1 内のプロンプト変更が進行中の run の途中から混ざることを許容するか — 構成案 §8.4
-- [ ] Q-7: **`invalid`（契約違反）のときエージェントに直す機会を与えるか。** 現状は `validate` が `invalid` を返すと即 `blocked` で終端になり、復旧は人間が `state.json` を書き換えて push するしかない。しかも `compose` の入力に `state.json` を含めないため、`phase` を手で戻しても**エージェントは `blocked_reason` を知らないまま同じ形の成果物を再生成する**（A-39 が人間の差し戻しについて指摘したのと同じ構図で、そちらは `reviews/*.md` に理由を残して解決済み）。案は 2 つ: (a) エージェントが成果物を書いたら自分で `validate` を実行し `ok` になるまで直す。`compose` が `## 自己検証` 節に実行すべき 1 行を書けばプロンプトはパスを知らずに済み、ハーネス側の `validate` は権威として残す（K-16）。ただし planner / plan-reviewer は readonly プロファイルで Bash を持たず、かつ非信頼入力 `issue.md` を読む唯一の 2 つなので、この 2 つに Bash を渡すのは契約 §5 と A-30 の方針変更になる (b) ハーネスが `invalid` の理由を `invalid-NN.md` に書き、同じ phase で 1 回だけ再実行する（回数は `runs/*.json` の `result: "invalid"` の数から導出できるので新しいカウンタは不要）。**判断は I-9c のプロンプトを書いて `dry_run: false` で走らせ、実際にどの契約違反が起きるかを見てから**（2026-09-05 時点は現状維持と決めた） — 契約 §6、A-39
+- [ ] Q-7: **`invalid`（契約違反）のときエージェントに直す機会を与えるか。** 現状は `validate` が `invalid` を返すと即 `blocked` で終端になり、復旧は人間が `state.json` を書き換えて push するしかない。しかも `compose` の入力に `state.json` を含めないため、`phase` を手で戻しても**エージェントは `blocked_reason` を知らないまま同じ形の成果物を再生成する**（A-39 が人間の差し戻しについて指摘したのと同じ構図で、そちらは `reviews/*.md` に理由を残して解決済み）。案は 2 つ: (a) エージェントが成果物を書いたら自分で `validate` を実行し `ok` になるまで直す。`compose` が `## 自己検証` 節に実行すべき 1 行を書けばプロンプトはパスを知らずに済み、ハーネス側の `validate` は権威として残す（K-16）。ただし planner / plan-reviewer は readonly プロファイルで Bash を持たず、かつ非信頼入力 `issue.md` を読む唯一の 2 つなので、この 2 つに Bash を渡すのは契約 §5 と A-30 の方針変更になる (b) ハーネスが `invalid` の理由を `invalid-NN.md` に書き、同じ phase で 1 回だけ再実行する（回数は `runs/*.json` の `result: "invalid"` の数から導出できるので新しいカウンタは不要）。**判断は I-9c のプロンプトを書いて `dry_run: false` で走らせ、実際にどの契約違反が起きるかを見てから**（2026-09-05 時点は現状維持と決めた）。**実機 1 回目の材料**: 最初の `invalid` はプロンプトの質ではなくハーネスの設定ミス（ツールの許可漏れ / A-24）だった。この種の失敗は自己検証でも直せない（エージェントは書き込み自体を拒否されている）ので、(a) の効果は限定的かもしれない — 契約 §6、A-39
 - [ ] Q-4: サービスアカウントの粒度（全リポジトリ共有か、リポジトリごとか）。コスト配賦が必要になるまで共有で開始する想定 — 設計書 §10.2
 - [ ] Q-6: 入力トークンの固定オーバーヘッドをどこまで削るか。V-13 の実測では 1 実行あたり約 17k 入力トークン（`cache_creation` 6056 + `cache_read` 10591）で、**自前のプロンプトは 2 トークン**だった。つまり削減対象はシステムプロンプト preset・ツール定義・skills 一覧であって、プロンプト文の圧縮ではない。手段は V-15（ツール削減）と V-17（preset / skills）。加えて、実運用のコストは固定分より**ターン数 × 再送される履歴**が支配的（developer は `max_turns: 40`）なので、`max_turns` とプロンプトの範囲の方が効く
 - [ ] A-42: **設計書のファイル形式を JSON に更新する（K-11）。** §4.1 の `templates/` 一覧、§5.1（`state.yml` → `state.json`、コメント付き例を JSON に）、§5.2（`acceptance.yml` → `acceptance.json`）、§4.1 の `defaults.yml` → `src/defaults.ts`。あわせて planner / developer のプロンプトに「`acceptance.json` を JSON で書く」ことを明記する（エージェントが書くファイルなので形式の指示が必要）— 実装は完了済み

@@ -264,7 +264,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 配布先は `satoshiarai-rgb/compass-wiki`。`dry_run` はリポジトリ変数 `AGENT_DRY_RUN` で
 切り替える（未設定なら dry run。`work/verify/check-dispatch.yml` を配布先にコピーしておく）。
 
-**段 1: dry run で 1 周（トークン消費なし）**
+**段 1: dry run で 1 周（トークン消費なし）** — 2026-09-05 に issue #5 で完了
 
 ```
 gh variable delete AGENT_DRY_RUN --repo satoshiarai-rgb/compass-wiki   # 未設定 = dry run
@@ -280,6 +280,11 @@ gh issue edit <n> --repo satoshiarai-rgb/compass-wiki --add-label agent:go
 - `validate` の `result` が `ok`。planning で `invalid` になるならダミーの `plan.md` の
   `## 規模判定` が届いていない
 - `done` まで進み、ラベルが `agent:done` になり draft PR が ready になる
+
+段 1 の結果（issue #5）: 上記すべて確認。`role_prompt` は
+`_actions/satoshiarai-rgb/agent-pipeline/main/prompts/<agent>.md`、`prompt_path` は
+`$RUNNER_TEMP/agent-prompt.md`、`setup.sh` が無い配布先では notice を出して通過、
+`validate` は 5 フェーズすべて `ok`、`dispatch-live` は skip（二重起動なし）。
 
 **段 2: 本物のエージェントで `awaiting_human` まで（planner + plan-reviewer の 2 実行）**
 

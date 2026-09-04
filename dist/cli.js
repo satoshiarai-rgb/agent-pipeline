@@ -119,6 +119,7 @@ function claudeArgs(a) {
     `--model ${a.model}`,
     `--max-turns ${a.max_turns}`,
     `--tools ${a.tools}`,
+    `--allowed-tools ${a.tools}`,
     ...denied.map((d) => `--disallowed-tools ${d}`)
   ].join(" ");
 }

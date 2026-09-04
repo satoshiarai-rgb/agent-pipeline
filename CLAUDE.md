@@ -74,4 +74,4 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 
 注意（構成案が誤っている箇所。`work/worklist.md` A-24 で修正予定）:
 
-- **`--allowedTools` はツールの制限ではない。**「確認を求めずに実行してよいツール」の指定であり、非対話実行では実質的に無意味。ツールを絞るには `--tools`（許可リスト）か `--disallowed-tools` を使う
+- **ツールの指定は 3 つの役割に分かれる**（2026-09-05 に実機で確認）。`--tools` はそのツールを使える状態にするか（コンテキストからも消える）、`--allowed-tools` は確認を求めずに実行してよいか、`--disallowed-tools` は明示的な拒否。**`--tools` だけでは書き込みが拒否される** — planner に `--tools Read,Glob,Grep,Write` だけを渡した実行は `permission_denials_count: 3` で `plan.md` を書けなかった。ハーネスは同じ集合を `--tools` と `--allowed-tools` の両方に渡す（`src/utils/resolve-agent.ts`）

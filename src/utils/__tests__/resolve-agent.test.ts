@@ -2,6 +2,8 @@ import { describe, expect, test } from "bun:test";
 import { config } from "../../__tests__/helpers.ts";
 import { resolveAgent } from "../resolve-agent.ts";
 
+const AGENTS = ["planner", "plan-reviewer", "developer", "dev-reviewer", "completion"] as const;
+
 describe("resolveAgent", () => {
   const c = config();
 
@@ -28,9 +30,21 @@ describe("resolveAgent", () => {
   });
 
   test("claude_args は上限とツールをフラグ列にする", () => {
+    // --tools（使える状態にする）と --allowed-tools（確認を求めない）は別の指定で、
+    // 後者が無いと非対話実行では書き込みが拒否される（実機で確認 / A-24）
     expect(resolveAgent(c, "developer").claude_args).toBe(
-      "--model claude-opus-5 --max-turns 40 --tools Read,Glob,Grep,Write,Edit,Bash",
+      "--model claude-opus-5 --max-turns 40" +
+        " --tools Read,Glob,Grep,Write,Edit,Bash" +
+        " --allowed-tools Read,Glob,Grep,Write,Edit,Bash",
     );
+  });
+
+  test("使えるツールと確認を免除するツールは同じ集合", () => {
+    for (const n of AGENTS) {
+      const { claude_args, tools } = resolveAgent(c, n);
+      expect(claude_args, n).toContain(`--tools ${tools}`);
+      expect(claude_args, n).toContain(`--allowed-tools ${tools}`);
+    }
   });
 
   test("Bash を持たないプロファイルには --disallowed-tools を重ねる（A-24）", () => {

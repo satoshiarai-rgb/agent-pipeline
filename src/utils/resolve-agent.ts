@@ -32,9 +32,16 @@ export function resolveAgent(config: Config, agent: AgentName) {
 }
 
 /**
- * `claude_args` に渡すフラグ列。
+ * `claude_args` に渡すフラグ列。ツールの指定は 3 つの役割に分かれる（実機で確認 / A-24）:
  *
- * `--tools` が許可リストで、非対話実行では列挙されていないツールは拒否される（A-24）。
+ *   --tools            そのツールを使える状態にするか（コンテキストからも消える）
+ *   --allowed-tools    確認を求めずに実行してよいか。**非対話実行では実質的に付与リスト**
+ *   --disallowed-tools 明示的な拒否
+ *
+ * `--tools` だけを渡した最初の実機実行（compass-wiki issue #7）では、planner が 14 ターン
+ * 動いた末に `permission_denials_count: 3` で `plan.md` を書けず `invalid` になった。
+ * 使える状態にすることと、確認なしで実行してよいことは別なので、同じ集合を両方に渡す。
+ *
  * その上で、Bash を持たないプロファイルには `--disallowed-tools Bash` を重ねる
  * — 付与漏れではなく明示的な拒否にしておくため（planner と plan-reviewer は
  * 唯一の非信頼入力である issue 本文を読むので、ここは二重に塞ぐ / 契約 §5）。
@@ -45,6 +52,7 @@ function claudeArgs(a: { model: string; max_turns: number; tools: string }): str
     `--model ${a.model}`,
     `--max-turns ${a.max_turns}`,
     `--tools ${a.tools}`,
+    `--allowed-tools ${a.tools}`,
     ...denied.map((d) => `--disallowed-tools ${d}`),
   ].join(" ");
 }
