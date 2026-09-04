@@ -67,7 +67,7 @@ describe("resolveAgent", () => {
     ] as const) {
       expect(() => resolveAgent(c, n)).not.toThrow();
     }
-    expect(c.limits.total_steps).toBe(16);
+    expect(c.limits.total_steps).toBe(24);
     expect(resolveAgent(c, "developer").max_turns).toBe(40);
   });
 });

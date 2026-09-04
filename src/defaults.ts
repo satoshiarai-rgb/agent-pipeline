@@ -45,16 +45,16 @@ export const defaults: Config = {
   },
 
   limits: {
-    plan_review_rounds: 3,
-    dev_review_rounds: 3,
+    plan_review_rounds: 5,
+    dev_review_rounds: 5,
     /**
      * 自走ループの最終防波堤。正常系は 5〜8 実行で終わる。
-     * ラウンド上限（3 + 3）から到達しうる最悪は 13 実行
-     * （planner 3 + plan-reviewer 3 + developer 3 + dev-reviewer 3 + completion 1）。
+     * ラウンド上限（5 + 5）から到達しうる最悪は 21 実行
+     * （planner 5 + plan-reviewer 5 + developer 5 + dev-reviewer 5 + completion 1）。
      * それより上に置くのは、止まった理由が「どのレビューが収束しなかったか」として
      * 残るようにするため。ここで先に止まると総数しか分からない
      */
-    total_steps: 16,
+    total_steps: 24,
   },
 
   /**

@@ -6,9 +6,9 @@ describe("defaults", () => {
     expect(defaults.pipeline_version).toBe(1);
     expect(defaults.models.default).toBe("claude-opus-5"); // K-3
     expect(defaults.models.reviewer).toBeNull();
-    expect(defaults.limits.plan_review_rounds).toBe(3);
-    expect(defaults.limits.dev_review_rounds).toBe(3);
-    expect(defaults.limits.total_steps).toBe(16);
+    expect(defaults.limits.plan_review_rounds).toBe(5);
+    expect(defaults.limits.dev_review_rounds).toBe(5);
+    expect(defaults.limits.total_steps).toBe(24);
     expect(defaults.approvers).toEqual(["OWNER", "COLLABORATOR"]); // K-1
   });
 

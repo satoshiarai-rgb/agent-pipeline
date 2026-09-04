@@ -723,9 +723,9 @@ var defaults = {
     reviewer: null
   },
   limits: {
-    plan_review_rounds: 3,
-    dev_review_rounds: 3,
-    total_steps: 16
+    plan_review_rounds: 5,
+    dev_review_rounds: 5,
+    total_steps: 24
   },
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write",

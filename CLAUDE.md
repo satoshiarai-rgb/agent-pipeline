@@ -44,7 +44,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 - **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧も人間が `state.yml` を書き換えて push するだけで再開する。
 - **遷移判定は `reviews/*.md` の frontmatter `verdict`（`approve` | `request_changes`）のみを見る。** 本文は次のエージェントへの入力。frontmatter が欠落・不正なら `blocked`。
 - **レビュアーには成果物と元 issue のみを渡す。** 生成側のセッションログや思考過程は渡さない（追認を防ぐため）。
-- **停止条件は多層。** フェーズ別ラウンド上限（既定 3）と、その上に自走ループの最終防波堤として `total_steps`（既定 16、正常系 5〜8）。`total_steps` はラウンド上限から到達しうる最悪（13）より大きく取る — 先に総数で止まると「どのレビューが収束しなかったか」が残らないため。認可チェックは入口（bootstrap のラベル付与者、approve のコメント投稿者の `author_association`）のみで、dispatch には掛けない。
+- **停止条件は多層。** フェーズ別ラウンド上限（既定 5）と、その上に自走ループの最終防波堤として `total_steps`（既定 24、正常系 5〜8）。`total_steps` はラウンド上限から到達しうる最悪（21）より大きく取る — 先に総数で止まると「どのレビューが収束しなかったか」が残らないため。認可チェックは入口（bootstrap のラベル付与者、approve のコメント投稿者の `author_association`）のみで、dispatch には掛けない。
 - **エージェント実行が失敗・タイムアウトしても、state 更新と push は必ず行い `phase: blocked` にする。**
 - **ツールチェーンを中央は知らない。** テスト実行の準備は配布先の `.agent/setup.sh` に委ね、`run.yml` がエージェント実行前に呼ぶ。
 - **`acceptance.yml` の `AC-N` id** を planner / developer / dev-reviewer が共通参照する。`verification: automated` なら `command` 必須。
