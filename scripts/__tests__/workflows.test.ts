@@ -296,3 +296,17 @@ describe("呼び出し側の権限が中央のワークフローを満たして�
     }
   }
 });
+
+describe("gh コマンドの書き方", () => {
+  // checkout より前のステップでは git remote が無く、gh はリポジトリを推測できない。
+  // ステップの順序に依存しないよう、常に --repo を明示する規則にしている。
+  for (const [wf, step, script] of runBlocks()) {
+    const calls = [...script.matchAll(/gh (pr|issue|label|release) [^\n]*/g)].map((m) => m[0]);
+    if (calls.length === 0) continue;
+    test(`${wf} ${step} は --repo を明示している`, () => {
+      for (const call of calls) {
+        expect(call, `${wf} ${step}`).toContain("--repo");
+      }
+    });
+  }
+});

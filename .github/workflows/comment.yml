@@ -58,7 +58,8 @@ jobs:
           REASON=$(printf '%s' "$BODY" | sed -E '1s@^/agent[[:space:]]+[a-z-]+[[:space:]]*@@')
 
           # PR のブランチから run のディレクトリを決める（route と同じ規則 / K-12）
-          BR=$(gh pr view "$PR" --json headRefName -q .headRefName)
+          # このステップは checkout より前に走るため --repo が必須（git remote から推測できない）
+          BR=$(gh pr view "$PR" --repo "$GITHUB_REPOSITORY" --json headRefName -q .headRefName)
           case "$BR" in
             claude/*) ;;
             *)
@@ -132,7 +133,7 @@ jobs:
           git add -A
           git commit -m "agent: $CMD -> $PHASE"
           git push
-          gh pr comment "$PR" --body "\`/agent $CMD\` を受け付けました。次のフェーズは \`$PHASE\` です。"
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "\`/agent $CMD\` を受け付けました。次のフェーズは \`$PHASE\` です。"
 
       - name: 受け付けられなかった理由を PR に返す
         if: |
@@ -148,12 +149,12 @@ jobs:
           set -euo pipefail
           case "$CMD" in
             no-reason)
-              gh pr comment "$PR" --body "差し戻すときは理由を書いてください: \`/agent request-changes <理由>\`。理由はレビューとして残り、次の計画に反映されます。"
+              gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "差し戻すときは理由を書いてください: \`/agent request-changes <理由>\`。理由はレビューとして残り、次の計画に反映されます。"
               ;;
             approve | request-changes)
-              gh pr comment "$PR" --body "コマンドを受け付けませんでした: \`$REASON\`"
+              gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "コマンドを受け付けませんでした: \`$REASON\`"
               ;;
             *)
-              gh pr comment "$PR" --body "\`$CMD\` は知らないコマンドです。使えるのは \`/agent approve\` と \`/agent request-changes <理由>\` です。"
+              gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "\`$CMD\` は知らないコマンドです。使えるのは \`/agent approve\` と \`/agent request-changes <理由>\` です。"
               ;;
           esac

@@ -131,7 +131,7 @@ jobs:
 
           issue 側のコメントは見ていません。
           EOF
-          gh pr create --draft --head "$BR" \
-            --title "$(gh issue view "$N" --json title -q .title)" \
+          gh pr create --repo "$GITHUB_REPOSITORY" --draft --head "$BR" \
+            --title "$(gh issue view "$N" --repo "$GITHUB_REPOSITORY" --json title -q .title)" \
             --body-file /tmp/pr-body.md
           echo "### bootstrap: $BR と draft PR を作成" >> "$GITHUB_STEP_SUMMARY"
