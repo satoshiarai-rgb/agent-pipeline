@@ -251,6 +251,7 @@ describe("scripts/run-cli.sh（action の実体）", () => {
 
   test("空の入力を引数に渡さない（CLI 側で未指定として扱わせる）", () => {
     const sh = readFileSync(join(ROOT, "scripts/run-cli.sh"), "utf8");
+    // biome-ignore lint/suspicious/noTemplateCurlyInString: シェルの ${2:-} を文字列として検査する
     expect(sh).toContain('[ -n "${2:-}" ] && args+=("$1" "$2")');
   });
 });
