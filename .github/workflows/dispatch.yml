@@ -338,3 +338,19 @@ jobs:
           PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --json number -q '.[0].number' 2>/dev/null || true)
           export PR
           bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"
+
+      # ---- blocked なら run を失敗させる（Actions の一覧で赤く見えるようにする）
+      #
+      # 必ず push とラベル更新の後に置く。先に失敗させると後続がスキップされ、
+      # 「state 更新と push は必ず行う」という不変条件が壊れる。
+      # blocked は人間が state.json を直して push するまで進まないので、
+      # 緑のまま静かに止まるより赤で気付けた方がよい
+      - name: blocked を失敗として扱う
+        if: always() && (needs.route.outputs.action == 'block' || steps.finish.outputs.phase == 'blocked')
+        env:
+          REASON: ${{ steps.finish.outputs.blocked_reason || needs.route.outputs.reason }}
+        run: |
+          echo "::error title=phase: blocked::$REASON"
+          echo "### blocked: $REASON" >> "$GITHUB_STEP_SUMMARY"
+          echo "復旧: agent-work/<run>/state.json の phase を書き換えて push する" >> "$GITHUB_STEP_SUMMARY"
+          exit 1

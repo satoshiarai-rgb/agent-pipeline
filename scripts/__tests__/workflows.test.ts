@@ -114,6 +114,17 @@ describe("ワークフローの YAML", () => {
     expect([...refs]).toEqual(["main"]);
   });
 
+  test("blocked で失敗させるステップは push より後", () => {
+    // 先に失敗させると push とラベル更新がスキップされ、状態が git に載らないまま止まる
+    for (const wf of all) {
+      const steps = Object.values(wf.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
+      const failAt = steps.findIndex((st) => st.name?.includes("blocked を失敗として扱う"));
+      if (failAt < 0) continue;
+      const pushAt = steps.reduce((last, st, i) => (st.run?.includes("git push") ? i : last), -1);
+      expect(failAt, wf.name).toBeGreaterThan(pushAt);
+    }
+  });
+
   test("中央リポジトリを .pipeline に取得するのは成果物の push より後", () => {
     // 先に取得すると .pipeline が git add -A で配布先にコミットされてしまう
     for (const wf of all) {
