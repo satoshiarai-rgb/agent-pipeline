@@ -1,0 +1,45 @@
+# Step A-1（暫定版）: Claude サブスクリプション認証で Claude を 1 回呼ぶ
+#
+# 置き場所: 検証用リポジトリの .github/workflows/oauth.yml
+#
+# 前提:
+#   1. ローカルで `claude setup-token` を実行して長期トークンを発行する
+#      （Pro / Max / Team / Enterprise プランで利用可能）
+#   2. リポジトリ Secrets に CLAUDE_CODE_OAUTH_TOKEN として登録する
+#      トークンは秘密情報なので Variables ではなく Secrets
+#   3. ANTHROPIC_API_KEY は登録しない（API キーはサブスクトークンより優先される）
+#
+# WIF 版（work/verify/step-a1/wif.yml）との違い:
+#   - Anthropic Console が不要。id-token: write も不要（OIDC を使わないため）
+#   - トークンは長期の秘密情報で、`claude setup-token` を実行した個人のサブスクに紐づく
+#   - 実行分はサブスクリプションの使用量として計上される（API 課金ではない）
+#   - Console を用意したら wif.yml に差し替える（worklist.md A-29）
+
+name: oauth-hello
+
+on:
+  workflow_dispatch:
+
+# OIDC を使わないので id-token: write は不要。
+# contents: read は将来 checkout を足すときのために残してある。
+permissions:
+  contents: read
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # base-action は「Claude Code を 1 回動かすだけ」の部品。
+      # PR へのコメントや issue の操作といった GitHub 連携は持たない（そこは自分で書く）。
+      # @v1 は移動タグなので、検証の再現性のためパッチ版に固定する。
+      - name: Claude を 1 回呼ぶ
+        uses: anthropics/claude-code-action/base-action@v1.0.215
+        with:
+          prompt: "Reply with exactly: subscription auth ok"
+          # プランで opus が使えない場合は --model を外して既定モデルで試す
+          # V-15: ツールを絞って入力トークンの削減量を測るときはこちらに差し替える
+          # claude_args: "--model claude-opus-5 --max-turns 1 --tools Read,Glob,Grep"
+          claude_args: "--model claude-opus-5 --max-turns 1"
+          show_full_output: "true"
+          claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

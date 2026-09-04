@@ -17,6 +17,8 @@
 | K-3 | モデルは生成・レビュー共に `claude-opus-5` | `defaults.yml`、設計書 §5.7 |
 | K-4 | **エージェントは `.github/workflows/**` を変更しない。GitHub App に Workflows 権限を付与しない** | 権限の最小化を維持。ワークフロー変更を要する issue はパイプライン対象外 |
 | K-5 | `agent-work/` は main に残す | 設計書 §10.5 で既決 |
+| K-8 | **配布先リポジトリの Claude Code 設定（`.claude/settings.json`）は読ませる。** ハーネスは `settings` 入力で上書きしない | 配布先固有の調整は `conventions.md` と同じ信頼境界にある（そのリポジトリの管理者が置くもの）。ただし配布先が意図せず権限を広げることは起きるため、**最低限の禁止はハーネス側が `--disallowed-tools` で明示的に重ねる**（設定で緩められない側に置く。フラグが設定より優先されることは D-1 で確認する） |
+| K-7 | **Anthropic Console のアカウントが未取得のため、当面は Claude Team サブスクリプションの認証（`claude_code_oauth_token`）でワークフロー全体を検証し、後日 Console + WIF に差し替える** | 設計書 §2.1 の「サブスク認証は CI に向かない」という結論は目標構成として維持する。差し替えは A-29。検証中は使用量がサブスクリプションに計上され、ワークスペース支出上限（§7.5）によるコスト制御は効かない |
 | K-6 | **現時点の検証はすべて個人アカウント配下のリポジトリに限る。** 組織アカウント（`<org>`） のリポジトリ・Secrets・App インストールには触らない | 複数リポジトリを要する検証（V-7 / V-8）は個人アカウント内に 2 リポジトリ用意して行う。org 側の作業は R-3 まで着手しない |
 
 ---
@@ -54,9 +56,10 @@
 - [ ] A-21: `blocked` からの復旧時に `total_steps` / `rounds` をどう扱うか決める。上限で止まった run は `phase` を戻すだけでは即再 blocked になる — 設計書 §7.2
 - [ ] A-22: コミットメッセージ形式の所有者を決める。ハーネスが `agent: <agent> -> <phase>` で固定するのか、`conventions.md` の規約に従わせるのか — 構成案 §5.5、設計書 §5.8
 - [ ] A-23: プロンプトと成果物の記述言語を明記する（日本語を既定とする想定） — 設計書 §4.1
-- [ ] A-24: `defaults.yml` の `allowed_tools` を、実際に制限として働くフラグに置き換える。`--tools` で許可リストを与える（planner / reviewer に `Bash` を渡さない意図はこれで初めて達成される）。非対話実行では `--allowedTools` は事実上無意味 — V-3、構成案 §6
+- [ ] A-24: ツール制限の指定を整理する（**前回の指摘を訂正**）。`--allowedTools` は「確認を求めずに実行してよいツール」の列挙だが、**action の非対話実行では既定の権限モードにより、許可されていないツールは拒否される**ため、実質的に付与リストとして機能する（公式ドキュメントも「必要なツールを `--allowedTools` か `permissions.allow` で付与するまで Claude はシェルにも GitHub API にもアクセスできない」と明記）。したがって構成案 §6 の `allowed_tools` の方針自体は妥当。**加えて** planner / plan-reviewer には `--disallowed-tools "Bash"` を明示して二重に塞ぐ（付与漏れではなく明示的な拒否にする） — V-3、構成案 §6
 - [ ] A-25: `base-action` に `github_token` 入力が無い前提を書く。`gh` を使う処理はすべてハーネス step 側で `GH_TOKEN` を渡して行い、**エージェント step には `GH_TOKEN` を渡さない**（エージェントが GitHub を直接操作できないようにし、露出面を減らす） — V-2、構成案 §1-3
 - [ ] A-26: `anthropic_oidc_audience` に `https://api.anthropic.com` を設定し、ルールの `match.audience` と一致させる。あわせて `ANTHROPIC_API_KEY` が job の環境に存在しないことを保証する（API キーは federation より優先され、静かに上書きする） — V-1
+- [ ] A-29: **Console 取得後の認証差し替えチェックリスト**を用意する（K-7）。(1) `claude_code_oauth_token` 入力を `anthropic_federation_rule_id` / `anthropic_organization_id` / `anthropic_service_account_id` に置き換える (2) workflow に `id-token: write` を追加する（**caller 側**に必要） (3) `CLAUDE_CODE_OAUTH_TOKEN` Secret を削除する（残っていると federation より優先され、action は警告して素通りする） (4) 識別子は Secrets ではなく Variables に置く (5) Step A-1 / A-2 を `wif.yml` で再実行する — K-7、設計書 §2.1
 - [ ] A-27: WIF ルールは当面**案A（リポジトリ単位の `subject_prefix`）で開始**すると決める。案B（`job_workflow_ref` の CEL 1 本）は `subject_prefix` を `repo:<owner>/*` まで緩める必要があり、CEL が期待どおり効かない場合に「所有者配下の全リポジトリ・全イベントに一致する」危険な構成へ退化する。V-11 が通り、かつリポジトリ数が増えた時点で再検討する。構成案 §7 の記述を案A に差し替え、案B は付録に落とす — V-1、設計書 §10.1
 - [x] ~~A-28: エージェント 1 実行あたりの上限時間を再設定する~~ → **取り消し。** V-12 の解消により、`planner: 20` / `developer: 45` 分はそのままで問題ない
 
@@ -67,6 +70,8 @@
 一次情報の確認（V-1〜V-3）は文書修正と並行できる。実機検証（V-4 以降）は中央リポジトリ作成の前後に分かれる。**すべて個人アカウント配下のリポジトリで行う（K-6）。**
 
 ### 中央リポジトリ作成前
+
+**K-7 により、Console 側の作業を伴う項目（V-4 / V-11）は Console 取得後まで延期する。** それ以外はサブスクリプション認証のまま実施できる。
 
 - [x] V-1: Anthropic の WIF フェデレーションルールの仕様を一次情報で確認した — 設計書 §10.1、構成案 §7 / §10-3
   - `match` は `subject_prefix`（末尾 `*` 可）/ `audience`（完全一致）/ `claims`（完全一致マップ）/ CEL `condition` の組み合わせ。うち少なくとも 1 つが必須で、設定した全マッチャが通る必要がある。構成案 §7 の JSON の形は妥当
@@ -81,16 +86,36 @@
 - [x] V-3: CLI のフラグを確認した — 構成案 §4.2
   - **`--allowedTools` / `--allowed-tools` は「確認を求めずに実行してよいツール」の指定であって、利用可能なツールの制限ではない。** 制限は `--tools`（利用可能なツールを絞る）か `--disallowed-tools`（ツールを取り除く）→ A-24
   - `--model` / `--max-turns` / `--permission-mode` は構成案の記述どおり
-- [ ] V-4: **WIF ルールを作成し、`base-action` を空プロンプトで疎通させる。** 検証用リポジトリ単体で実施可。V-1 / V-2 の結果を反映してから行う — 構成案 §11-5
-- [ ] V-5: `[skip ci]` を含むコミットで `push` トリガーが抑止されることを確認する。**単一コミットの push と、`[skip ci]` を含むコミットが混在する複数コミットの push の両方**を試す。後者が抑止されると、start コミットの push が rejected されて finalize がまとめて push した場合に run が無音で停止する — スモーク §未確認 2、構成案 §4.2
-- [ ] V-6: `branches: ['claude/**']` と `paths: ['agent-work/**']` の併用を確認する — スモーク §未確認 1
+- [ ] V-4: **（Console 取得後に延期）** WIF ルールを作成し、`base-action` を `wif.yml` で疎通させる — 構成案 §11-5、K-7
+- [x] V-13: サブスクリプション認証で `base-action` を疎通させた（`oauth.yml`、検証リポジトリ `compass-wiki`、2026-09-04）— K-7
+  - `result: "subscription auth ok"` / `is_error: false` / `num_turns: 1`。`apiKeySource: "none"` なので API キーではなくサブスクトークンで認証されている。`claude-opus-5` が使えた
+  - `base-action@v1.0.215` とパッチ固定の参照、`show_full_output: true` の挙動も確認できた
+- [ ] V-14: サブスクリプションの使用量上限が検証の妨げにならないか把握する — K-7、設計書 §7.5
+  - **判明（V-15 の副産物）**: API 側のエラーは `subtype: "success"` のまま `is_error: true` + `api_error_status`（404 等）+ `terminal_reason: "api_error"` として出て、base-action は exit 1 で落ちる。使用量上限も同じ形（`api_error_status: 429`）で出る可能性が高い → A-31
+  - **判明**: 実行ログに `rate_limit_event` が出る。V-13 の時点で `five_hour` の utilization が **0.45**、`seven_day` が 0.05。**CI の実行とローカルの Claude Code 作業が同じシートの枠を共有する**ため、フェーズ D（1 run で最大 5 エージェント）を繰り返すとローカル作業が止まる、あるいはその逆が起きる
+  - 残: 上限に当たったときの action の挙動（エラー終了か待機か）。ハーネスはこれを `blocked` として扱う必要があるため、`validate-artifacts` / `finalize` の失敗分類に反映する
+- [~] V-15: **半分完了（2026-09-04）。`--tools` は実在するフラグで、ツールをコンテキストから取り除くことを確認した**（`init` の `tools` が 27 件 → `["Glob","Grep","Read"]` の 3 件）。これで A-24 は決着し、`--tools` を付与リストとして使えば制限としても機能する。**残: トークン数の比較**（この実行は `--model claude-opus-4` のタイポで 404 `model_not_found` になり、API リクエストが飛ばず usage が全ゼロだった。`claude-opus-5` で再実行する）
+- [x] V-15b: **ツール削減の効果を実測した（2026-09-04）。固定オーバーヘッドの 3 分の 2 はツール定義だった**
+  - 無制限（tools 27 件）: `cache_creation` 6056 + `cache_read` 10591 + `input` 2 = **16,649** トークン / opus のコスト $0.0661
+  - `--tools Read,Glob,Grep`（tools 3 件）: 2729 + 2800 + 2 = **5,531** トークン / $0.0289
+  - 差: **−11,118 トークン（−67%）**、コストは −56%（1 時間 TTL のキャッシュ作成が base の 2 倍単価のため、トークン比より削減率が低い）
+  - 残った 5,531 の内訳はシステムプロンプト preset + skills / slash commands 一覧 + ツール 3 個分 → V-17 の対象
+- [ ] V-17: **（優先度低）** skills / subagents の一覧とシステムプロンプト preset を抑止できるか確認する。V-15b でツール定義を削った後の残りは 5,531 トークン / $0.029 なので、**設定 1 つで消せるなら試す価値はあるが深追いはしない**。V-13 のログでは skills 17 件・subagents 6 件・slash commands 40 件超が読み込まれており、その名前と説明もコンテキストを消費している。`systemPrompt` は `{type: "preset", preset: "claude_code"}` 固定なので、これを差し替える CLI フラグ（`--system-prompt` 系）が使えるかを CLI リファレンスで確認する。使えるなら固定オーバーヘッドの最大要因を削れる — Q-6
+- [ ] V-16: 配布先の `.claude/settings.json` の影響を確認する。V-13 のログの `settingSources: ["user", "project", "local"]` から、**エージェントは配布先リポジトリ内の Claude Code 設定を読む**ことが分かった。配布先が置いた設定でツール権限が緩む可能性があるため、ハーネスが `settings` 入力を明示して上書きするかどうかを決める — 設計書 §7.4
+- [x] V-5: **`[skip ci]` の判定は push の HEAD コミットに対して行われる（2026-09-04、`check-loop.yml` 実測）** — 構成案 §4.2
+  - `skip-single`（marker 付き単独コミット）: 次のランが**立たない**。抑止される
+  - `skip-mixed`（marker 付き → marker なし の 2 コミットを 1 回で push）: 次のランが**立つ**。非 HEAD の marker は無視される
+  - **結論: 構成案 §4.2 の `[skip ci]` 方針は条件なしで成立する。** finalize の順序は必ず「start マーカー（marker 付き）→ 成果物（HEAD、marker なし）」なので、start の push が失敗してまとめて push されても HEAD に marker が無く、連鎖は続く（懸念していた「無音で停止」は起きない）
+  - **制約（A-36）**: 逆順（HEAD に marker）は静かに止まる。ハーネスはその順序を作ってはいけない
+- [x] V-6: `branches: ['claude/**']` と `paths: ['agent-work/**']` の併用を確認した（2026-09-04）。`agent-work` の外（`docs/loop-runs/`）だけを変更した push では起動せず、ブランチ条件が一致していても paths で弾かれる — スモーク §未確認 1
+  - 副産物: 近接した 2 回の dispatch で**別ブランチの step が同時に走った**（09:33:33 と 09:33:37）。互いに干渉せず、ブランチ分離による並列安全性が実測で確認できた
 
 ### 中央リポジトリ作成後
 
 - [ ] V-7: 別リポジトリの reusable workflow を `uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@v1` で呼ぶ経路を確認する。**個人アカウント内に配布先役の検証用リポジトリを 1 つ用意して行う**（K-6）。private の場合、個人アカウントでは org の「Accessible from repositories in the organization」に相当する設定が無く、private リポジトリの reusable workflow は他リポジトリから参照できない。中央を public にするか、検証中は同一リポジトリ内で完結させるかの判断が必要 — スモーク §未確認 3、構成案 §8.1
 - [ ] V-8: `secrets: inherit` で配布先のリポジトリ Secrets が中央の reusable workflow に渡ることを確認する（V-7 と同時）。App は検証用の 2 リポジトリ両方にインストールする
 - [ ] V-9: reusable workflow 内で取得した OIDC トークンの `job_workflow_ref` の実値を確認し、V-1 で確定した CEL 条件と一致することを確かめる — スモーク §未確認 4
-- [ ] V-11: CEL `condition` から `job_workflow_ref` を参照できるかを実機で確認する。ルールを 1 本作り、reusable workflow 経由の交換が成功するか / `condition` を偽にしたときに拒否されるかを見る。案B の採否はこの結果次第（A-27） — V-1
+- [ ] V-11: **（Console 取得後に延期）** CEL `condition` から `job_workflow_ref` を参照できるかを実機で確認する。ルールを 1 本作り、reusable workflow 経由の交換が成功するか / `condition` を偽にしたときに拒否されるかを見る。案B の採否はこの結果次第（A-27） — V-1
 - [x] V-12: 10 分を超えるエージェント実行でのトークン更新は、**実装を読んで解消した**（実験不要）— V-1、V-2
   - `base-action` v1.0.215 の `base-action/src/workload-identity.ts` は、OIDC JWT を `RUNNER_TEMP` 下のファイルに書いて `ANTHROPIC_IDENTITY_TOKEN_FILE` を指し、**4 分間隔でバックグラウンド更新する**（`REFRESH_INTERVAL_MS = 4 * 60 * 1000`。GitHub の JWT 失効約 5 分より短い）。長時間実行は設計上サポートされている
   - さらに SDK のディスク上クレデンシャルキャッシュを有効にする profile を書き、action が起動する複数の `claude` プロセスが 1 つの交換済みトークンを共有するようにして `jti_reused` を回避している（ソースのコメントに明記）
@@ -135,4 +160,12 @@
 - [ ] Q-2: 同一 issue の 2 周目をどう扱うか。bootstrap はブランチ存在で no-op、かつ `agent:go` を外す運用なので、現状は再実行できない — 設計書 §6.2
 - [ ] Q-3: `pipeline_version` はメジャーのみで、配布先は移動タグ `@v1` を参照する。v1 内のプロンプト変更が進行中の run の途中から混ざることを許容するか — 構成案 §8.4
 - [ ] Q-4: サービスアカウントの粒度（全リポジトリ共有か、リポジトリごとか）。コスト配賦が必要になるまで共有で開始する想定 — 設計書 §10.2
+- [ ] Q-6: 入力トークンの固定オーバーヘッドをどこまで削るか。V-13 の実測では 1 実行あたり約 17k 入力トークン（`cache_creation` 6056 + `cache_read` 10591）で、**自前のプロンプトは 2 トークン**だった。つまり削減対象はシステムプロンプト preset・ツール定義・skills 一覧であって、プロンプト文の圧縮ではない。手段は V-15（ツール削減）と V-17（preset / skills）。加えて、実運用のコストは固定分より**ターン数 × 再送される履歴**が支配的（developer は `max_turns: 40`）なので、`max_turns` とプロンプトの範囲の方が効く
+- [ ] A-36: **`[skip ci]` は HEAD コミットに置かないという制約を明記する。** V-5 の実測で、判定は push の HEAD コミットに対して行われることが分かった。連鎖を続けたい push では最後のコミットに marker を付けてはならない（finalize は「start マーカー → 成果物」の順序を必ず守る）。逆に、**状態は書きたいが次を起動したくない場面（stale 検知が run を `blocked` にする、completing が `done` を書く等）では HEAD に marker を置くのが正しい手段**になる。構成案 §4.2 と §5.5、A-14 の `stale.yml` に反映する — V-5
+- [ ] A-35: `app-token` composite（構成案 §5.1）を `create-github-app-token@v3` の現行入力に合わせる。**`app-id` は非推奨で `client-id` が正**（値は App 設定ページの Client ID、`Iv23li...` 形式。数値の App ID とは別物）。Secrets 名は `AGENT_APP_CLIENT_ID` にする。あわせて同 action の **`permission-*` 入力でジョブごとにトークン権限を絞る**: bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents（+ 必要なら pull-requests）、approve は contents / issues。App 自体の権限に加えて**実行単位でさらに落とせる**ため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1、設計書 §2.1
+- [ ] A-33: **`rounds` と `total_steps` を `state.yml` から外し、追記専用のレコードの数から導出する。** 1 実行 1 ファイル（例 `agent-work/issue-<n>/runs/<agent>-<run_id>-<attempt>.yml`、内容は agent / 開始終了時刻 / result / モデル / verdict）にすれば、並行した 2 つの更新でもファイル名が衝突しないため rebase は常に「両方を保持」となり、A-32 の silent corruption が**カウンタについては構造的に消える**。`rounds.plan_review` は `runs/` 内の plan-reviewer レコード数、`total_steps` は全レコード数として導出する。結果として `state.yml` に残る可変値は `phase` と `blocked_reason` だけになり、危険域が最小化される — A-32、設計書 §5.1
+- [ ] A-34: **`log.md` の追記も同じ問題を持つ。** 追記専用でも同じ行域（末尾）を触るため、並行時は rebase で競合する（自動マージされて順序が入れ替わる可能性もある）。A-33 の `runs/` レコードがそのまま実行ログになるので、`log.md` は**ハーネスが書く実体ではなく、completing フェーズで `runs/` を時刻順に連結して生成する読み物**に変える。人間が PR で 1 ファイルとして読める利点は維持できる — A-33、設計書 §5.6
+- [ ] A-32: **`finalize` の push 再試行を「rebase」から「状態の再計算」に変える。** 構成案 §5.5 は rejected 時に `git pull --rebase` して 1 回再試行するとしているが、`state.yml` は複数行の YAML なので、2 つの並行更新が別の行を触っていると **rebase が競合を出さずに自動マージし、どちらのランも書いていない状態が生まれる**（例: ラン A が `phase` を、ラン B が `rounds` を更新 → 両方が混ざった状態）。競合すれば `blocked` になって気付けるが、きれいにマージされると誰も気付かない。**唯一の silent corruption 経路**。正しい再試行は「リモートの `state.yml` を fetch して読み直し、遷移を再計算してから書く」。コード変更（developer の成果物）は rebase して構わないが、状態ファイルは再計算する。あわせて穴 2（`concurrency.group` がイベントごとに変わる、A-13 の周辺）を直せば発生確率自体が下がる — 構成案 §5.5、設計書 §6.4 手順 8
+- [ ] A-31: `finalize` が `base-action` の `execution_file` 出力（実行ログ JSON）を読み、`terminal_reason` / `api_error_status` / `is_error` で失敗を分類するようにする。**「API・設定のエラー」と「エージェントが不正な成果物を出した」を区別しないと、モデル名のタイポのような設定ミスがエージェントの失敗として記録され原因が追えない。** `blocked_reason` に分類名を書き、`log.md` に `api_error_status` を残す。あわせて `conclusion` / `session_id` 出力も `log.md` に記録する（`--resume` で追跡できる） — V-15、V-14、構成案 §5.5
+- [ ] A-30: `defaults.yml` のツール構成を**エージェント 5 種別から 2 プロファイルに減らす**。読み取り専用（planner / plan-reviewer: `Read,Glob,Grep,Write`）と実行可能（developer / dev-reviewer / completion: `+Edit,Bash`）の 2 本。**主な理由は設定の単純さ**で、キャッシュ共有による節約は list price で 1 issue あたり $0.15 程度と限定的（V-15b の実測から算出）。ツール削減自体の効果（−67%）はプロファイル数とは無関係に得られる。プロンプトキャッシュはプレフィックスの完全一致で効くため、エージェントごとにツール集合を変えるとキャッシュのプレフィックスが 5 本に分かれ、1 時間 TTL のキャッシュ作成が 5 回発生する。読み取り専用プロファイル（planner / plan-reviewer）と実行可能プロファイル（developer / dev-reviewer / completion）の 2 本に寄せれば、作成 2 回 + 残りは読み出しで済む。**V-13 のログで、まだ何も実行していない最初の run が `cache_read` 10591 を記録している**ことから、preset のプレフィックスはアカウント単位で温まっている（ローカルの Claude Code 利用と共有されている）と分かる — Q-6、構成案 §6
 - [ ] Q-5: completing フェーズで `automated` 項目をハーネスが再実行するか。初期は planner 報告 + dev-reviewer 照合で開始する想定。再実行するなら `setup.sh` の実行もそのフェーズで必要 — 設計書 §10.4

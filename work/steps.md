@@ -23,6 +23,21 @@
 
 最初につまずくのはたいてい**「job をまたぐとファイルが消える」**点。だからこのパイプラインは、エージェント実行から成果物の commit・push までを**1 つの job の中で**やる。
 
+### 状態を次のランに引き継ぐ手段
+
+ランナーは使い捨てで、**コンテナは再利用されない**。ラン間で値を引き継ぐ手段は 4 つある。
+
+| 手段 | 範囲 | 評価 |
+|---|---|---|
+| **git（commit & push）** | 無期限、ラン間・リポジトリ間 | **採用。** 人間が PR で読める / 履歴が残る / **push 自体が次の起動トリガーになる** / git が push を直列化するので二重実行が起きにくい |
+| artifacts（`upload-artifact`） | 既定 90 日、ラン間で受け渡し可 | 人間が PR 上で読めず、保持期間で消える。成果物を後から追跡する設計に合わない |
+| cache（`actions/cache`） | いつ消えてもよい前提 | 状態の正には使えない |
+| job outputs / `needs` | **同一ラン内のみ** | B-4 の `route` job → `run` job の値渡しに使う。ラン間には使えない |
+
+設計書 §2.3 の「状態の正は `agent-work/issue-<n>/state.yml`」は、この表の 1 行目を選んだという宣言。**コンテナ再利用に依存する設計は、並列実行・再実行・キューされたランが別マシンに乗った時点で壊れる**ため、その依存を最初から持たない。
+
+なお git に置くだけでは連鎖しない。`GITHUB_TOKEN` の push では後続ワークフローが起動しないため、**「git に状態を置く」と「App トークンで push する」の組み合わせ**で初めてループになる。
+
 ### 再利用の 2 つの仕組み（名前が似ていて混同しやすい）
 
 | | reusable workflow | composite action |
@@ -49,32 +64,35 @@
 
 ## フェーズ A: 認証の土台
 
-**目的**: 「Claude を CI から呼べる」ことを、パイプラインとは無関係に単体で確定させる。ここが最大の未知（`worklist.md` V-12）。
+**目的**: 「Claude を CI から呼べる」ことを、パイプラインとは無関係に単体で確定させる。
 
-### Step A-1: WIF で Claude を 1 回呼ぶ
+**認証方式（K-7）**: Anthropic Console が未取得のため、**当面は Claude Team サブスクリプションの認証（`claude_code_oauth_token`）で全体を検証し、後日 Console + WIF に差し替える**（Step E-3）。設計書 §2.1 の「サブスク認証は個人シートに紐づき CI に向かない」という結論は目標構成として維持する。差し替えで変わるのは認証の 3 行と `permissions` だけなので、パイプライン本体の検証はこの方式で先に進められる。
 
-- **学ぶ概念**: `permissions.id-token: write`、`uses:` で他人の action を使う、`secrets` と `vars` の使い分け
+### Step A-1: サブスクリプション認証で Claude を 1 回呼ぶ ✅ 完了（2026-09-04）
+
+- **学ぶ概念**: `uses:` で他人の action を使う、`secrets` の使い方、`workflow_dispatch` による手動起動
 - **やること**:
-  1. Anthropic Console → **Settings → Workload identity → Connect workload → GitHub Actions** のウィザードで、issuer（`https://token.actions.githubusercontent.com`、JWKS は discovery）、サービスアカウント、フェデレーションルールを作る
-  2. ルールの `match` は `subject_prefix: repo:satoshiarai-rgb/<検証リポジトリ>:` と `audience: https://api.anthropic.com`、`claims.repository_owner: satoshiarai-rgb`（案A）
-  3. サービスアカウントが対象ワークスペースのメンバーになっていることを確認する
-  4. `fdrl_...` / `svac_...` / 組織 UUID（Settings → Organization）を**リポジトリ Variables** に登録する（秘密ではないので Secrets ではない）: `ANTHROPIC_FDRL` / `ANTHROPIC_SVAC` / `ANTHROPIC_ORG_ID`
-  5. `verify/step-a1/wif.yml` を検証用リポジトリの `.github/workflows/wif.yml` にコピーし、Actions タブから手動起動する。**このステップに GitHub App は不要**（App トークンが必要になるのは Step B-1 以降）
-  - ウィザードは作成後 15 分間だけ交換の成功を待つので、その間に起動すると接続テストも同時に通る
-- **確認**: ログに Claude の応答が出る。`ANTHROPIC_API_KEY` は設定しない（設定すると WIF より優先されて静かに上書きされる）
-- **完了条件**: 手動起動で 1 回成功する
-- **つまずきやすい点**: `id-token: write` の付け忘れ、ルールの `audience` と `anthropic_oidc_audience` の不一致（既定は `https://api.anthropic.com`）、サービスアカウントがワークスペースのメンバーになっていない、`ANTHROPIC_API_KEY` が環境に残っている（WIF より優先され、action は警告して素通りする）
-- **失敗したときの切り分け**: 交換が拒否されると `401` と `Authentication failed` しか返らない（どの検査で落ちたかは伏せられる）。理由は Console の **Workload identity → History** に記録されるので必ずそこを見る。GitHub 側で最も多い原因は `sub` の形式不一致（理由 `match_subject_prefix`）。`wif.yml` を `debug_claims: true` で起動すると実際の claim を表示できる
-- 対応: worklist V-4、A-26、A-27
+  1. ローカルで `claude setup-token` を実行し、長期の OAuth トークンを発行する（Pro / Max / Team / Enterprise プランで利用可能）
+  2. 検証用リポジトリの Secrets に `CLAUDE_CODE_OAUTH_TOKEN` として登録する（秘密情報なので Variables ではなく Secrets）
+  3. `ANTHROPIC_API_KEY` を登録していないことを確認する（API キーはサブスクトークンより優先される）
+  4. `work/verify/step-a1/oauth.yml` を検証用リポジトリの `.github/workflows/oauth.yml` にコピーし、Actions タブから手動起動する
+  - **このステップに GitHub App は不要**（App トークンが必要になるのは Step B-1 以降）。**OIDC を使わないので `id-token: write` も不要**
+- **確認**: ログに Claude の応答（`subscription auth ok`）が出る
+- **完了条件**: 手動起動で 1 回成功する → **達成**（`result: "subscription auth ok"`、`apiKeySource: "none"`、`claude-opus-5`）
+- **つまずきやすい点**: `ANTHROPIC_API_KEY` が残っている（優先されて素通りする）、プランで指定モデルが使えない（`--model` を外して既定モデルで試す）、トークンを Variables に入れてしまう（ログに残る）
+- **この方式の性質（後で差し替える理由）**: トークンは `claude setup-token` を実行した個人のサブスクに紐づく長期の秘密情報で、使用量はサブスクリプションに計上される。組織で共有する用途には向かない（公式ドキュメントも、複数リポジトリで共有する秘密には API キーを推奨している）
+- 対応: worklist V-13、K-7
 
-### Step A-2: 15 分かかる実行でも落ちないことを確認する
+### Step A-2: 15 分かかる実行でも落ちないことを確認する（**Step E-3 まで延期を推奨**）
 
 - **学ぶ概念**: step / job の `timeout-minutes`、長時間ステップの扱い
 - **やること**: A-1 のプロンプトを、実行が 15 分程度に伸びるものに差し替えて流す
-- **前提が変わった点**: 当初これは「通らなければパイプラインが成立しない」最大の未知だったが、`base-action` v1.0.215 の実装（`base-action/src/workload-identity.ts`）を読んで解消した。action は OIDC JWT をファイルに書き、**4 分間隔でバックグラウンド更新する**（GitHub の JWT 失効約 5 分より短い）。加えて SDK のクレデンシャルキャッシュを有効にする profile を書き、複数の `claude` プロセスが 1 つの交換済みトークンを共有して `jti_reused` を避けている。したがってこのステップは**ブロッカーの検証から、実装どおり動くことの確認に格下げ**された
-- **確認**: 10 分を超えた時点で `401` / `authentication_error` が出ないこと。ログに `Failed to refresh the GitHub Actions OIDC identity token` の警告が出ていないこと
+- **延期の判断**: このステップが検証していた唯一の failure mode（OIDC トークンの更新）は WIF 固有で、サブスクリプション認証では発生しない。一方でサブスクの 5 時間枠は CI とローカル作業で共有されており（V-14: 実測 45% 消費済み）、15 分の実行を試すコストが相対的に高い。**WIF に差し替える Step E-3 で実施するのが合理的**
+- **サブスクリプション認証では、当初懸念した 10 分の壁は関係ない。** OAuth トークンは長期なので、OIDC トークンの更新という問題がそもそも発生しない。ここで確認したいのは「長い実行が job タイムアウトや使用量上限で落ちないか」
+- **WIF に差し替えた後も問題ない**ことは実装確認済み: `base-action` v1.0.215（`base-action/src/workload-identity.ts`）は OIDC JWT をファイルに書き、**4 分間隔でバックグラウンド更新する**（GitHub の JWT 失効約 5 分より短い）。加えて SDK のクレデンシャルキャッシュを有効にする profile を書き、複数の `claude` プロセスが 1 つの交換済みトークンを共有して `jti_reused` を避けている
+- **確認**: 15 分の実行が完走する。使用量上限に当たった場合は、action がどう失敗するか（エラーか待機か）を記録しておく（worklist V-14）
 - **完了条件**: 15 分の実行が完走する
-- **背景（なぜ 10 分が境目か）**: Anthropic トークンの寿命は `min(ルールの token_lifetime_seconds, JWT 残寿命 × 2)` で、GitHub の JWT が約 5 分なので実効上限は約 10 分。つまり 10 分を超える実行は必ず 1 回以上の更新を経る
+- **背景（WIF に差し替えたときの数字）**: Anthropic トークンの寿命は `min(ルールの token_lifetime_seconds, JWT 残寿命 × 2)` で、GitHub の JWT が約 5 分なので実効上限は約 10 分。つまり 10 分を超える実行は必ず 1 回以上の更新を経る（それを action が担う）
 - 対応: worklist V-12（解消済み）
 ---
 
@@ -82,12 +100,19 @@
 
 **目的**: パイプラインの心臓部である「push で次が動く」ループを、Claude を一切呼ばずに確定させる。すべて 1 リポジトリ内で完結させる。
 
-### Step B-1: push で自分が再起動する連鎖と、その止め方
+### Step B-1: push で自分が再起動する連鎖と、その止め方 ✅ 完了（2026-09-04）
 
 - **学ぶ概念**: `on: push` の `branches` / `paths` フィルタ、`[skip ci]`、`concurrency`
-- **やること**: `loop.yml` を置く。`workflow_dispatch` で `claude/loop-test` ブランチを作り、`counter.txt` の数字を +1 して App トークンで push する。`on: push`（`branches: ['claude/**']`、`paths: ['agent-work/**']`）でも同じ job が起動するようにし、3 まで数えたら止める
+- **やること**: `work/verify/step-b1/loop.yml` を検証用リポジトリの `.github/workflows/loop.yml` にコピーし、`mode` を選んで手動起動する。4 モードあり、それぞれ 1 回の起動で 1 つの問いに答える
+  - `normal`: 連鎖が 3 本まで進んで止まる（ループと停止条件）。**カウントは保存せず、`agent-work/loop/runs/` のファイル数から導出する**
+  - `skip-single`: `[skip ci]` 付きの単独コミット → 次のランが立たない
+  - `skip-mixed`: `[skip ci]` 付きと無しを 1 回の push にまとめる → **立つか立たないかがこの検証の本題**
+  - `outside-paths`: `agent-work` の外だけを変更 → `paths` フィルタで起動しない
+- **設計原則が 2 つ入っている**:
+  1. push で起動したジョブは `workflow_dispatch` の入力を受け取れないため、モードも `agent-work/loop/mode` というファイルに書いて渡している。パイプライン本体の「状態はイベントではなく git 上のファイルに置く」原則の最小版
+  2. **カウントを保存せず導出する。** 1 行の共有カウンタは、並行した 2 つの更新が rebase で自動マージされて「どちらのランも書いていない値」を生む余地がある。実行ごとに別ファイル（`<run_id>-<attempt>`）を作れば名前が衝突しないので、マージは常に「両方を保持」になる。本体でも `rounds` / `total_steps` を同じ形にする（worklist A-33）
 - **確認**: 3 本のランが連鎖する。`[skip ci]` を付けたコミットでは連鎖が止まる。**`[skip ci]` を含むコミットと含まないコミットを混ぜた 1 回の push でどうなるかも試す**（start マーカーの push が失敗して 2 コミットまとまったときに無音で止まらないか）
-- **完了条件**: 連鎖の起動と抑止を意図どおりに制御できる
+- **完了条件**: 連鎖の起動と抑止を意図どおりに制御できる → **達成**。4 モードすべて期待どおり（normal: 3 ラン連鎖 / skip-single: 抑止 / skip-mixed: **抑止されない** = 判定は HEAD コミット / outside-paths: paths フィルタで起動せず）
 - **この段階では持ち込まない**: state.yml、YAML パース、エージェント。数字を数えるだけ
 - 対応: worklist V-5、V-6
 
@@ -204,6 +229,22 @@
 
 - **やること**: `install/` 一式を使って 2 つ目に導入し、過不足を洗う。タグ `v1` / `v1.0.0` を打つ
 - 対応: worklist I-12、I-13、R-1、R-2
+
+### Step E-3: Console + WIF へ認証を差し替える
+
+- **学ぶ概念**: OIDC（`permissions.id-token: write`）、Secrets と Variables の使い分け
+- **前提**: Anthropic Console のアカウントを取得済み（K-7 の解除）
+- **やること**:
+  1. Console → **Settings → Workload identity → Connect workload → GitHub Actions** で issuer（`https://token.actions.githubusercontent.com`、JWKS は discovery）、サービスアカウント、ルールを作る
+  2. ルールの `match` は `subject_prefix: repo:<owner>/<repo>:`、`audience: https://api.anthropic.com`、`claims.repository_owner: <owner>`（案A）
+  3. サービスアカウントが対象ワークスペースのメンバーになっていることを確認する
+  4. `fdrl_...` / `svac_...` / 組織 UUID を **Variables** に登録する（秘密ではないので Secrets ではない）
+  5. `claude_code_oauth_token` 入力を WIF の 3 入力に置き換え、workflow に `id-token: write` を追加する（**caller 側**に必要）
+  6. **`CLAUDE_CODE_OAUTH_TOKEN` Secret を削除する**（残っていると federation より優先され、action は警告して素通りする）
+  7. `work/verify/step-a1/wif.yml` で Step A-1 / A-2 を再実行する
+- **失敗したときの切り分け**: 交換が拒否されると `401` と `Authentication failed` しか返らない（どの検査で落ちたかは伏せられる）。理由は Console の **Workload identity → History** に記録される。最も多い原因は `sub` の形式不一致（理由 `match_subject_prefix`）。`wif.yml` を `debug_claims: true` で起動すると実際の claim を表示できる
+- **ここで初めてコスト制御が効く**: ワークスペース単位の月次支出上限（設計書 §7.5）は Console 前提。それまでの検証はサブスクリプションの使用量上限が唯一のブレーキになる
+- 対応: worklist A-29、V-4、V-11、A-26、A-27
 
 ---
 
