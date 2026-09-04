@@ -12,7 +12,7 @@
 `awaiting_human` → PR コメント `/agent approve` → developer → dev-reviewer → completion →
 `done`、ラベル射影と `gh pr ready` まで）。ただしエージェントはダミー（`dry_run: true`）。
 
-- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 214 件 / 24 ファイル、`bunx tsc --noEmit`、
+- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 228 件 / 24 ファイル、`bunx tsc --noEmit`、
   `bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り**コミットする**
   （配布先はルートの `action.yml` から `uses:` で呼ぶ）
 - 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
@@ -21,22 +21,35 @@
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
 - 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `validate` が担う
 - 本番経路: `dispatch.yml` の `run` job が `compose` → `base-action` → `validate` → `finish` を通す。
-  `dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）
+  `dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）。
+  `blocked` になった run は push とラベル更新の後に失敗させるので、Actions の一覧で赤く見える
 
 **dry run の一巡は実機で確認済み（2026-09-05、issue #5）**。planner → plan-reviewer →
 `awaiting_human` → PR コメント `/agent approve` → developer → dev-reviewer → completion → `done`。
 5 つの実行レコードすべてが `result: ok`、`compose` は中央の既定プロンプトを解決し、
 `validate` は 5 フェーズすべてで `ok`、`issue.md` も作られた。`dispatch-live` は skip され二重起動なし。
 
-**段 2（本物のエージェント）の 1 回目は `blocked` で止まった（issue #7）**。原因はハーネス側で、
-`--tools` だけではツールを使える状態にするだけで書き込みの許可にならず、planner が
-`permission_denials_count: 3` で `plan.md` を書けなかった（A-24 を実機で確定。`--allowed-tools` を
-足して修正済み）。あわせて `session_id` / `execution_file` の出力名が実在することと、
-`claude_args` が壊れずに渡ることを確認した。契約違反が `blocked_reason` に残る経路も本番で効いた。
+**段 2（本物のエージェント）は `awaiting_human` まで到達（issue #7、2026-09-05）**。
 
-**次の一手**: フェーズ D。`dry_run: false` で小さな issue を 1 本通し、planner から順に成果物の質を見る
-（配線は I-9d で繋がっているので、ここからの失敗は「プロンプトの質」と、実行時にしか分からない
-入出力名の食い違いに限定される）。先に `dry_run: true` を 1 周させて validate 込みの tail を確認する。
+- 1 回目の planner は `invalid` で `blocked`。原因はハーネス側で、`--tools` はツールを使える
+  状態にするだけで書き込みの許可にならず `permission_denials_count: 3` になっていた
+  （A-24 を実機で確定。`--allowed-tools` を足して修正）。`state.json` を手で戻して push する
+  復旧経路もそのまま機能した
+- 復旧後: planner `ok` → plan-reviewer **`request_changes`** → planner → plan-reviewer
+  **`approve`** → `awaiting_human` → PR に人間の `/agent request-changes` → planner →
+  plan-reviewer `approve` → `awaiting_human`（現在ここ）。ラベル射影も追随した
+- plan-reviewer は実際に穴を見つけた（planner が書いた検証コマンドが `refs/heads/main` の
+  無いワークツリーで fatal になり、出力が空なので `test -z` が通ってしまう＝検証していない
+  ものが緑になる）。レビュアーに成果物だけを渡す設計が効いている
+- 実測コスト: planner 1 実行 $1.0〜1.2（18〜22 ターン、5 分前後）、plan-reviewer $0.75〜0.88。
+  ここまでで約 $5。**ターン数がそのままコストになる**（Q-6 の見立てどおり）
+- `session_id` / `execution_file` の出力名は実在し、`runs/*.json` と `validate` に届く
+- plan-reviewer を 3 本使ったので上限を 5 に上げた（K-17）。残り 2 ラウンド
+
+**次の一手**: 段 3。PR #8 に `/agent approve` を投稿すると developer / dev-reviewer /
+completion の 3 実行に進む。見るところは `work/steps.md` の Step D-0 の段 3
+（`setup.sh` の無い配布先で落ちないか、差分が `agent-work/` の外にあるか、
+dev-reviewer が `git diff origin/HEAD...HEAD` を読めているか）。そのあとフェーズ D。
 
 ---
 
