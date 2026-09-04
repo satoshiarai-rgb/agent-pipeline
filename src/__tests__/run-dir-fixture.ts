@@ -1,7 +1,12 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseStateFile } from "../state-file.ts";
+import type { Outcome } from "../commands/finish.ts";
+import { finishRun } from "../commands/finish.ts";
+import { startRun } from "../commands/start.ts";
+import { defaults } from "../defaults.ts";
+import { readStateFile } from "../file/state-file.ts";
+import type { AgentName } from "../types.ts";
 
 const dirs: string[] = [];
 
@@ -24,5 +29,28 @@ export function cleanupRuns(): void {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 }
 
-export const phaseOf = (dir: string) =>
-  parseStateFile(readFileSync(join(dir, "state.json"), "utf8"));
+export const phaseOf = (dir: string) => readStateFile(dir);
+
+let seq = 0;
+
+/**
+ * エージェント 1 回の実行（開始の記録 → 結末の書き込み）をまとめて行う。
+ * 遷移の検証はすべてこの単位で書く（純粋関数を公開せずに全経路を通せる）。
+ */
+export function runOnce(
+  dir: string,
+  agent: AgentName,
+  outcome: Outcome,
+  config = defaults,
+): ReturnType<typeof finishRun> {
+  const run_id = String(++seq);
+  const { record_path } = startRun({
+    dir,
+    config,
+    agent,
+    run_id,
+    attempt: 1,
+    model: "claude-opus-5",
+  });
+  return finishRun({ dir, config, record_path, outcome, session_id: `sess-${run_id}` });
+}

@@ -1,4 +1,4 @@
-import type { RunRecord } from "../run-record.ts";
+import type { RunRecord } from "../file/run-record.ts";
 import type { RoundKey } from "../types.ts";
 
 /**

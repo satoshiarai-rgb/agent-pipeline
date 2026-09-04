@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync } from "node:fs";
-import { routeRun, startRun } from "../index.ts";
-import { parseRecord } from "../run-record.ts";
-import { config } from "./helpers.ts";
-import { cleanupRuns, makeRun } from "./run-dir-fixture.ts";
+import { config } from "../../__tests__/helpers.ts";
+import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
+import { type RunRecord, readRecords } from "../../file/run-record.ts";
+import { routeRun } from "../route.ts";
+import { startRun } from "../start.ts";
 
 const c = config();
 afterEach(cleanupRuns);
@@ -21,7 +21,7 @@ describe("startRun", () => {
     });
     expect(record_path).toContain("runs/planner-100-1.json");
 
-    const rec = parseRecord(readFileSync(record_path, "utf8"));
+    const rec = readRecords(dir)[0] as RunRecord;
     expect(rec.finished_at).toBeNull();
     expect(rec.phase).toBe("planning");
 

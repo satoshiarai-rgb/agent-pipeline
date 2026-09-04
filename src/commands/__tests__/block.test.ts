@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { blockRun } from "../index.ts";
-import { config } from "./helpers.ts";
-import { cleanupRuns, makeRun, phaseOf } from "./run-dir-fixture.ts";
+import { config } from "../../__tests__/helpers.ts";
+import { cleanupRuns, makeRun, phaseOf } from "../../__tests__/run-dir-fixture.ts";
+import { blockRun } from "../block.ts";
 
 const c = config();
 afterEach(cleanupRuns);

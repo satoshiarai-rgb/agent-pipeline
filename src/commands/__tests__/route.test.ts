@@ -1,9 +1,9 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { routeRun } from "../index.ts";
-import { config } from "./helpers.ts";
-import { cleanupRuns, makeRun } from "./run-dir-fixture.ts";
+import { config } from "../../__tests__/helpers.ts";
+import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
+import { routeRun } from "../route.ts";
 
 const c = config();
 afterEach(cleanupRuns);

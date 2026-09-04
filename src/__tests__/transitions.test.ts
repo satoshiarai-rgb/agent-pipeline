@@ -1,23 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { agentFor, isIdle, isTerminal, nextPhase, roundKeyFor } from "../transitions.ts";
+import { isTerminal, nextPhase, reviewKindFor, roundKeyFor } from "../transitions.ts";
 import { config } from "./helpers.ts";
 
 const c = config();
-
-describe("agentFor", () => {
-  test("フェーズごとのエージェント", () => {
-    expect(agentFor("planning", c)).toBe("planner");
-    expect(agentFor("plan_review", c)).toBe("plan-reviewer");
-    expect(agentFor("developing", c)).toBe("developer");
-    expect(agentFor("dev_review", c)).toBe("dev-reviewer");
-    expect(agentFor("completing", c)).toBe("completion");
-  });
-
-  test("遷移表に無いフェーズは null", () => {
-    expect(agentFor("awaiting_human", c)).toBeNull();
-    expect(agentFor("done", c)).toBeNull();
-  });
-});
 
 describe("nextPhase", () => {
   test("成功で次に進む", () => {
@@ -44,20 +29,22 @@ describe("nextPhase", () => {
   });
 });
 
-describe("roundKeyFor / isIdle / isTerminal", () => {
+describe("roundKeyFor / reviewKindFor / isTerminal", () => {
   test("ラウンドを数えるのはレビューのフェーズだけ", () => {
     expect(roundKeyFor("plan_review", c)).toBe("plan_review");
     expect(roundKeyFor("dev_review", c)).toBe("dev_review");
     expect(roundKeyFor("planning", c)).toBeNull();
   });
 
-  test("待機フェーズと終端フェーズ", () => {
-    expect(
-      ["bootstrap", "awaiting_human", "done", "blocked"].every((p) => isIdle(p as never)),
-    ).toBe(true);
-    expect(isIdle("planning")).toBe(false);
+  test("人間の差し戻しをどのレビューとして残すか", () => {
+    expect(reviewKindFor("awaiting_human", c)).toBe("plan");
+    expect(reviewKindFor("planning", c)).toBeNull();
+  });
+
+  test("終端フェーズ（continue_chain の判定に使う）", () => {
     expect(isTerminal("done")).toBe(true);
     expect(isTerminal("blocked")).toBe(true);
     expect(isTerminal("awaiting_human")).toBe(false);
+    expect(isTerminal("planning")).toBe(false);
   });
 });

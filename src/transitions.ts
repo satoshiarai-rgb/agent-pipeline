@@ -1,5 +1,5 @@
 import type { Config } from "./defaults.ts";
-import type { RunRecord } from "./run-record.ts";
+import type { RunRecord } from "./file/run-record.ts";
 import type { AgentName, Phase, RoundKey } from "./types.ts";
 import { deriveRunStats } from "./utils/derive-run-stats.ts";
 import { resolveAgent } from "./utils/resolve-agent.ts";
@@ -23,18 +23,18 @@ export interface RouteResult {
 }
 
 /** 遷移表を引くためのイベント。エージェントの実行結果をこの語彙に落としてから渡す */
-export type TransitionEvent = "ok" | "approve" | "request_changes" | "pass" | "fail" | "approval";
+type TransitionEvent = "ok" | "approve" | "request_changes" | "pass" | "fail" | "approval";
 
 /** エージェントを起動しない phase */
-export const IDLE_PHASES: readonly Phase[] = ["bootstrap", "awaiting_human", "done", "blocked"];
+const IDLE_PHASES: readonly Phase[] = ["bootstrap", "awaiting_human", "done", "blocked"];
 /** これ以上進まない phase */
-export const TERMINAL_PHASES: readonly Phase[] = ["done", "blocked"];
+const TERMINAL_PHASES: readonly Phase[] = ["done", "blocked"];
 
-export const isIdle = (phase: Phase): boolean => IDLE_PHASES.includes(phase);
+const isIdle = (phase: Phase): boolean => IDLE_PHASES.includes(phase);
 export const isTerminal = (phase: Phase): boolean => TERMINAL_PHASES.includes(phase);
 
 /** その phase で動かすエージェント。遷移表に無ければ null */
-export function agentFor(phase: Phase, config: Config): AgentName | null {
+function agentFor(phase: Phase, config: Config): AgentName | null {
   return config.transitions[phase]?.agent ?? null;
 }
 

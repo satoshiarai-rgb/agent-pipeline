@@ -1,39 +1,45 @@
-import { describe, expect, test } from "bun:test";
+import { afterEach, describe, expect, test } from "bun:test";
 import { config } from "../../__tests__/helpers.ts";
-import { route } from "../../transitions.ts";
-import { approve } from "../approve.ts";
+import { cleanupRuns, makeRun, phaseOf } from "../../__tests__/run-dir-fixture.ts";
+import { approveRun } from "../approve.ts";
+import { routeRun } from "../route.ts";
 
 const c = config();
+afterEach(cleanupRuns);
 
-describe("approve", () => {
+describe("approveRun", () => {
   test("awaiting_human なら developing へ進む", () => {
-    expect(approve({ phase: "awaiting_human", association: "OWNER", config: c })).toEqual({
+    const dir = makeRun("awaiting_human");
+    expect(approveRun({ dir, config: c, association: "OWNER" })).toEqual({
       ok: true,
       phase: "developing",
     });
+    expect(phaseOf(dir).phase).toBe("developing");
   });
 
-  test("approvers に無い association は拒否する", () => {
-    const r = approve({ phase: "awaiting_human", association: "NONE", config: c });
-    expect(r).toEqual({ ok: false, reason: "not_authorized: NONE" });
+  test("承認前は dispatch が何も起動せず、承認後は developer が起動する", () => {
+    const dir = makeRun("awaiting_human");
+    expect(routeRun({ dir, config: c }).action).toBe("none");
+    approveRun({ dir, config: c, association: "COLLABORATOR" });
+    expect(routeRun({ dir, config: c }).run?.agent).toBe("developer");
+  });
+
+  test("approvers に無い association は拒否し、state.json を書き換えない", () => {
+    const dir = makeRun("awaiting_human");
+    expect(approveRun({ dir, config: c, association: "NONE" })).toEqual({
+      ok: false,
+      reason: "not_authorized: NONE",
+    });
+    expect(phaseOf(dir).phase).toBe("awaiting_human");
   });
 
   test("awaiting_human 以外での /approve は何もしない", () => {
     for (const phase of ["planning", "dev_review", "done", "blocked"] as const) {
-      const r = approve({ phase, association: "OWNER", config: c });
+      const dir = makeRun(phase);
+      const r = approveRun({ dir, config: c, association: "OWNER" });
       expect(r.ok).toBe(false);
       expect((r as { reason: string }).reason).toContain("not_awaiting_approval");
+      expect(phaseOf(dir).phase).toBe(phase);
     }
-  });
-
-  test("承認前の awaiting_human では dispatch は何も起動しない", () => {
-    expect(route({ phase: "awaiting_human", records: [], config: c }).action).toBe("none");
-  });
-
-  test("承認後の developing では developer が起動する", () => {
-    const a = approve({ phase: "awaiting_human", association: "COLLABORATOR", config: c });
-    expect(a.ok).toBe(true);
-    if (!a.ok) return;
-    expect(route({ phase: a.phase, records: [], config: c }).run?.agent).toBe("developer");
   });
 });

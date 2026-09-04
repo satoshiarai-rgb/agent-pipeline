@@ -1,8 +1,16 @@
 import type { Config } from "../defaults.ts";
-import type { RunRecord } from "../run-record.ts";
+import {
+  closeRecord,
+  findRecord,
+  type RunRecord,
+  readRecords,
+  saveRecord,
+} from "../file/run-record.ts";
+import { readStateFile, writeStateFile } from "../file/state-file.ts";
 import { isTerminal, nextPhase, roundKeyFor } from "../transitions.ts";
 import type { Phase, RunResult, Verdict } from "../types.ts";
 import { deriveRunStats } from "../utils/derive-run-stats.ts";
+import type { CommandInput } from "./input.ts";
 
 /**
  * エージェント実行 1 回の結果。commands/validate（未実装）と base-action の
@@ -48,11 +56,12 @@ function advance(
 }
 
 /**
- * エージェント実行が終わったあとの phase を決める。
+ * エージェント実行が終わったあとの phase を決める（finishRun の内部）。
  * 実行結果を遷移イベントに落とし、ラウンド上限を見て、遷移表を引く。
- * records には「今回の実行のレコード（finished_at 済み）」を含めて渡す。
+ * records には今回の実行のレコードも含める（ラウンド上限は今回を含めて数えるため。
+ * startRun が実行前にレコードを書くので、この条件は自然に満たされる）。
  */
-export function finish(input: {
+function finish(input: {
   phase: Phase;
   records: RunRecord[];
   config: Config;
@@ -87,4 +96,33 @@ export function finish(input: {
 
   // 4. それ以外は成功でそのまま進む
   return advance(phase, "ok", config, "ok");
+}
+
+/**
+ * エージェント実行の結末を書き、次の phase を決めて state.json を更新する
+ * （dispatch.yml の finalize ステップ）。
+ */
+export function finishRun(
+  input: CommandInput & { record_path: string; outcome: Outcome; session_id?: string | null },
+): FinishResult {
+  const { dir, record_path, outcome, config, session_id = null, now = new Date() } = input;
+  const file = readStateFile(dir);
+  const records = readRecords(dir);
+
+  const current = findRecord(records, record_path);
+  if (!current) throw new Error(`実行レコードが見つかりません: ${record_path}`);
+  const updated = closeRecord(current, {
+    finished_at: now.toISOString(),
+    result: outcome.result,
+    verdict: outcome.verdict,
+    api_error_status: outcome.api_error_status,
+    session_id,
+  });
+  saveRecord(dir, updated);
+
+  // 差し替えは不要: finish が records から数えるのはエージェント別のレコード数で、
+  // 閉じたレコードも agent は同じ。startRun 済みなので今回の実行は既に含まれている
+  const result = finish({ phase: file.phase, records, config, outcome });
+  writeStateFile(dir, file, result, now);
+  return result;
 }

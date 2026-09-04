@@ -3,9 +3,82 @@
 // src/cli.ts
 import { parseArgs } from "node:util";
 
-// src/index.ts
-import { mkdirSync, writeFileSync } from "node:fs";
-import { join as join3 } from "node:path";
+// src/file/state-file.ts
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+
+// src/utils/parse-json.ts
+function parseJson(text, source = "JSON") {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${source} の解析に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+// src/utils/pick.ts
+function pick(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (source[key] !== undefined)
+      out[key] = source[key];
+  }
+  return out;
+}
+
+// src/utils/stringify-json.ts
+function stringifyJson(value) {
+  return `${JSON.stringify(value, null, 2)}
+`;
+}
+
+// src/file/state-file.ts
+function parseStateFile(text) {
+  const raw = parseJson(text, "state.json");
+  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
+    throw new Error("state.json に issue か phase がありません");
+  }
+  return {
+    meta: {
+      pipeline_version: Number(raw.pipeline_version ?? 0),
+      issue: raw.issue,
+      branch: typeof raw.branch === "string" ? raw.branch : "",
+      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
+    },
+    phase: raw.phase,
+    blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
+  };
+}
+var STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at"
+];
+function renderStateFile(file, patch) {
+  const shape = {
+    ...file.meta,
+    phase: patch.phase,
+    blocked_reason: patch.blocked_reason,
+    updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z")
+  };
+  const ordered = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
+}
+function checkPipelineVersion(meta, config) {
+  return meta.pipeline_version === config.pipeline_version ? null : `pipeline_version_mismatch: run=${meta.pipeline_version} harness=${config.pipeline_version}`;
+}
+function stateFilePath(dir) {
+  return join(dir, "state.json");
+}
+function readStateFile(dir) {
+  return parseStateFile(readFileSync(stateFilePath(dir), "utf8"));
+}
+function writeStateFile(dir, file, patch, now) {
+  writeFileSync(stateFilePath(dir), renderStateFile(file, { ...patch, now }));
+}
 
 // src/utils/derive-run-stats.ts
 function deriveRunStats(records) {
@@ -112,6 +185,103 @@ function humanTransition(input) {
 function approve(input) {
   return humanTransition({ ...input, event: "approval" });
 }
+function approveRun(input) {
+  const { dir, association, config, now = new Date } = input;
+  const file = readStateFile(dir);
+  const decision = approve({ phase: file.phase, association, config });
+  if (!decision.ok)
+    return decision;
+  writeStateFile(dir, file, { phase: decision.phase, blocked_reason: null }, now);
+  return decision;
+}
+// src/commands/block.ts
+function blockRun(input) {
+  const { dir, reason, now = new Date } = input;
+  const file = readStateFile(dir);
+  const result = {
+    phase: "blocked",
+    blocked_reason: reason,
+    continue_chain: false,
+    reason
+  };
+  writeStateFile(dir, file, result, now);
+  return result;
+}
+// src/file/run-record.ts
+import { existsSync, mkdirSync, readdirSync, readFileSync as readFileSync2, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join2 } from "node:path";
+function normalizeRecord(r) {
+  return {
+    agent: r.agent,
+    phase: r.phase,
+    run_id: String(r.run_id),
+    attempt: Number(r.attempt ?? 1),
+    started_at: r.started_at ?? "",
+    finished_at: r.finished_at ?? null,
+    result: r.result ?? null,
+    verdict: r.verdict ?? null,
+    api_error_status: r.api_error_status ?? null,
+    model: r.model ?? null,
+    session_id: r.session_id ?? null
+  };
+}
+function parseRecord(text) {
+  const r = parseJson(text, "実行レコード");
+  if (!r?.agent || !r.run_id)
+    throw new Error("実行レコードに agent か run_id がありません");
+  return normalizeRecord(r);
+}
+function openRecord(input) {
+  return normalizeRecord(input);
+}
+function closeRecord(current, patch) {
+  return normalizeRecord({
+    ...current,
+    finished_at: patch.finished_at,
+    result: patch.result,
+    verdict: patch.verdict ?? null,
+    api_error_status: patch.api_error_status ?? null,
+    session_id: patch.session_id ?? current.session_id
+  });
+}
+var RECORD_KEYS = [
+  "agent",
+  "phase",
+  "run_id",
+  "attempt",
+  "started_at",
+  "finished_at",
+  "result",
+  "verdict",
+  "api_error_status",
+  "model",
+  "session_id"
+];
+function renderRecord(r) {
+  const ordered = pick(r, RECORD_KEYS);
+  return stringifyJson(ordered);
+}
+function recordFileName(r) {
+  return `${r.agent}-${r.run_id}-${r.attempt}.json`;
+}
+function recordPath(dir, r) {
+  return join2(dir, "runs", recordFileName(r));
+}
+function readRecords(dir) {
+  const runs = join2(dir, "runs");
+  if (!existsSync(runs))
+    return [];
+  return readdirSync(runs).filter((n) => n.endsWith(".json")).sort().map((n) => parseRecord(readFileSync2(join2(runs, n), "utf8")));
+}
+function saveRecord(dir, record) {
+  const path = recordPath(dir, record);
+  mkdirSync(join2(dir, "runs"), { recursive: true });
+  writeFileSync2(path, renderRecord(record));
+  return path;
+}
+function findRecord(records, path) {
+  return records.find((r) => path.endsWith(recordFileName(r)));
+}
 
 // src/commands/finish.ts
 function blocked(reason) {
@@ -153,133 +323,28 @@ function finish(input) {
     return advance(phase, "pass", config, "acceptance_passed");
   return advance(phase, "ok", config, "ok");
 }
-
-// src/commands/request-changes.ts
-function requestChanges(input) {
-  return humanTransition({ ...input, event: "request_changes" });
+function finishRun(input) {
+  const { dir, record_path, outcome, config, session_id = null, now = new Date } = input;
+  const file = readStateFile(dir);
+  const records = readRecords(dir);
+  const current = findRecord(records, record_path);
+  if (!current)
+    throw new Error(`実行レコードが見つかりません: ${record_path}`);
+  const updated = closeRecord(current, {
+    finished_at: now.toISOString(),
+    result: outcome.result,
+    verdict: outcome.verdict,
+    api_error_status: outcome.api_error_status,
+    session_id
+  });
+  saveRecord(dir, updated);
+  const result = finish({ phase: file.phase, records, config, outcome });
+  writeStateFile(dir, file, result, now);
+  return result;
 }
-
-// src/utils/parse-json.ts
-function parseJson(text, source = "JSON") {
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`${source} の解析に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
-
-// src/utils/pick.ts
-function pick(source, keys) {
-  const out = {};
-  for (const key of keys) {
-    if (source[key] !== undefined)
-      out[key] = source[key];
-  }
-  return out;
-}
-
-// src/utils/stringify-json.ts
-function stringifyJson(value) {
-  return `${JSON.stringify(value, null, 2)}
-`;
-}
-
-// src/run-record.ts
-function parseRecord(text) {
-  const r = parseJson(text, "実行レコード");
-  if (!r?.agent || !r.run_id)
-    throw new Error("実行レコードに agent か run_id がありません");
-  return {
-    agent: r.agent,
-    phase: r.phase,
-    run_id: String(r.run_id),
-    attempt: Number(r.attempt ?? 1),
-    started_at: r.started_at ?? "",
-    finished_at: r.finished_at ?? null,
-    result: r.result ?? null,
-    verdict: r.verdict ?? null,
-    api_error_status: r.api_error_status ?? null,
-    model: r.model ?? null,
-    session_id: r.session_id ?? null
-  };
-}
-var RECORD_KEYS = [
-  "agent",
-  "phase",
-  "run_id",
-  "attempt",
-  "started_at",
-  "finished_at",
-  "result",
-  "verdict",
-  "api_error_status",
-  "model",
-  "session_id"
-];
-function renderRecord(r) {
-  const ordered = pick(r, RECORD_KEYS);
-  return stringifyJson(ordered);
-}
-
-// src/state-file.ts
-function parseStateFile(text) {
-  const raw = parseJson(text, "state.json");
-  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
-    throw new Error("state.json に issue か phase がありません");
-  }
-  return {
-    meta: {
-      pipeline_version: Number(raw.pipeline_version ?? 0),
-      issue: raw.issue,
-      branch: typeof raw.branch === "string" ? raw.branch : "",
-      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
-    },
-    phase: raw.phase,
-    blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
-  };
-}
-var STATE_KEYS = [
-  "pipeline_version",
-  "issue",
-  "branch",
-  "phase",
-  "blocked_reason",
-  "updated_at"
-];
-function renderStateFile(file, patch) {
-  const shape = {
-    ...file.meta,
-    phase: patch.phase,
-    blocked_reason: patch.blocked_reason,
-    updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z")
-  };
-  const ordered = pick(shape, STATE_KEYS);
-  return stringifyJson(ordered);
-}
-function checkPipelineVersion(meta, config) {
-  return meta.pipeline_version === config.pipeline_version ? null : `pipeline_version_mismatch: run=${meta.pipeline_version} harness=${config.pipeline_version}`;
-}
-
-// src/utils/next-review-number.ts
-import { existsSync, readdirSync } from "node:fs";
-import { join } from "node:path";
-function nextReviewNumber(dir, kind) {
-  const reviews = join(dir, "reviews");
-  if (!existsSync(reviews))
-    return 1;
-  return readdirSync(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).length + 1;
-}
-
-// src/utils/read-run-dir.ts
-import { existsSync as existsSync2, readdirSync as readdirSync2, readFileSync } from "node:fs";
-import { join as join2 } from "node:path";
-function readRunDir(dir) {
-  const runsDir = join2(dir, "runs");
-  const records = existsSync2(runsDir) ? readdirSync2(runsDir).filter((n) => n.endsWith(".json")).sort().map((n) => ({ path: join2(runsDir, n), text: readFileSync(join2(runsDir, n), "utf8") })) : [];
-  return { stateText: readFileSync(join2(dir, "state.json"), "utf8"), records };
-}
-
-// src/utils/render-review.ts
+// src/file/review-file.ts
+import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync as readdirSync2, writeFileSync as writeFileSync3 } from "node:fs";
+import { join as join3 } from "node:path";
 function renderReview(input) {
   const { verdict, round, reviewer, body } = input;
   return `---
@@ -291,7 +356,75 @@ reviewer: ${reviewer}
 ${body.trim()}
 `;
 }
+function nextReviewNumber(dir, kind) {
+  const reviews = join3(dir, "reviews");
+  if (!existsSync2(reviews))
+    return 1;
+  return readdirSync2(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).length + 1;
+}
+function reviewPath(dir, kind, round) {
+  return join3(dir, "reviews", `${kind}-${String(round).padStart(2, "0")}.md`);
+}
+function saveReview(input) {
+  const { dir, kind, verdict, reviewer, body } = input;
+  const round = nextReviewNumber(dir, kind);
+  const path = reviewPath(dir, kind, round);
+  mkdirSync2(join3(dir, "reviews"), { recursive: true });
+  writeFileSync3(path, renderReview({ verdict, round, reviewer, body }));
+  return path;
+}
 
+// src/commands/request-changes.ts
+function requestChanges(input) {
+  return humanTransition({ ...input, event: "request_changes" });
+}
+function requestChangesRun(input) {
+  const { dir, association, body, config, now = new Date } = input;
+  const file = readStateFile(dir);
+  const decision = requestChanges({ phase: file.phase, association, config });
+  if (!decision.ok)
+    return decision;
+  const kind = reviewKindFor(file.phase, config) ?? "plan";
+  const review_path = saveReview({
+    dir,
+    kind,
+    verdict: "request_changes",
+    reviewer: `human:${association}`,
+    body
+  });
+  writeStateFile(dir, file, { phase: decision.phase, blocked_reason: null }, now);
+  return { ...decision, review_path };
+}
+// src/commands/route.ts
+function routeRun(input) {
+  const file = readStateFile(input.dir);
+  const records = readRecords(input.dir);
+  const mismatch = checkPipelineVersion(file.meta, input.config);
+  if (mismatch) {
+    return {
+      action: "block",
+      reason: mismatch,
+      phase: file.phase,
+      total_steps: records.length,
+      rounds: { plan_review: 0, dev_review: 0 }
+    };
+  }
+  return route({ phase: file.phase, records, config: input.config });
+}
+// src/commands/start.ts
+function startRun(input) {
+  const { dir, agent, run_id, attempt, model, now = new Date } = input;
+  const file = readStateFile(dir);
+  const record = openRecord({
+    agent,
+    phase: file.phase,
+    run_id,
+    attempt,
+    model,
+    started_at: now.toISOString()
+  });
+  return { record_path: saveRecord(dir, record) };
+}
 // src/defaults.ts
 var defaults = {
   pipeline_version: 1,
@@ -339,110 +472,6 @@ var defaults = {
     }
   }
 };
-
-// src/index.ts
-var load = (dir) => {
-  const { stateText, records } = readRunDir(dir);
-  return { file: parseStateFile(stateText), records: records.map((r) => parseRecord(r.text)) };
-};
-var recordName = (r) => `${r.agent}-${r.run_id}-${r.attempt}.json`;
-var writeState = (dir, file, patch, now) => writeFileSync(join3(dir, "state.json"), renderStateFile(file, { ...patch, now }));
-function startRun(input) {
-  const { dir, agent, run_id, attempt, model, now = new Date } = input;
-  const { file } = load(dir);
-  const record = {
-    agent,
-    phase: file.phase,
-    run_id,
-    attempt,
-    started_at: now.toISOString(),
-    finished_at: null,
-    result: null,
-    verdict: null,
-    api_error_status: null,
-    model,
-    session_id: null
-  };
-  const path = join3(dir, "runs", recordName({ agent, run_id, attempt }));
-  mkdirSync(join3(dir, "runs"), { recursive: true });
-  writeFileSync(path, renderRecord(record));
-  return { record_path: path };
-}
-function routeRun(input) {
-  const { file, records } = load(input.dir);
-  const mismatch = checkPipelineVersion(file.meta, input.config);
-  if (mismatch) {
-    return {
-      action: "block",
-      reason: mismatch,
-      phase: file.phase,
-      total_steps: records.length,
-      rounds: { plan_review: 0, dev_review: 0 }
-    };
-  }
-  return route({ phase: file.phase, records, config: input.config });
-}
-function finishRun(input) {
-  const { dir, record_path, outcome, config, session_id = null, now = new Date } = input;
-  const before = load(dir);
-  const current = before.records.find((r) => record_path.endsWith(recordName(r)));
-  if (!current)
-    throw new Error(`実行レコードが見つかりません: ${record_path}`);
-  const updated = {
-    agent: current.agent,
-    phase: current.phase,
-    run_id: current.run_id,
-    attempt: current.attempt,
-    started_at: current.started_at,
-    finished_at: now.toISOString(),
-    result: outcome.result,
-    verdict: outcome.verdict ?? null,
-    api_error_status: outcome.api_error_status ?? null,
-    model: current.model,
-    session_id: session_id ?? current.session_id
-  };
-  writeFileSync(record_path, renderRecord(updated));
-  const records = before.records.map((r) => r === current ? updated : r);
-  const result = finish({ phase: before.file.phase, records, config, outcome });
-  writeState(dir, before.file, result, now);
-  return result;
-}
-function approveRun(input) {
-  const { dir, association, config, now = new Date } = input;
-  const { file } = load(dir);
-  const decision = approve({ phase: file.phase, association, config });
-  if (!decision.ok)
-    return decision;
-  writeState(dir, file, { phase: decision.phase, blocked_reason: null }, now);
-  return decision;
-}
-function requestChangesRun(input) {
-  const { dir, association, body, config, now = new Date } = input;
-  const { file } = load(dir);
-  const decision = requestChanges({ phase: file.phase, association, config });
-  if (!decision.ok)
-    return decision;
-  const kind = reviewKindFor(file.phase, config) ?? "plan";
-  const round = nextReviewNumber(dir, kind);
-  const review_path = join3(dir, "reviews", `${kind}-${String(round).padStart(2, "0")}.md`);
-  mkdirSync(join3(dir, "reviews"), { recursive: true });
-  writeFileSync(review_path, renderReview({ verdict: "request_changes", round, reviewer: `human:${association}`, body }));
-  writeState(dir, file, { phase: decision.phase, blocked_reason: null }, now);
-  return { ...decision, review_path };
-}
-function blockRun(input) {
-  const { dir, reason, now = new Date } = input;
-  const { file } = load(dir);
-  const result = {
-    phase: "blocked",
-    blocked_reason: reason,
-    continue_chain: false,
-    reason
-  };
-  writeState(dir, file, result, now);
-  return result;
-}
-
 // src/cli.ts
 var USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 

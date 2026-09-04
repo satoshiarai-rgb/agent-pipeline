@@ -1,7 +1,7 @@
 import type { AgentName, Phase, RoundKey } from "./types.ts";
 
 /** 遷移表の 1 エントリ。エージェントが起こす辺と人間が起こす辺の両方を持つ */
-export interface TransitionEntry {
+interface TransitionEntry {
   /** 無ければエージェントを起動しない（人間が起こす遷移） */
   agent?: AgentName;
   round_key?: RoundKey;

@@ -1,5 +1,5 @@
 import { type Config, defaults } from "../defaults.ts";
-import type { RunRecord } from "../run-record.ts";
+import type { RunRecord } from "../file/run-record.ts";
 import type { AgentName, Verdict } from "../types.ts";
 
 /**

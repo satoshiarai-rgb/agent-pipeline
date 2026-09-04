@@ -1,11 +1,13 @@
-import type { Config } from "./defaults.ts";
-import type { Phase } from "./types.ts";
-import { parseJson } from "./utils/parse-json.ts";
-import { pick } from "./utils/pick.ts";
-import { stringifyJson } from "./utils/stringify-json.ts";
+import { readFileSync, writeFileSync } from "node:fs";
+import { join } from "node:path";
+import type { Config } from "../defaults.ts";
+import type { Phase } from "../types.ts";
+import { parseJson } from "../utils/parse-json.ts";
+import { pick } from "../utils/pick.ts";
+import { stringifyJson } from "../utils/stringify-json.ts";
 
 /** state.json のうち、遷移判断に使わない識別子とメタ情報 */
-export interface RunMeta {
+interface RunMeta {
   pipeline_version: number;
   issue: number;
   branch: string;
@@ -18,7 +20,7 @@ export interface StateFile {
   blocked_reason: string | null;
 }
 
-export function parseStateFile(text: string): StateFile {
+function parseStateFile(text: string): StateFile {
   const raw = parseJson<Partial<RunMeta & { phase: Phase; blocked_reason: string | null }>>(
     text,
     "state.json",
@@ -55,7 +57,7 @@ type StateFileShape = RunMeta & { phase: Phase; blocked_reason: string | null };
  * state.json を組み立てる。キー順を固定して差分を安定させる。
  * 可変値は phase と blocked_reason だけ（rounds と total_steps は導出する / A-33）。
  */
-export function renderStateFile(
+function renderStateFile(
   file: StateFile,
   patch: { phase: Phase; blocked_reason: string | null; now: Date },
 ): string {
@@ -78,4 +80,24 @@ export function checkPipelineVersion(meta: RunMeta, config: Config): string | nu
   return meta.pipeline_version === config.pipeline_version
     ? null
     : `pipeline_version_mismatch: run=${meta.pipeline_version} harness=${config.pipeline_version}`;
+}
+
+/** state.json のパス */
+export function stateFilePath(dir: string): string {
+  return join(dir, "state.json");
+}
+
+/** state.json を読む */
+export function readStateFile(dir: string): StateFile {
+  return parseStateFile(readFileSync(stateFilePath(dir), "utf8"));
+}
+
+/** state.json を書く。書き換わるのは phase / blocked_reason / updated_at だけ */
+export function writeStateFile(
+  dir: string,
+  file: StateFile,
+  patch: { phase: Phase; blocked_reason: string | null },
+  now: Date,
+): void {
+  writeFileSync(stateFilePath(dir), renderStateFile(file, { ...patch, now }));
 }
