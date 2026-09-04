@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { deriveRunStats } from "../derive-run-stats.ts";
 import { rec, review } from "../../__tests__/helpers.ts";
+import { deriveRunStats } from "../derive-run-stats.ts";
 
 describe("deriveRunStats", () => {
   test("total_steps は全レコード数", () => {
@@ -21,7 +21,10 @@ describe("deriveRunStats", () => {
   });
 
   test("失敗した実行も 1 ラウンドとして数える", () => {
-    const s = deriveRunStats([review("plan-reviewer", "approve"), rec("plan-reviewer", { result: "invalid" })]);
+    const s = deriveRunStats([
+      review("plan-reviewer", "approve"),
+      rec("plan-reviewer", { result: "invalid" }),
+    ]);
     expect(s.rounds.plan_review).toBe(2);
   });
 

@@ -4,13 +4,16 @@
   "type": "module",
   "scripts": {
     "test": "bun test",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "format": "biome check --write",
+    "lint": "biome check"
   },
   "dependencies": {
     "@actions/core": "^1.11.0",
     "yaml": "^2.5.0"
   },
   "devDependencies": {
+    "@biomejs/biome": "^2.5.12",
     "@types/bun": "latest",
     "typescript": "^5.5.0"
   }

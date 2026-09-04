@@ -1,7 +1,7 @@
 import { mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { parseRunFile } from "../run-file.ts";
+import { parseStateFile } from "../state-file.ts";
 
 const dirs: string[] = [];
 
@@ -22,4 +22,5 @@ export function cleanupRuns(): void {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
 }
 
-export const phaseOf = (dir: string) => parseRunFile(readFileSync(join(dir, "state.yml"), "utf8"));
+export const phaseOf = (dir: string) =>
+  parseStateFile(readFileSync(join(dir, "state.yml"), "utf8"));

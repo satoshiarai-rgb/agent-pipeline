@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { route } from "../state.ts";
+import { route } from "../transitions.ts";
 import { config, rec, review } from "./helpers.ts";
 
 describe("route", () => {

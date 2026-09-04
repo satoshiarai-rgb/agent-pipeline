@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { agentFor, isIdle, isTerminal, nextPhase, roundKeyFor } from "../state.ts";
+import { agentFor, isIdle, isTerminal, nextPhase, roundKeyFor } from "../transitions.ts";
 import { config } from "./helpers.ts";
 
 const c = config();
@@ -52,7 +52,9 @@ describe("roundKeyFor / isIdle / isTerminal", () => {
   });
 
   test("待機フェーズと終端フェーズ", () => {
-    expect(["bootstrap", "awaiting_human", "done", "blocked"].every((p) => isIdle(p as never))).toBe(true);
+    expect(
+      ["bootstrap", "awaiting_human", "done", "blocked"].every((p) => isIdle(p as never)),
+    ).toBe(true);
     expect(isIdle("planning")).toBe(false);
     expect(isTerminal("done")).toBe(true);
     expect(isTerminal("blocked")).toBe(true);

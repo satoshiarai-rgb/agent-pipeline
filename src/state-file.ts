@@ -1,5 +1,6 @@
 import type { Document } from "yaml";
-import type { Config, Phase } from "./types.ts";
+import type { Phase } from "./types.ts";
+import type { Config } from "./utils/load-config.ts";
 import { parseYamlDocument } from "./utils/parse-yaml-document.ts";
 import { setYamlFields } from "./utils/set-yaml-fields.ts";
 
@@ -11,7 +12,7 @@ export interface RunMeta {
   updated_at: string | null;
 }
 
-export interface RunFile {
+export interface StateFile {
   /** コメントとキー順を保持して書き戻すための Document */
   doc: Document;
   meta: RunMeta;
@@ -19,7 +20,7 @@ export interface RunFile {
   blocked_reason: string | null;
 }
 
-export function parseRunFile(text: string): RunFile {
+export function parseStateFile(text: string): StateFile {
   const doc = parseYamlDocument(text);
   const raw = doc.toJS() as Record<string, unknown> | null;
   if (!raw || typeof raw.phase !== "string" || typeof raw.issue !== "number") {
@@ -39,7 +40,7 @@ export function parseRunFile(text: string): RunFile {
 }
 
 /** phase / blocked_reason / updated_at だけを書き換える */
-export function applyRunFile(
+export function applyStateFile(
   doc: Document,
   patch: { phase: Phase; blocked_reason: string | null; now: Date },
 ): string {

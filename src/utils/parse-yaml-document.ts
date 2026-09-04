@@ -1,5 +1,4 @@
-import { parseDocument } from "yaml";
-import type { Document } from "yaml";
+import { type Document, parseDocument } from "yaml";
 
 /**
  * コメントと書式を保持したまま編集できる Document として読む。

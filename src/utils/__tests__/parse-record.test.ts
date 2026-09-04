@@ -1,6 +1,6 @@
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
 import { parseRecord } from "../parse-record.ts";
 
 const yaml = `agent: planner
@@ -34,7 +34,9 @@ describe("parseRecord", () => {
 
 describe("templates/run-record.yml（雛形）", () => {
   test("実行中の状態から始まるレコードとして読める", () => {
-    const r = parseRecord(readFileSync(join(import.meta.dir, "../../../templates/run-record.yml"), "utf8"));
+    const r = parseRecord(
+      readFileSync(join(import.meta.dir, "../../../templates/run-record.yml"), "utf8"),
+    );
     expect(r.agent).toBe("planner");
     expect(r.finished_at).toBeNull();
     expect(r.result).toBeNull();

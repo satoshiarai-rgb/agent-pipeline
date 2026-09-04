@@ -1,7 +1,8 @@
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { AgentName, Verdict } from "../types.ts";
 import { loadConfig } from "../utils/load-config.ts";
-import type { AgentName, RunRecord, Verdict } from "../types.ts";
+import type { RunRecord } from "../utils/parse-record.ts";
 
 export const defaultsText = readFileSync(join(import.meta.dir, "../../defaults.yml"), "utf8");
 export const config = () => loadConfig(defaultsText);

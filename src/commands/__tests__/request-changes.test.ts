@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { route } from "../../state.ts";
 import { config } from "../../__tests__/helpers.ts";
+import { route } from "../../transitions.ts";
 import { approve } from "../approve.ts";
 import { requestChanges } from "../request-changes.ts";
 
@@ -15,7 +15,9 @@ describe("requestChanges", () => {
   });
 
   test("approvers に無い association は拒否する", () => {
-    expect(requestChanges({ phase: "awaiting_human", association: "NONE", config: c }).ok).toBe(false);
+    expect(requestChanges({ phase: "awaiting_human", association: "NONE", config: c }).ok).toBe(
+      false,
+    );
   });
 
   test("awaiting_human 以外では何もしない", () => {

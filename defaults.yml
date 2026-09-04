@@ -1,5 +1,6 @@
-# ハーネスの既定値。配布先の .agent/config.yml でこのファイルのキーだけを上書きできる
-# （深いマージ、null は「継承」、defaults に無いキーはエラー。src/config.ts）
+# ハーネスの既定値。型と読み込みは src/utils/load-config.ts。
+# 配布先の .agent/config.yml による上書き（深いマージ、null は継承、未知キーはエラー）は
+# 2 リポジトリに分離する Step B-5 で実装する（A-19）。それまでこのファイルが唯一の設定
 
 pipeline_version: 1
 
@@ -11,7 +12,6 @@ limits:
   plan_review_rounds: 2
   dev_review_rounds: 2
   total_steps: 12 # 自走ループの最終防波堤。正常系は 6〜8 で終わる
-  max_files_per_pr: 10
 
 # ツールは 2 プロファイルに寄せる（A-30）。
 # エージェントごとに集合を変えるとプロンプトキャッシュのプレフィックスが分かれるため。
@@ -48,8 +48,6 @@ approvers:
   - OWNER
   - COLLABORATOR
 
-labels:
-  prefix: "agent:"
 
 # 遷移表。遷移を変えるときにコードを触らないよう宣言的に持つ。
 # agent が無いエントリはエージェントを起動しない（人間が起こす遷移）。

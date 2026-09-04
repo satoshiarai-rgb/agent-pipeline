@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { route } from "../../state.ts";
 import { config } from "../../__tests__/helpers.ts";
+import { route } from "../../transitions.ts";
 import { approve } from "../approve.ts";
 
 const c = config();

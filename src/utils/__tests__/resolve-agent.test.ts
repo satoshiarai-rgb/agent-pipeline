@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { resolveAgent } from "../resolve-agent.ts";
 import { config } from "../../__tests__/helpers.ts";
+import { resolveAgent } from "../resolve-agent.ts";
 
 describe("resolveAgent", () => {
   const c = config();
@@ -22,7 +22,13 @@ describe("resolveAgent", () => {
   });
 
   test("defaults.yml は 5 エージェントと上限を定義している", () => {
-    for (const n of ["planner", "plan-reviewer", "developer", "dev-reviewer", "completion"] as const) {
+    for (const n of [
+      "planner",
+      "plan-reviewer",
+      "developer",
+      "dev-reviewer",
+      "completion",
+    ] as const) {
       expect(() => resolveAgent(c, n)).not.toThrow();
     }
     expect(c.limits.total_steps).toBe(12);

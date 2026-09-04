@@ -1,5 +1,34 @@
-import { isTerminal, nextPhase, roundKeyFor } from "../state.ts";
-import type { Config, FinishResult, Outcome, Phase, RunRecord } from "../types.ts";
+import { isTerminal, nextPhase, roundKeyFor } from "../transitions.ts";
+import type { Phase, RunResult, Verdict } from "../types.ts";
+import type { Config } from "../utils/load-config.ts";
+import type { RunRecord } from "../utils/parse-record.ts";
+
+/**
+ * エージェント実行 1 回の結果。commands/validate（未実装）と base-action の
+ * execution_file から組み立て、finish に渡す。
+ */
+export interface Outcome {
+  result: RunResult;
+  verdict?: Verdict | null;
+  /** planner の規模判定が上限超過 */
+  oversize?: boolean;
+  /** completing で acceptance.yml が全 passed だったか */
+  acceptance_passed?: boolean;
+  /** A-31: 設定ミスとエージェントの失敗を区別するために残す */
+  api_error_status?: number | null;
+}
+
+export interface FinishResult {
+  phase: Phase;
+  blocked_reason: string | null;
+  /**
+   * false なら finalize は HEAD コミットに [skip ci] を付けて連鎖を止める
+   * （[skip ci] の判定は push の HEAD コミットに対して行われる。V-5 実測 / A-36）
+   */
+  continue_chain: boolean;
+  reason: string;
+}
+
 import { deriveRunStats } from "../utils/derive-run-stats.ts";
 
 /**

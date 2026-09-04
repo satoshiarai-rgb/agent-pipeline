@@ -1,8 +1,7 @@
+import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { afterEach, describe, expect, test } from "bun:test";
 import { requestChangesRun } from "../index.ts";
-import { parseRecord } from "../utils/parse-record.ts";
 import { config } from "./helpers.ts";
 import { cleanupRuns, makeRun, phaseOf } from "./run-dir-fixture.ts";
 
@@ -26,7 +25,13 @@ describe("requestChangesRun", () => {
   test("レビュー番号は既存ファイルの次を取る", () => {
     const dir = makeRun("awaiting_human");
     requestChangesRun({ dir, config: c, association: "OWNER", body: "1 回目" });
-    writeFileSync(join(dir, "state.yml"), readFileSync(join(dir, "state.yml"), "utf8").replace("phase: planning", "phase: awaiting_human"));
+    writeFileSync(
+      join(dir, "state.yml"),
+      readFileSync(join(dir, "state.yml"), "utf8").replace(
+        "phase: planning",
+        "phase: awaiting_human",
+      ),
+    );
     const r = requestChangesRun({ dir, config: c, association: "OWNER", body: "2 回目" });
     expect(r.ok && r.review_path).toContain("reviews/plan-02.md");
   });

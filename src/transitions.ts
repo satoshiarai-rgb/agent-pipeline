@@ -1,6 +1,26 @@
-import type { AgentName, Config, Phase, RoundKey, RouteResult, RunRecord } from "./types.ts";
+import type { AgentName, Phase, RoundKey } from "./types.ts";
 import { deriveRunStats } from "./utils/derive-run-stats.ts";
+import type { Config } from "./utils/load-config.ts";
+import type { RunRecord } from "./utils/parse-record.ts";
 import { resolveAgent } from "./utils/resolve-agent.ts";
+
+export interface RouteResult {
+  /** run=実行する / none=何もしない / block=phase を blocked に書く必要がある */
+  action: "run" | "none" | "block";
+  /** 判断理由。ログとサマリーに出す */
+  reason: string;
+  phase: Phase;
+  total_steps: number;
+  rounds: Record<RoundKey, number>;
+  /** action=run のときだけ */
+  run?: {
+    agent: AgentName;
+    model: string;
+    max_turns: number;
+    timeout_minutes: number;
+    tools: string;
+  };
+}
 
 /** 遷移表を引くためのイベント。エージェントの実行結果をこの語彙に落としてから渡す */
 export type TransitionEvent = "ok" | "approve" | "request_changes" | "pass" | "fail" | "approval";
@@ -52,11 +72,7 @@ export function nextPhase(phase: Phase, event: TransitionEvent, config: Config):
  * 現在の状態から次に何をするかを決める（読み取り専用の判断）。
  * 識別子や版の整合性はこの層では見ない（run-file.ts の責務）。
  */
-export function route(input: {
-  phase: Phase;
-  records: RunRecord[];
-  config: Config;
-}): RouteResult {
+export function route(input: { phase: Phase; records: RunRecord[]; config: Config }): RouteResult {
   const { phase, records, config } = input;
   const stats = deriveRunStats(records);
   const base = { phase, total_steps: stats.total_steps, rounds: stats.rounds };

@@ -1,8 +1,17 @@
 #!/usr/bin/env node
 import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
-import { approveRun, blockRun, finishRun, loadConfig, requestChangesRun, routeRun, startRun } from "./index.ts";
-import type { AgentName, Outcome, RunResult, Verdict } from "./types.ts";
+import {
+  approveRun,
+  blockRun,
+  finishRun,
+  loadConfig,
+  type Outcome,
+  requestChangesRun,
+  routeRun,
+  startRun,
+} from "./index.ts";
+import type { AgentName, RunResult, Verdict } from "./types.ts";
 
 /**
  * 公開 IF（index.ts）をワークフローから叩くための薄い入口。
@@ -55,7 +64,7 @@ const need = <T>(v: T | undefined, name: string): T => {
 
 const command = positionals[0];
 const dir = need(values.dir, "dir");
-const config = loadConfig(readFileSync(values.defaults!, "utf8"));
+const config = loadConfig(readFileSync(values.defaults ?? "defaults.yml", "utf8"));
 
 const outcome = (): Outcome => ({
   result: need(values.result, "result") as RunResult,

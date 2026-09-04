@@ -1,5 +1,6 @@
-import type { Config, Phase } from "../types.ts";
-import { humanTransition, type HumanDecision } from "./human-transition.ts";
+import type { Phase } from "../types.ts";
+import type { Config } from "../utils/load-config.ts";
+import { type HumanDecision, humanTransition } from "./human-transition.ts";
 
 /**
  * 人間の /request-changes コメントによる差し戻し（awaiting_human → planning）。

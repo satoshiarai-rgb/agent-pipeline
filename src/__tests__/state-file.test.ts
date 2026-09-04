@@ -1,7 +1,7 @@
+import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
-import { applyRunFile, checkPipelineVersion, parseRunFile } from "../run-file.ts";
+import { applyStateFile, checkPipelineVersion, parseStateFile } from "../state-file.ts";
 import { config } from "./helpers.ts";
 
 const stateYaml = `# この run の状態。復旧するときは phase を書き換えて push する
@@ -15,9 +15,9 @@ phase: planning
 blocked_reason: null
 `;
 
-describe("parseRunFile", () => {
+describe("parseStateFile", () => {
   test("識別子と phase を分けて返す", () => {
-    const f = parseRunFile(stateYaml);
+    const f = parseStateFile(stateYaml);
     expect(f.phase).toBe("planning");
     expect(f.blocked_reason).toBeNull();
     expect(f.meta).toEqual({
@@ -29,14 +29,14 @@ describe("parseRunFile", () => {
   });
 
   test("issue か phase が無ければエラー", () => {
-    expect(() => parseRunFile("issue: 1\n")).toThrow(/issue か phase/);
-    expect(() => parseRunFile("phase: planning\n")).toThrow(/issue か phase/);
+    expect(() => parseStateFile("issue: 1\n")).toThrow(/issue か phase/);
+    expect(() => parseStateFile("phase: planning\n")).toThrow(/issue か phase/);
   });
 });
 
-describe("applyRunFile", () => {
+describe("applyStateFile", () => {
   test("phase を書き換えてもコメントとキー順が保持される（人間が編集するファイル）", () => {
-    const out = applyRunFile(parseRunFile(stateYaml).doc, {
+    const out = applyStateFile(parseStateFile(stateYaml).doc, {
       phase: "plan_review",
       blocked_reason: null,
       now: new Date("2026-09-04T10:22:00Z"),
@@ -49,7 +49,7 @@ describe("applyRunFile", () => {
   });
 
   test("blocked_reason を書ける", () => {
-    const out = applyRunFile(parseRunFile(stateYaml).doc, {
+    const out = applyStateFile(parseStateFile(stateYaml).doc, {
       phase: "blocked",
       blocked_reason: "total_steps_exceeded: 12/12",
       now: new Date(),
@@ -60,18 +60,20 @@ describe("applyRunFile", () => {
 
 describe("checkPipelineVersion", () => {
   test("一致すれば null", () => {
-    expect(checkPipelineVersion(parseRunFile(stateYaml).meta, config())).toBeNull();
+    expect(checkPipelineVersion(parseStateFile(stateYaml).meta, config())).toBeNull();
   });
 
   test("不一致なら理由を返す（中央の破壊的変更から進行中の run を守る）", () => {
-    const meta = { ...parseRunFile(stateYaml).meta, pipeline_version: 2 };
-    expect(checkPipelineVersion(meta, config())).toContain("pipeline_version_mismatch: run=2 harness=1");
+    const meta = { ...parseStateFile(stateYaml).meta, pipeline_version: 2 };
+    expect(checkPipelineVersion(meta, config())).toContain(
+      "pipeline_version_mismatch: run=2 harness=1",
+    );
   });
 });
 
 describe("templates/state.yml（bootstrap が使う雛形）", () => {
   const text = readFileSync(join(import.meta.dir, "../../templates/state.yml"), "utf8");
-  const file = parseRunFile(text);
+  const file = parseStateFile(text);
 
   test("雛形は planning から始まる", () => {
     expect(file.phase).toBe("planning");

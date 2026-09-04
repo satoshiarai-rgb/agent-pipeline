@@ -1,6 +1,6 @@
-import { existsSync, readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { afterEach, describe, expect, test } from "bun:test";
+import { readFileSync } from "node:fs";
+import { join } from "node:path";
 import { approveRun, finishRun, routeRun, startRun } from "../index.ts";
 import { parseRecord } from "../utils/parse-record.ts";
 import { config } from "./helpers.ts";
@@ -10,8 +10,20 @@ const c = config();
 afterEach(cleanupRuns);
 
 describe("finishRun", () => {
-  const step = (dir: string, agent: Parameters<typeof startRun>[0]["agent"], run_id: string, outcome: Parameters<typeof finishRun>[0]["outcome"]) => {
-    const { record_path } = startRun({ dir, config: c, agent, run_id, attempt: 1, model: "claude-opus-5" });
+  const step = (
+    dir: string,
+    agent: Parameters<typeof startRun>[0]["agent"],
+    run_id: string,
+    outcome: Parameters<typeof finishRun>[0]["outcome"],
+  ) => {
+    const { record_path } = startRun({
+      dir,
+      config: c,
+      agent,
+      run_id,
+      attempt: 1,
+      model: "claude-opus-5",
+    });
     return finishRun({ dir, config: c, record_path, outcome, session_id: `sess-${run_id}` });
   };
 
@@ -34,7 +46,9 @@ describe("finishRun", () => {
   test("ラウンド上限は今回の実行を含めて数える（2 回目の差し戻しで blocked）", () => {
     const dir = makeRun();
     step(dir, "planner", "100", { result: "ok" });
-    expect(step(dir, "plan-reviewer", "101", { result: "ok", verdict: "request_changes" }).phase).toBe("planning");
+    expect(
+      step(dir, "plan-reviewer", "101", { result: "ok", verdict: "request_changes" }).phase,
+    ).toBe("planning");
     step(dir, "planner", "102", { result: "ok" });
     const f = step(dir, "plan-reviewer", "103", { result: "ok", verdict: "request_changes" });
     expect(f.phase).toBe("blocked");
@@ -56,7 +70,10 @@ describe("finishRun", () => {
     expect(phaseOf(dir).phase).toBe("awaiting_human");
     expect(routeRun({ dir, config: c }).action).toBe("none");
 
-    expect(approveRun({ dir, config: c, association: "OWNER" })).toEqual({ ok: true, phase: "developing" });
+    expect(approveRun({ dir, config: c, association: "OWNER" })).toEqual({
+      ok: true,
+      phase: "developing",
+    });
     step(dir, "developer", "3", { result: "ok" });
     step(dir, "dev-reviewer", "4", { result: "ok", verdict: "approve" });
     const last = step(dir, "completion", "5", { result: "ok", acceptance_passed: true });

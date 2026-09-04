@@ -1,4 +1,5 @@
-import type { RoundKey, RunRecord } from "../types.ts";
+import type { RoundKey } from "../types.ts";
+import type { RunRecord } from "./parse-record.ts";
 
 /**
  * 実行レコードから状態を導出する（A-33）。

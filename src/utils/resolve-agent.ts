@@ -1,4 +1,5 @@
-import type { AgentName, Config } from "../types.ts";
+import type { AgentName } from "../types.ts";
+import type { Config } from "./load-config.ts";
 
 /**
  * エージェントの実行パラメータを解決する。

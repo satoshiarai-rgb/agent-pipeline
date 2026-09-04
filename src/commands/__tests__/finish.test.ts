@@ -1,7 +1,8 @@
 import { describe, expect, test } from "bun:test";
-import { finish } from "../finish.ts";
-import type { Phase, RunRecord } from "../../types.ts";
 import { config, rec, review } from "../../__tests__/helpers.ts";
+import type { Phase } from "../../types.ts";
+import type { RunRecord } from "../../utils/parse-record.ts";
+import { finish } from "../finish.ts";
 
 describe("finish", () => {
   const c = config();
@@ -147,14 +148,19 @@ describe("finish", () => {
     // planner → plan-reviewer(approve) → 人間承認 → developer → dev-reviewer(approve) → completion
     let phase: Phase = "planning";
     const records: RunRecord[] = [];
-    const step = (outcome: Parameters<typeof finish>[0]["outcome"], agent: Parameters<typeof rec>[0]) => {
+    const step = (
+      outcome: Parameters<typeof finish>[0]["outcome"],
+      agent: Parameters<typeof rec>[0],
+    ) => {
       records.push(rec(agent));
       const f = finish({ phase, records, config: c, outcome });
       phase = f.phase;
       return f;
     };
     expect(step({ result: "ok" }, "planner").phase).toBe("plan_review");
-    expect(step({ result: "ok", verdict: "approve" }, "plan-reviewer").phase).toBe("awaiting_human");
+    expect(step({ result: "ok", verdict: "approve" }, "plan-reviewer").phase).toBe(
+      "awaiting_human",
+    );
     phase = "developing"; // /approve による人間の遷移
     expect(step({ result: "ok" }, "developer").phase).toBe("dev_review");
     expect(step({ result: "ok", verdict: "approve" }, "dev-reviewer").phase).toBe("completing");
