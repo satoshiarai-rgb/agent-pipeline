@@ -23,6 +23,7 @@ export interface Config {
   tool_profiles: Record<string, string>;
   agents: Record<AgentName, { max_turns: number; timeout_minutes: number; tools: string }>;
   approvers: string[];
+  labels: { prefix: string; trigger: string };
   transitions: Partial<Record<Phase, TransitionEntry>>;
 }
 
@@ -73,6 +74,15 @@ export const defaults: Config = {
    * 個人アカウント配下では MEMBER が返らないため COLLABORATOR を使う（K-1）
    */
   approvers: ["OWNER", "COLLABORATOR"],
+
+  /**
+   * issue ラベルは状態の射影（設計書 §2.3）。ラベル操作の失敗は状態を壊さない。
+   * trigger はパイプラインを起動するラベルで、bootstrap が成功したら外す。
+   */
+  labels: {
+    prefix: "agent:",
+    trigger: "agent:go",
+  },
 
   /**
    * 遷移表。エージェントが起こす辺と人間が起こす辺をすべてここに集約する。

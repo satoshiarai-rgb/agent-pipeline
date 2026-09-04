@@ -226,3 +226,27 @@ jobs:
             echo "- reason=\`${{ steps.finish.outputs.reason }}\`"
             echo "- continue_chain=\`${{ steps.finish.outputs.continue_chain }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # ---- ラベルの射影と、done なら PR の ready 化（設計書 §2.3 / §6.3）
+      # 中央リポジトリの取得は成果物の push より後に行う。
+      # 先に取得すると .pipeline が git add -A で配布先にコミットされてしまう
+      - name: 中央リポジトリを .pipeline に取得する
+        if: always() && needs.route.outputs.action != 'none'
+        uses: actions/checkout@v7
+        with:
+          repository: satoshiarai-rgb/agent-pipeline
+          ref: main
+          path: .pipeline
+
+      # ラベル操作の失敗は状態を壊さない
+      - name: ラベルを phase に合わせる
+        if: always() && needs.route.outputs.action != 'none'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUN_DIR: ${{ needs.route.outputs.dir }}
+          CLI: ${{ github.workspace }}/.pipeline/dist/cli.js
+        run: |
+          set -uo pipefail
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --json number -q '.[0].number' 2>/dev/null || true)
+          export PR
+          bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"

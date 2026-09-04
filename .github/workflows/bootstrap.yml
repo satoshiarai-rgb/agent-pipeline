@@ -135,3 +135,20 @@ jobs:
             --title "$(gh issue view "$N" --repo "$GITHUB_REPOSITORY" --json title -q .title)" \
             --body-file /tmp/pr-body.md
           echo "### bootstrap: $BR と draft PR を作成" >> "$GITHUB_STEP_SUMMARY"
+
+      - name: 中央リポジトリを .pipeline に取得する
+        if: steps.authorize.outputs.skip != 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: satoshiarai-rgb/agent-pipeline
+          ref: main
+          path: .pipeline
+
+      # 起動用ラベル（agent:go）が外れて agent:planning が付く
+      - name: ラベルを phase に合わせる
+        if: steps.authorize.outputs.skip != 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUN_DIR: agent-work/issue-${{ inputs.issue }}
+          CLI: ${{ github.workspace }}/.pipeline/dist/cli.js
+        run: bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"

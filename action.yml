@@ -8,11 +8,11 @@
 # 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
-description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / block）
+description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / block / label）
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | block"
+    description: "start | route | finish | approve | request-changes | block | label"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
@@ -37,6 +37,12 @@ inputs:
   reason: { description: "block: blocked_reason に残す理由", required: false }
 
 outputs:
+  label:
+    description: "label: いま issue に付いているべきラベル"
+    value: ${{ steps.run.outputs.label }}
+  issue:
+    description: "label: issue 番号"
+    value: ${{ steps.run.outputs.issue }}
   json:
     description: "CLI の出力全体（JSON）"
     value: ${{ steps.run.outputs.json }}

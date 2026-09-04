@@ -342,6 +342,21 @@ function finishRun(input) {
   writeStateFile(dir, file, result, now);
   return result;
 }
+// src/commands/label.ts
+function labelFor(phase, prefix) {
+  return `${prefix}${phase.replace(/_/g, "-")}`;
+}
+function labelRun(input) {
+  const file = readStateFile(input.dir);
+  const { prefix, trigger } = input.config.labels;
+  return {
+    label: labelFor(file.phase, prefix),
+    issue: file.meta.issue,
+    phase: file.phase,
+    prefix,
+    trigger
+  };
+}
 // src/file/review-file.ts
 import { existsSync as existsSync2, mkdirSync as mkdirSync2, readdirSync as readdirSync2, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join3 } from "node:path";
@@ -449,6 +464,10 @@ var defaults = {
     completion: { max_turns: 15, timeout_minutes: 15, tools: "exec" }
   },
   approvers: ["OWNER", "COLLABORATOR"],
+  labels: {
+    prefix: "agent:",
+    trigger: "agent:go"
+  },
   transitions: {
     planning: { agent: "planner", on_ok: "plan_review" },
     plan_review: {
@@ -483,6 +502,7 @@ commands:
   approve  /approve による遷移                --association
   request-changes  /request-changes による差し戻し  --association --body
   block    phase を blocked にする            --reason
+  label    いま付いているべきラベルを返す
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -556,6 +576,8 @@ var run = () => {
       });
     case "block":
       return blockRun({ dir, config: defaults, reason: need(values.reason, "reason") });
+    case "label":
+      return labelRun({ dir, config: defaults });
     default:
       console.error(`不明なコマンド: ${command ?? "(なし)"}
 

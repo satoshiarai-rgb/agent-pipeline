@@ -8,6 +8,7 @@ export { approveRun } from "./commands/approve.ts";
 export { blockRun } from "./commands/block.ts";
 export type { FinishResult, Outcome } from "./commands/finish.ts";
 export { finishRun } from "./commands/finish.ts";
+export { labelRun } from "./commands/label.ts";
 export { requestChangesRun } from "./commands/request-changes.ts";
 export { routeRun } from "./commands/route.ts";
 export { startRun } from "./commands/start.ts";

@@ -95,16 +95,33 @@ describe("ワークフローの YAML", () => {
     }
   });
 
-  test("中央 action の参照はすべて同じ ref を使う（A-11 の版ずれ防止）", () => {
+  test("中央リポジトリの参照はすべて同じ ref を使う（A-11 の版ずれ防止）", () => {
     const refs = new Set<string>();
     for (const wf of all) {
-      for (const m of readFileSync(wf.path, "utf8").matchAll(
-        /satoshiarai-rgb\/agent-pipeline\S*@(\S+)/g,
-      )) {
+      const text = readFileSync(wf.path, "utf8");
+      // uses: owner/repo/...@ref の形
+      for (const m of text.matchAll(/satoshiarai-rgb\/agent-pipeline\S*@(\S+)/g)) {
+        refs.add(m[1] as string);
+      }
+      // actions/checkout の repository: + ref: の形
+      for (const m of text.matchAll(/repository: satoshiarai-rgb\/agent-pipeline\s+ref: (\S+)/g)) {
         refs.add(m[1] as string);
       }
     }
     expect([...refs]).toEqual(["main"]);
+  });
+
+  test("中央リポジトリを .pipeline に取得するのは成果物の push より後", () => {
+    // 先に取得すると .pipeline が git add -A で配布先にコミットされてしまう
+    for (const wf of all) {
+      const steps = Object.values(wf.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
+      const pipelineAt = steps.findIndex((st) => st.name?.includes(".pipeline"));
+      if (pipelineAt < 0) continue;
+      // git add -A を含むステップは複数あるので、最後のものと比べる
+      const pushAt = steps.reduce((last, st, i) => (st.run?.includes("git add -A") ? i : last), -1);
+      if (pushAt < 0) continue;
+      expect(pipelineAt, wf.name).toBeGreaterThan(pushAt);
+    }
   });
 });
 

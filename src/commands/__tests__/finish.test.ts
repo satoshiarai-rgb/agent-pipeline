@@ -18,7 +18,8 @@ describe("finishRun: レコードの更新", () => {
     const rec = readRecords(dir)[0] as RunRecord;
     expect(rec.finished_at).not.toBeNull();
     expect(rec.result).toBe("ok");
-    expect(rec.session_id).toBe("sess-1");
+    // 実行番号はテスト全体で共有のカウンタから採るので、レコードの run_id と突き合わせる
+    expect(rec.session_id).toBe(`sess-${rec.run_id}`);
 
     // 識別子は書き換えずに保つ
     expect(phaseOf(dir).meta.issue).toBe(123);

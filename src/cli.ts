@@ -5,6 +5,7 @@ import {
   blockRun,
   defaults as config,
   finishRun,
+  labelRun,
   type Outcome,
   requestChangesRun,
   routeRun,
@@ -26,6 +27,7 @@ commands:
   approve  /approve による遷移                --association
   request-changes  /request-changes による差し戻し  --association --body
   block    phase を blocked にする            --reason
+  label    いま付いているべきラベルを返す
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -102,6 +104,8 @@ const run = () => {
       });
     case "block":
       return blockRun({ dir, config, reason: need(values.reason, "reason") });
+    case "label":
+      return labelRun({ dir, config });
     default:
       console.error(`不明なコマンド: ${command ?? "(なし)"}\n\n${USAGE}`);
       return process.exit(2);

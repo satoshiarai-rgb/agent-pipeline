@@ -1,13 +1,17 @@
-export type Phase =
-  | "bootstrap"
-  | "planning"
-  | "plan_review"
-  | "awaiting_human"
-  | "developing"
-  | "dev_review"
-  | "completing"
-  | "done"
-  | "blocked";
+/** run の状態。ラベルの射影で列挙するため実行時の配列も持つ */
+export const PHASES = [
+  "bootstrap",
+  "planning",
+  "plan_review",
+  "awaiting_human",
+  "developing",
+  "dev_review",
+  "completing",
+  "done",
+  "blocked",
+] as const;
+
+export type Phase = (typeof PHASES)[number];
 
 export type AgentName = "planner" | "plan-reviewer" | "developer" | "dev-reviewer" | "completion";
 

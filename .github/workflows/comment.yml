@@ -138,6 +138,22 @@ jobs:
           git push
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "\`/agent $CMD\` を受け付けました。次のフェーズは \`$PHASE\` です。"
 
+      - name: 中央リポジトリを .pipeline に取得する
+        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
+        uses: actions/checkout@v7
+        with:
+          repository: satoshiarai-rgb/agent-pipeline
+          ref: main
+          path: .pipeline
+
+      - name: ラベルを phase に合わせる
+        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUN_DIR: ${{ steps.parse.outputs.dir }}
+          CLI: ${{ github.workspace }}/.pipeline/dist/cli.js
+        run: bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"
+
       - name: 受け付けられなかった理由を PR に返す
         if: |
           steps.parse.outputs.command != 'none' &&
