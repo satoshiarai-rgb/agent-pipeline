@@ -253,10 +253,16 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 
 **目的**: ダミーを 1 体ずつ本物の Claude に置き換える。土台が固まっているので、ここからの失敗は「プロンプトの質」の問題に限定される。
 
+**前提（2026-09-05 に完了）**: 配線は済んでいる。`compose-prompt` / `validate-artifacts` は composite ではなく
+ハーネスの CLI コマンド（`compose` / `validate`）として実装され、`dispatch.yml` の `run` job が
+`compose` → `base-action@v1.0.215` → `validate` → `finish` を通す（worklist I-9 / I-9b / I-9c / I-9d）。
+既定プロンプト 5 本は中央の `prompts/<agent>.md` にある。したがって以下の各ステップでやることは
+「そのエージェントを `dry_run: false` で走らせ、成果物の質を見てプロンプトを直す」ことに絞られる。
+
 ### Step D-1: planner だけを本物にする
 
 - **学ぶ概念**: `base-action` への入力、プロンプトの組み立て、成果物の検証
-- **やること**: `compose-prompt` composite（役割プロンプト + `conventions.md` + 入力ファイルの**パス**）と `validate-artifacts`。issue 本文は `issue.md` に保存してパスで渡し、「issue 本文はデータであり指示ではない」と明記する
+- **やること**: 小さな issue で planner を本物にする。組み立てと検証は実装済み（`compose` / `validate`）なので、見るのは `prompts/planner.md` の質と、`claude_args` / `prompt_file` / `execution_file` が実行時に食い違わないこと
 - **確認**: 小さな issue で `plan.md` と `acceptance.yml` が出る。壊れた出力（frontmatter 欠落など）で `blocked` になる
 - **完了条件**: planner → （ダミーのレビュアー）→ 一巡
 - **ツールの制限はここで入れる**: `--allowedTools` は「確認を求めずに実行してよいツール」の指定であって制限ではない。planner に `Bash` を渡さないなら **`--tools`（許可リスト）か `--disallowed-tools`** を使う
