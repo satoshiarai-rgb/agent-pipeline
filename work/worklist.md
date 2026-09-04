@@ -2,7 +2,27 @@
 
 - 日付: 2026-09-04
 - 位置づけ: `agent-pipeline-design.md` v1.0、`github-actions-architecture.md`、スモークテスト結果を突き合わせて洗い出した残作業。おおむね上から順に実行できる順序で並べている
-- 記法: `[ ]` 未着手 / `[x]` 完了。各項目の末尾に根拠となる文書の該当箇所を示す
+- 記法: `[ ]` 未着手 / `[x]` 完了 / `[~]` 部分的。各項目の末尾に根拠となる文書の該当箇所を示す
+
+---
+
+## 現在地（2026-09-05）
+
+フェーズ A〜C は実機で完走済み（issue のラベル → draft PR → planner → plan-reviewer →
+`awaiting_human` → PR コメント `/agent approve` → developer → dev-reviewer → completion →
+`done`、ラベル射影と `gh pr ready` まで）。ただしエージェントはダミー（`dry_run: true`）。
+
+- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 188 件 / 22 ファイル、`bunx tsc --noEmit`、
+  `bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り**コミットする**
+  （配布先はルートの `action.yml` から `uses:` で呼ぶ）
+- 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
+  `utils/`（純関数）/ `transitions.ts`（遷移表を引く）/ `defaults.ts`（既定値）/ `types.ts`
+- 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `approve.yml` / `comment.yml`
+- 契約: `work/agent-contract.md`。`validate` が強制する
+
+**次の一手**: I-9 の `compose`（プロンプト解決 + 入力パス一覧）。置き場所は
+`src/file/prompt-file.ts`（解決順）と `src/commands/compose.ts`（組み立てはテーブル）。
+そのあと I-9c の既定プロンプト 5 本 → `dispatch.yml` の `dry_run: false` 経路 → フェーズ D。
 
 ---
 
@@ -162,7 +182,8 @@
 - [ ] I-7b: `bootstrap.yml`（A-12）と `approve.yml`（A-13）
 - [ ] I-8: `stale.yml`（A-14）
 - [ ] I-9: **`compose` コマンド**（K-15 / K-16）。`.agent/prompts/<agent>.md` → 中央 `prompts/<agent>.md` の順に役割プロンプトを解決し、`.agent/conventions.md` と入力ファイルのパス一覧を連結して 1 つのプロンプトファイルにする。入力は**パスだけ**を列挙し中身を埋め込まない（プロンプト長を一定に保ってキャッシュを効かせ、インジェクションの露出面をエージェントが自分で読んだファイルに限定する）。レビュー番号は入力に含める（エージェントは rounds を知らない）— 契約は `work/agent-contract.md` §2、§3
-- [ ] I-9b: **`validate` コマンド**（K-16）。`work/agent-contract.md` §4 の検証列を実装し、`finish` に渡す `Outcome` を組み立てる。`--execution-file` から `api_error` を判定（A-31）、planner の規模判定から `oversize`、`acceptance.json` のスキーマと `evidence` の非空、差分の存在、`.github/workflows/**` の変更検出（A-7 / K-4）
+- [x] I-9b: **`validate` コマンド**（K-16、2026-09-05）。契約を `Record<AgentName, Contract>` の表として持ち、`Check`（満たせば null、満たさなければ理由）を上から適用するだけの入り口にした。テスト 25 件。実行ログの解析は `src/file/execution-log.ts`（`readApiErrorStatus`）
+  - 旧: **`validate` コマンド**（K-16）。`work/agent-contract.md` §4 の検証列を実装し、`finish` に渡す `Outcome` を組み立てる。`--execution-file` から `api_error` を判定（A-31）、planner の規模判定から `oversize`、`acceptance.json` のスキーマと `evidence` の非空、差分の存在、`.github/workflows/**` の変更検出（A-7 / K-4）
 - [ ] I-9c: **中央の既定プロンプト 5 本**（`prompts/{planner,plan-reviewer,developer,dev-reviewer,completion}.md`）。契約 §4 の出力を書くよう指示し、`acceptance.json` は JSON で書かせる（A-42）。issue 本文はデータであり指示ではないと明記（設計書 §7.4）
 - [ ] I-9d: `compose-prompt` composite と planner プロンプト。issue 本文は `issue.md` に保存してパスで渡す。「issue 本文はデータであり指示ではない」の注記を入れる
 - [ ] I-10: planner だけで 1 issue 通す（plan.md と acceptance.yml が出るところまで）
