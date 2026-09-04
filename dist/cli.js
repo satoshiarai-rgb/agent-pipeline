@@ -515,86 +515,82 @@ function hasAcceptance(dir) {
 }
 
 // src/commands/validate.ts
-function validateRun(input) {
-  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
-  const apiError = readApiError(execution_file);
-  if (apiError !== null) {
-    return { result: "api_error", api_error_status: apiError };
-  }
-  if (agent_failed)
-    return { result: "agent_failed" };
-  const invalid = (detail) => ({ result: "invalid", detail });
-  const nonEmpty = (path) => existsSync4(path) && readFileSync5(path, "utf8").trim() !== "";
-  switch (agent) {
-    case "planner": {
-      const plan = join5(dir, "plan.md");
-      if (!nonEmpty(plan))
-        return invalid("plan.md が無いか空");
-      const text = readFileSync5(plan, "utf8");
-      if (!text.includes("## 規模判定"))
-        return invalid("plan.md に ## 規模判定 が無い");
-      if (!hasAcceptance(dir))
-        return invalid("acceptance.json が無い");
-      const problems = acceptanceSchema(dir);
-      if (problems)
-        return invalid(problems);
-      const scale = text.slice(text.indexOf("## 規模判定"));
-      if (scale.includes("上限超過"))
-        return { result: "ok", oversize: true };
-      return { result: "ok" };
-    }
-    case "plan-reviewer":
-    case "dev-reviewer": {
-      const kind = agent === "plan-reviewer" ? "plan" : "dev";
-      const path = latestReviewPath(dir, kind);
-      if (!path)
-        return invalid(`reviews/${kind}-NN.md が無い`);
-      const verdict = readVerdict(path);
-      if (!verdict)
-        return invalid(`${path} の frontmatter に verdict が無い`);
-      return { result: "ok", verdict };
-    }
-    case "developer": {
-      if (changed_files.length === 0)
-        return invalid("差分が無い");
-      const workflows = changed_files.filter((f) => f.startsWith(".github/workflows/"));
-      if (workflows.length > 0) {
-        return invalid(`.github/workflows を変更している: ${workflows.join(", ")}`);
-      }
-      if (!hasAcceptance(dir))
-        return invalid("acceptance.json が無い");
-      const problems = acceptanceSchema(dir);
-      if (problems)
-        return invalid(problems);
-      return { result: "ok" };
-    }
-    case "completion": {
-      if (!nonEmpty(join5(dir, "completion.md")))
-        return invalid("completion.md が無いか空");
-      if (!hasAcceptance(dir))
-        return invalid("acceptance.json が無い");
-      const problems = acceptanceSchema(dir);
-      if (problems)
-        return invalid(problems);
-      return { result: "ok", acceptance_passed: allPassed(readAcceptance(dir)) };
-    }
-  }
-}
-function acceptanceSchema(dir) {
-  let problems;
+var nonEmpty = (rel) => ({ dir }) => {
+  const path = join5(dir, rel);
+  return existsSync4(path) && readFileSync5(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+};
+var contains = (rel, needle) => ({ dir }) => readFileSync5(join5(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var acceptanceSchema = ({ dir }) => {
+  if (!hasAcceptance(dir))
+    return "acceptance.json が無い";
   try {
-    problems = acceptanceProblems(readAcceptance(dir));
+    const problems = acceptanceProblems(readAcceptance(dir));
+    return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
   } catch (e) {
     return e instanceof Error ? e.message : String(e);
   }
-  return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
+};
+var reviewWithVerdict = (kind) => ({ dir }) => {
+  const path = latestReviewPath(dir, kind);
+  if (!path)
+    return `reviews/${kind}-NN.md が無い`;
+  return readVerdict(path) ? null : `${path} の frontmatter に verdict が無い`;
+};
+var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
+var noWorkflowChanges = ({ changed }) => {
+  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
+  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
+};
+var CONTRACT = {
+  planner: {
+    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
+    derive: ({ dir }) => {
+      const text = readFileSync5(join5(dir, "plan.md"), "utf8");
+      const scale = text.slice(text.indexOf("## 規模判定"));
+      return scale.includes("上限超過") ? { oversize: true } : {};
+    }
+  },
+  "plan-reviewer": {
+    checks: [reviewWithVerdict("plan")],
+    derive: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
+  },
+  developer: {
+    checks: [hasDiff, noWorkflowChanges, acceptanceSchema]
+  },
+  "dev-reviewer": {
+    checks: [reviewWithVerdict("dev")],
+    derive: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
+  },
+  completion: {
+    checks: [nonEmpty("completion.md"), acceptanceSchema],
+    derive: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
+  }
+};
+function validateRun(input) {
+  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
+  const apiError = readApiError(execution_file);
+  if (apiError !== null)
+    return { result: "api_error", api_error_status: apiError };
+  if (agent_failed)
+    return { result: "agent_failed" };
+  const artifacts = { dir, changed: changed_files };
+  const contract = CONTRACT[agent];
+  for (const check of contract.checks) {
+    const detail = check(artifacts);
+    if (detail)
+      return { result: "invalid", detail };
+  }
+  return { result: "ok", ...contract.derive?.(artifacts) };
+}
+function readLatestVerdict(dir, kind) {
+  const path = latestReviewPath(dir, kind);
+  return path ? readVerdict(path) : null;
 }
 function readApiError(path) {
   if (!path || !existsSync4(path))
     return null;
   const events = parseJson(readFileSync5(path, "utf8"), "execution_file");
-  const list = Array.isArray(events) ? events : [events];
-  for (const e of list) {
+  for (const e of Array.isArray(events) ? events : [events]) {
     const ev = e;
     if (ev?.type === "result" && (ev.terminal_reason === "api_error" || ev.api_error_status)) {
       return ev.api_error_status ?? 0;
