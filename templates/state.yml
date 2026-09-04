@@ -1,0 +1,27 @@
+# この run の状態。書くのはハーネスだけ（エージェントは書かない / 設計書 §7.1）
+#
+# 復旧のしかた:
+#   blocked になった run は、下の phase を戻したい地点に書き換えて push すれば再開する。
+#   agent-work/** の変更で dispatch が起動するため、それ以外の操作は不要。
+#
+# ここに無い値は保存せず導出する:
+#   total_steps / rounds … runs/ 配下のレコード数から数える（A-33）
+#   実行中かどうか        … runs/ に finished_at が空のレコードがあるか
+#   PR 番号               … gh pr list --head <branch> で引く（A-16）
+
+# 中央リポジトリのメジャー版。進行中の run では上げない。
+# ハーネス側と一致しない run は blocked にする（設計書 §5.1）
+pipeline_version: 1
+
+issue: 0
+branch: ""
+
+# bootstrap | planning | plan_review | awaiting_human
+# | developing | dev_review | completing | done | blocked
+phase: planning
+
+# blocked のときだけ理由が入る（例: plan_review_rounds_exceeded: 2/2、api_error:429）
+blocked_reason: null
+
+# ハーネスが状態を書き換えた時刻。人間は触らなくてよい
+updated_at: null

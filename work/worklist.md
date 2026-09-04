@@ -17,6 +17,8 @@
 | K-3 | モデルは生成・レビュー共に `claude-opus-5` | `defaults.yml`、設計書 §5.7 |
 | K-4 | **エージェントは `.github/workflows/**` を変更しない。GitHub App に Workflows 権限を付与しない** | 権限の最小化を維持。ワークフロー変更を要する issue はパイプライン対象外 |
 | K-5 | `agent-work/` は main に残す | 設計書 §10.5 で既決 |
+| K-10 | **`done` は終端。PR を見た人間がコードに変更を求める経路は用意しない。作り直しが必要なら新しい issue を立てる** | 検討して却下したもの: `done → planning` の差し戻し辺と、人間の差し戻しごとにカウントを数え直す「サイクル」の仕組み（レコードのファイル名に世代を入れる案）。実装して動かしたうえで、**やり直すなら最初からやり直す方が単純**という判断で削除した。`awaiting_human` からの差し戻し（計画段階、`/request-changes`）は残す — 設計書 §1「マージまでが責務」と整合 |
+| K-9 | **ハーネスの実装言語は TypeScript。ランタイムは Node、bun は開発ツールチェーンとして使う** | 手順は composite action ではなく **JS action**（`runs.using: node24` / `main: dist/index.js`）にし、bun でビルドしたバンドルをコミットする。ランナーに bun は同梱されていないため、ランタイムに bun を要求しない形にする。設計書 §4.1 の `scripts/*.py` は `src/*.ts` + `dist/` に置き換わる。選定理由: npm の `yaml` が **YAML のコメントと書式を保持**して round-trip できる（`state.yml` は人間が復旧時に編集するファイル）／`execution_file` の JSON 解析が自然（A-31）／`claude-code-action` 自体が TS で書かれている／`@actions/core` で入出力を型付きに扱える／`bun test` で遷移表の網羅テストが速い。代償はビルド成果物 `dist/` をコミットすることと、タグを切る前にビルドする手順が必要になること |
 | K-8 | **配布先リポジトリの Claude Code 設定（`.claude/settings.json`）は読ませる。** ハーネスは `settings` 入力で上書きしない | 配布先固有の調整は `conventions.md` と同じ信頼境界にある（そのリポジトリの管理者が置くもの）。ただし配布先が意図せず権限を広げることは起きるため、**最低限の禁止はハーネス側が `--disallowed-tools` で明示的に重ねる**（設定で緩められない側に置く。フラグが設定より優先されることは D-1 で確認する） |
 | K-7 | **Anthropic Console のアカウントが未取得のため、当面は Claude Team サブスクリプションの認証（`claude_code_oauth_token`）でワークフロー全体を検証し、後日 Console + WIF に差し替える** | 設計書 §2.1 の「サブスク認証は CI に向かない」という結論は目標構成として維持する。差し替えは A-29。検証中は使用量がサブスクリプションに計上され、ワークスペース支出上限（§7.5）によるコスト制御は効かない |
 | K-6 | **現時点の検証はすべて個人アカウント配下のリポジトリに限る。** 組織アカウント（`<org>`） のリポジトリ・Secrets・App インストールには触らない | 複数リポジトリを要する検証（V-7 / V-8）は個人アカウント内に 2 リポジトリ用意して行う。org 側の作業は R-3 まで着手しない |
@@ -51,7 +53,7 @@
 ### 仕様の空白を埋める
 
 - [ ] A-18: `reviews/<kind>-NN.md` の `NN` はハーネスが決め、`compose-prompt` が出力先パスをプロンプトに渡す、と明記する。エージェントは `rounds` を知らない — 設計書 §5.5
-- [ ] A-19: `defaults.yml` と `.agent/config.yml` のマージ規則を明記する（深いマージ、`null` は「継承」、未知キーはエラー）。担当は `read-state` composite — 構成案 §5.2、設計書 §5.7
+- [ ] A-19: `defaults.yml` と `.agent/config.yml` のマージ規則を明記し、実装する（深いマージ、`null` は「継承」、未知キーはエラー）。担当は `read-state`。**着手は Step B-5（2 リポジトリ分離）** — それ以前は配布先の `config.yml` が存在しないため書かない — 構成案 §5.2、設計書 §5.7
 - [ ] A-20: 成果物スキーマの置き場所を決める（中央に `schemas/acceptance.yml.json` 等）。`validate-artifacts` はこれを参照する — 構成案 §5.4
 - [ ] A-21: `blocked` からの復旧時に `total_steps` / `rounds` をどう扱うか決める。上限で止まった run は `phase` を戻すだけでは即再 blocked になる — 設計書 §7.2
 - [ ] A-22: コミットメッセージ形式の所有者を決める。ハーネスが `agent: <agent> -> <phase>` で固定するのか、`conventions.md` の規約に従わせるのか — 構成案 §5.5、設計書 §5.8
@@ -130,11 +132,21 @@
 
 構成案 §11 の順序に、上記の修正を織り込んだもの。
 
-- [ ] I-1: `scripts/state.py`（`read` / `start` / `finish` / `transition`）と `defaults.yml` の宣言的遷移表。ユニットテストをここに集中させる。git も GitHub API も触らない純関数に寄せる
-- [ ] I-2: `scripts/labels.py`（状態 → ラベルの射影、ラベル一括作成）
-- [ ] I-3: `scripts/authorize.py`、`scripts/scaffold.py`、スキーマ検証（A-20）
-- [ ] I-4: composite: `read-state` / `finalize` / `state-start` / `authorize` / `scaffold`（A-9、A-10）。ローカル実行できる形にする
-- [ ] I-5: composite: `app-token`。secrets は inputs 経由で受け取る。git identity は `<bot user id>+<slug>[bot]@users.noreply.github.com`、`bot_user_id` を output に出す。変数名に `UID` を使わない（bash の readonly 変数） — スモーク §実装への反映
+- [x] I-0: TypeScript のプロジェクト基盤（2026-09-04）。`package.json` / `tsconfig.json`（strict + `noUncheckedIndexedAccess`）/ `.gitignore`。依存は `@actions/core` と `yaml` のみ。`bun test` と `bunx tsc --noEmit` が通る
+  - 残: `bun build` によるバンドルとリリース手順は JS action を書く I-4 で足す（それまでビルド対象が無い）
+  - 残: `@actions/core` は v3 が出ているが API 差分が未確認のため v1 系で開始した。I-4 で評価する
+- [x] I-1: 状態機械と遷移表（2026-09-04）。**テスト 34 件が通る。git も GitHub API も触らない純関数**
+  - `defaults.yml`: 宣言的な遷移表、2 つの tool_profiles（A-30）、`approvers: [OWNER, COLLABORATOR]`（K-1）、モデルは `claude-opus-5`（K-3）
+  - `src/types.ts`: `state.yml` の可変値は `phase` と `blocked_reason` だけ（A-33）。`RunRecord` に `finished_at`（stale 検知用）
+  - `src/config.ts`: `resolveAgent` が tool_profiles とレビュアーのモデルを解決するだけ（22 行）。**設定マージ（A-19）は配布先の `config.yml` を実際に読む B-5 まで書かない**
+  - `src/records.ts`: `total_steps` と `rounds` をレコード数から導出、`in_flight` を検出（A-33）
+  - `src/state.ts`: `parseState` / `applyState`（**コメントとキー順を保持**）、`route`（`run` / `none` / `block`）、`finish`（`continue_chain` で `[skip ci]` の要否を返す、A-36）
+  - 遷移表に行き先が無い場合も `blocked` にする（設定の壊れを静かに通さない）
+  - 実装は src 239 行（実コード）/ テスト 26 件。うち `route` + `finish` の判断ロジックが約 90 行で、残りは YAML の読み書きと型宣言。分岐は設計書 §7.2 の停止条件と 1 対 1 で対応する
+- [ ] I-2: `src/labels.ts`（状態 → ラベルの射影、ラベル一括作成）
+- [ ] I-3: `src/authorize.ts`、`src/scaffold.ts`、スキーマ検証（A-20）
+- [ ] I-4: JS action: `read-state` / `finalize` / `state-start` / `authorize` / `scaffold`（A-9、A-10）。`@actions/core` で入出力を扱い、ローカルでも実行できる形にする
+- [ ] I-5: `app-token`（`create-github-app-token` を呼ぶだけなので composite で十分）。secrets は inputs 経由で受け取る。git identity は `<bot user id>+<slug>[bot]@users.noreply.github.com`、`bot_user_id` を output に出す。変数名に `UID` を使わない（bash の readonly 変数） — スモーク §実装への反映
 - [ ] I-6: `dispatch.yml` を、エージェント step をダミー（`echo` で成果物を生成）に置き換えて通す。状態機械と push ループ、`[skip ci]` の挙動をここで確認する
 - [ ] I-7: `bootstrap.yml`（A-12）と `approve.yml`（A-13）
 - [ ] I-8: `stale.yml`（A-14）
@@ -161,6 +173,11 @@
 - [ ] Q-3: `pipeline_version` はメジャーのみで、配布先は移動タグ `@v1` を参照する。v1 内のプロンプト変更が進行中の run の途中から混ざることを許容するか — 構成案 §8.4
 - [ ] Q-4: サービスアカウントの粒度（全リポジトリ共有か、リポジトリごとか）。コスト配賦が必要になるまで共有で開始する想定 — 設計書 §10.2
 - [ ] Q-6: 入力トークンの固定オーバーヘッドをどこまで削るか。V-13 の実測では 1 実行あたり約 17k 入力トークン（`cache_creation` 6056 + `cache_read` 10591）で、**自前のプロンプトは 2 トークン**だった。つまり削減対象はシステムプロンプト preset・ツール定義・skills 一覧であって、プロンプト文の圧縮ではない。手段は V-15（ツール削減）と V-17（preset / skills）。加えて、実運用のコストは固定分より**ターン数 × 再送される履歴**が支配的（developer は `max_turns: 40`）なので、`max_turns` とプロンプトの範囲の方が効く
+- [ ] A-41: **`awaiting_human` からの人間の差し戻しを設計書に反映する（K-10）。** 設計書 §3.1 は `awaiting_human` からの出口を `/approve` の 1 本しか定義していなかった。`/request-changes <理由>` でコメント本文を `reviews/plan-NN.md`（`verdict: request_changes` / `reviewer: human:<association>`）として残し `planning` に戻す経路を実装済み。レビュー種別は遷移表の `review_kind` が持つ。**差し戻し自体はレコードを作らないため `total_steps` は増えないが、戻った先のエージェント実行は通常どおり数える**（`plan_review_rounds: 2` を使い切っていると次のレビューで blocked になる点は許容する）。`done` からの差し戻しとサイクルの仕組みは K-10 で却下 — 設計書 §3.1 / §3.2 / §6.5
+- [ ] A-39: **`/request-changes` の入口を配布先 `agent.yml` と中央 `approve.yml` に追加する。** 設計書 §3.1 は `awaiting_human` からの出口を `/approve` の 1 本しか定義していなかった。人間が計画に変更を求める経路が無く、`phase` を手で戻しても planner は理由を知らないまま同じ計画を再生成する。実装済みの `requestChangesRun`（コメント本文を `reviews/plan-NN.md` に `verdict: request_changes` / `reviewer: human:<association>` として残し `planning` へ戻す）をワークフローから呼ぶ。設計書 §3.1 / §3.2 / §6.5 とラベル射影に反映する — 実装は `src/index.ts`
+- [ ] A-40: 中止の経路を決める。現状は `state.yml` を手で `done` か `blocked` に書き換えるしかない。候補は (a) `/abort` コメント、(b) issue を閉じたら止める（`issues: closed` を受ける）、(c) `agent:abort` ラベル。draft PR とブランチをどう片付けるか（閉じる / 残す）も併せて決める — 設計書 §3.1
+- [ ] A-37: `/approve` の入口にボット除外を足す（`github.event.comment.user.type != 'Bot'`）。ハーネス自身が投稿するコメント（承認の記録、`blocked` の通知）が将来 `/approve` で始まる文面になった場合に自己承認が成立してしまう。現在の文面では起きないが、入口の条件として明示しておく — 設計書 §6.5、§7.3
+- [ ] A-38: `/approve` の判定を `startsWith` のままにするか決める。先頭一致なので「LGTM /approve」では発火せず、`approve`（スラッシュなし）も無効。誤爆防止としては妥当だが、運用しにくければ `contains` に緩める。決めた内容を issue テンプレートと draft PR 本文に書いて周知する — 設計書 §6.5、Q-1
 - [ ] A-36: **`[skip ci]` は HEAD コミットに置かないという制約を明記する。** V-5 の実測で、判定は push の HEAD コミットに対して行われることが分かった。連鎖を続けたい push では最後のコミットに marker を付けてはならない（finalize は「start マーカー → 成果物」の順序を必ず守る）。逆に、**状態は書きたいが次を起動したくない場面（stale 検知が run を `blocked` にする、completing が `done` を書く等）では HEAD に marker を置くのが正しい手段**になる。構成案 §4.2 と §5.5、A-14 の `stale.yml` に反映する — V-5
 - [ ] A-35: `app-token` composite（構成案 §5.1）を `create-github-app-token@v3` の現行入力に合わせる。**`app-id` は非推奨で `client-id` が正**（値は App 設定ページの Client ID、`Iv23li...` 形式。数値の App ID とは別物）。Secrets 名は `AGENT_APP_CLIENT_ID` にする。あわせて同 action の **`permission-*` 入力でジョブごとにトークン権限を絞る**: bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents（+ 必要なら pull-requests）、approve は contents / issues。App 自体の権限に加えて**実行単位でさらに落とせる**ため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1、設計書 §2.1
 - [ ] A-33: **`rounds` と `total_steps` を `state.yml` から外し、追記専用のレコードの数から導出する。** 1 実行 1 ファイル（例 `agent-work/issue-<n>/runs/<agent>-<run_id>-<attempt>.yml`、内容は agent / 開始終了時刻 / result / モデル / verdict）にすれば、並行した 2 つの更新でもファイル名が衝突しないため rebase は常に「両方を保持」となり、A-32 の silent corruption が**カウンタについては構造的に消える**。`rounds.plan_review` は `runs/` 内の plan-reviewer レコード数、`total_steps` は全レコード数として導出する。結果として `state.yml` に残る可変値は `phase` と `blocked_reason` だけになり、危険域が最小化される — A-32、設計書 §5.1
