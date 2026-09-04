@@ -544,7 +544,7 @@ var noWorkflowChanges = ({ changed }) => {
 var CONTRACT = {
   planner: {
     checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
-    derive: ({ dir }) => {
+    postProcess: ({ dir }) => {
       const text = readFileSync5(join5(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));
       return scale.includes("上限超過") ? { oversize: true } : {};
@@ -552,18 +552,18 @@ var CONTRACT = {
   },
   "plan-reviewer": {
     checks: [reviewWithVerdict("plan")],
-    derive: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
+    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
   },
   developer: {
     checks: [hasDiff, noWorkflowChanges, acceptanceSchema]
   },
   "dev-reviewer": {
     checks: [reviewWithVerdict("dev")],
-    derive: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
+    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
   },
   completion: {
     checks: [nonEmpty("completion.md"), acceptanceSchema],
-    derive: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
+    postProcess: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
   }
 };
 function validateRun(input) {
@@ -580,7 +580,7 @@ function validateRun(input) {
     if (detail)
       return { result: "invalid", detail };
   }
-  return { result: "ok", ...contract.derive?.(artifacts) };
+  return { result: "ok", ...contract.postProcess?.(artifacts) };
 }
 function readLatestVerdict(dir, kind) {
   const path = latestReviewPath(dir, kind);
