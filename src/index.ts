@@ -4,14 +4,13 @@ import { approve } from "./commands/approve.ts";
 import { type FinishResult, finish, type Outcome } from "./commands/finish.ts";
 import { requestChanges } from "./commands/request-changes.ts";
 import type { Config } from "./defaults.ts";
+import { parseRecord, type RunRecord, renderRecord } from "./run-record.ts";
 import { checkPipelineVersion, parseStateFile, renderStateFile } from "./state-file.ts";
 import { type RouteResult, reviewKindFor, route } from "./transitions.ts";
 import type { AgentName, Phase } from "./types.ts";
 import { nextReviewNumber } from "./utils/next-review-number.ts";
-import { parseRecord, type RunRecord } from "./utils/parse-record.ts";
 import { readRunDir } from "./utils/read-run-dir.ts";
 import { renderReview } from "./utils/render-review.ts";
-import { stringifyJson } from "./utils/stringify-json.ts";
 
 export type { FinishResult, Outcome } from "./commands/finish.ts";
 export type { Config } from "./defaults.ts";
@@ -58,12 +57,13 @@ export function startRun(
     finished_at: null,
     result: null,
     verdict: null,
+    api_error_status: null,
     model,
     session_id: null,
   };
   const path = join(dir, "runs", recordName({ agent, run_id, attempt }));
   mkdirSync(join(dir, "runs"), { recursive: true });
-  writeFileSync(path, stringifyJson(record));
+  writeFileSync(path, renderRecord(record));
   return { record_path: path };
 }
 
@@ -100,16 +100,19 @@ export function finishRun(
   const current = before.records.find((r) => record_path.endsWith(recordName(r)));
   if (!current) throw new Error(`実行レコードが見つかりません: ${record_path}`);
   const updated: RunRecord = {
-    ...current,
+    agent: current.agent,
+    phase: current.phase,
+    run_id: current.run_id,
+    attempt: current.attempt,
+    started_at: current.started_at,
     finished_at: now.toISOString(),
     result: outcome.result,
     verdict: outcome.verdict ?? null,
-    session_id: session_id ?? current.session_id ?? null,
+    api_error_status: outcome.api_error_status ?? null,
+    model: current.model,
+    session_id: session_id ?? current.session_id,
   };
-  writeFileSync(
-    record_path,
-    stringifyJson({ ...updated, api_error_status: outcome.api_error_status ?? null }),
-  );
+  writeFileSync(record_path, renderRecord(updated));
 
   const records = before.records.map((r) => (r === current ? updated : r));
   const result = finish({ phase: before.file.phase, records, config, outcome });

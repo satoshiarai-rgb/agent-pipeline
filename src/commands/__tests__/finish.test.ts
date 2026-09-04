@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { config, rec, review } from "../../__tests__/helpers.ts";
+import type { RunRecord } from "../../run-record.ts";
 import type { Phase } from "../../types.ts";
-import type { RunRecord } from "../../utils/parse-record.ts";
 import { finish } from "../finish.ts";
 
 describe("finish", () => {

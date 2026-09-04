@@ -1,6 +1,7 @@
 import type { Config } from "./defaults.ts";
 import type { Phase } from "./types.ts";
 import { parseJson } from "./utils/parse-json.ts";
+import { pick } from "./utils/pick.ts";
 import { stringifyJson } from "./utils/stringify-json.ts";
 
 /** state.json のうち、遷移判断に使わない識別子とメタ情報 */
@@ -37,6 +38,19 @@ export function parseStateFile(text: string): StateFile {
   };
 }
 
+/** ファイルに書くときのキー順。書き忘れると renderStateFile の型注釈で tsc が落ちる */
+const STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at",
+] as const satisfies readonly (keyof StateFileShape)[];
+
+/** state.json の平坦な形（読むときは meta と phase に分けるが、書くときはこの形） */
+type StateFileShape = RunMeta & { phase: Phase; blocked_reason: string | null };
+
 /**
  * state.json を組み立てる。キー順を固定して差分を安定させる。
  * 可変値は phase と blocked_reason だけ（rounds と total_steps は導出する / A-33）。
@@ -45,14 +59,15 @@ export function renderStateFile(
   file: StateFile,
   patch: { phase: Phase; blocked_reason: string | null; now: Date },
 ): string {
-  return stringifyJson({
-    pipeline_version: file.meta.pipeline_version,
-    issue: file.meta.issue,
-    branch: file.meta.branch,
+  const shape: StateFileShape = {
+    ...file.meta,
     phase: patch.phase,
     blocked_reason: patch.blocked_reason,
     updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z"),
-  });
+  };
+  // 注釈が網羅チェックを兼ねる: STATE_KEYS に書き忘れたキーがあると代入できない
+  const ordered: StateFileShape = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
 }
 
 /**

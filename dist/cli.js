@@ -168,10 +168,57 @@ function parseJson(text, source = "JSON") {
   }
 }
 
+// src/utils/pick.ts
+function pick(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (source[key] !== undefined)
+      out[key] = source[key];
+  }
+  return out;
+}
+
 // src/utils/stringify-json.ts
 function stringifyJson(value) {
   return `${JSON.stringify(value, null, 2)}
 `;
+}
+
+// src/run-record.ts
+function parseRecord(text) {
+  const r = parseJson(text, "実行レコード");
+  if (!r?.agent || !r.run_id)
+    throw new Error("実行レコードに agent か run_id がありません");
+  return {
+    agent: r.agent,
+    phase: r.phase,
+    run_id: String(r.run_id),
+    attempt: Number(r.attempt ?? 1),
+    started_at: r.started_at ?? "",
+    finished_at: r.finished_at ?? null,
+    result: r.result ?? null,
+    verdict: r.verdict ?? null,
+    api_error_status: r.api_error_status ?? null,
+    model: r.model ?? null,
+    session_id: r.session_id ?? null
+  };
+}
+var RECORD_KEYS = [
+  "agent",
+  "phase",
+  "run_id",
+  "attempt",
+  "started_at",
+  "finished_at",
+  "result",
+  "verdict",
+  "api_error_status",
+  "model",
+  "session_id"
+];
+function renderRecord(r) {
+  const ordered = pick(r, RECORD_KEYS);
+  return stringifyJson(ordered);
 }
 
 // src/state-file.ts
@@ -191,15 +238,23 @@ function parseStateFile(text) {
     blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
   };
 }
+var STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at"
+];
 function renderStateFile(file, patch) {
-  return stringifyJson({
-    pipeline_version: file.meta.pipeline_version,
-    issue: file.meta.issue,
-    branch: file.meta.branch,
+  const shape = {
+    ...file.meta,
     phase: patch.phase,
     blocked_reason: patch.blocked_reason,
     updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z")
-  });
+  };
+  const ordered = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
 }
 function checkPipelineVersion(meta, config) {
   return meta.pipeline_version === config.pipeline_version ? null : `pipeline_version_mismatch: run=${meta.pipeline_version} harness=${config.pipeline_version}`;
@@ -213,14 +268,6 @@ function nextReviewNumber(dir, kind) {
   if (!existsSync(reviews))
     return 1;
   return readdirSync(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).length + 1;
-}
-
-// src/utils/parse-record.ts
-function parseRecord(text) {
-  const r = parseJson(text, "実行レコード");
-  if (!r?.agent || !r.run_id)
-    throw new Error("実行レコードに agent か run_id がありません");
-  return { ...r, finished_at: r.finished_at ?? null };
 }
 
 // src/utils/read-run-dir.ts
@@ -312,12 +359,13 @@ function startRun(input) {
     finished_at: null,
     result: null,
     verdict: null,
+    api_error_status: null,
     model,
     session_id: null
   };
   const path = join3(dir, "runs", recordName({ agent, run_id, attempt }));
   mkdirSync(join3(dir, "runs"), { recursive: true });
-  writeFileSync(path, stringifyJson(record));
+  writeFileSync(path, renderRecord(record));
   return { record_path: path };
 }
 function routeRun(input) {
@@ -341,13 +389,19 @@ function finishRun(input) {
   if (!current)
     throw new Error(`実行レコードが見つかりません: ${record_path}`);
   const updated = {
-    ...current,
+    agent: current.agent,
+    phase: current.phase,
+    run_id: current.run_id,
+    attempt: current.attempt,
+    started_at: current.started_at,
     finished_at: now.toISOString(),
     result: outcome.result,
     verdict: outcome.verdict ?? null,
-    session_id: session_id ?? current.session_id ?? null
+    api_error_status: outcome.api_error_status ?? null,
+    model: current.model,
+    session_id: session_id ?? current.session_id
   };
-  writeFileSync(record_path, stringifyJson({ ...updated, api_error_status: outcome.api_error_status ?? null }));
+  writeFileSync(record_path, renderRecord(updated));
   const records = before.records.map((r) => r === current ? updated : r);
   const result = finish({ phase: before.file.phase, records, config, outcome });
   writeState(dir, before.file, result, now);

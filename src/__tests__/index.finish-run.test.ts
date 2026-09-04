@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
 import { approveRun, finishRun, routeRun, startRun } from "../index.ts";
-import { parseRecord } from "../utils/parse-record.ts";
+import { parseRecord } from "../run-record.ts";
 import { config } from "./helpers.ts";
 import { cleanupRuns, makeRun, phaseOf } from "./run-dir-fixture.ts";
 
