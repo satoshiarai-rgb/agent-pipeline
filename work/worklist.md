@@ -12,7 +12,7 @@
 
 | # | 判断 | 影響 |
 |---|---|---|
-| K-1 | 中央・配布先とも当面は個人アカウント `satoshiarai-rgb` で検証し、後に 組織アカウント（`<org>`） へ移す | Secrets / Variables はリポジトリスコープ、`approvers` は `OWNER` / `COLLABORATOR` |
+| K-1 | 中央・配布先とも当面は個人アカウント `satoshiarai-rgb` で検証し、後に組織アカウント（`<org>`）へ移す | Secrets / Variables はリポジトリスコープ、`approvers` は `OWNER` / `COLLABORATOR` |
 | K-2 | `verification: manual` の受け入れ条件は developer が `evidence` 付きで `passed` にし、dev-reviewer が妥当性を照合する | completing の「全 passed」条件が成立する。検証の追加が必要（A-3） |
 | K-3 | モデルは生成・レビュー共に `claude-opus-5` | `defaults.yml`、設計書 §5.7 |
 | K-4 | **エージェントは `.github/workflows/**` を変更しない。GitHub App に Workflows 権限を付与しない** | 権限の最小化を維持。ワークフロー変更を要する issue はパイプライン対象外 |
@@ -21,7 +21,7 @@
 | K-9 | **ハーネスの実装言語は TypeScript。ランタイムは Node、bun は開発ツールチェーンとして使う** | 手順は composite action ではなく **JS action**（`runs.using: node24` / `main: dist/index.js`）にし、bun でビルドしたバンドルをコミットする。ランナーに bun は同梱されていないため、ランタイムに bun を要求しない形にする。設計書 §4.1 の `scripts/*.py` は `src/*.ts` + `dist/` に置き換わる。選定理由: npm の `yaml` が **YAML のコメントと書式を保持**して round-trip できる（`state.yml` は人間が復旧時に編集するファイル）／`execution_file` の JSON 解析が自然（A-31）／`claude-code-action` 自体が TS で書かれている／`@actions/core` で入出力を型付きに扱える／`bun test` で遷移表の網羅テストが速い。代償はビルド成果物 `dist/` をコミットすることと、タグを切る前にビルドする手順が必要になること |
 | K-8 | **配布先リポジトリの Claude Code 設定（`.claude/settings.json`）は読ませる。** ハーネスは `settings` 入力で上書きしない | 配布先固有の調整は `conventions.md` と同じ信頼境界にある（そのリポジトリの管理者が置くもの）。ただし配布先が意図せず権限を広げることは起きるため、**最低限の禁止はハーネス側が `--disallowed-tools` で明示的に重ねる**（設定で緩められない側に置く。フラグが設定より優先されることは D-1 で確認する） |
 | K-7 | **Anthropic Console のアカウントが未取得のため、当面は Claude Team サブスクリプションの認証（`claude_code_oauth_token`）でワークフロー全体を検証し、後日 Console + WIF に差し替える** | 設計書 §2.1 の「サブスク認証は CI に向かない」という結論は目標構成として維持する。差し替えは A-29。検証中は使用量がサブスクリプションに計上され、ワークスペース支出上限（§7.5）によるコスト制御は効かない |
-| K-6 | **現時点の検証はすべて個人アカウント配下のリポジトリに限る。** 組織アカウント（`<org>`） のリポジトリ・Secrets・App インストールには触らない | 複数リポジトリを要する検証（V-7 / V-8）は個人アカウント内に 2 リポジトリ用意して行う。org 側の作業は R-3 まで着手しない |
+| K-6 | **現時点の検証はすべて個人アカウント配下のリポジトリに限る。** 組織アカウント（`<org>`）のリポジトリ・Secrets・App インストールには触らない | 複数リポジトリを要する検証（V-7 / V-8）は個人アカウント内に 2 リポジトリ用意して行う。org 側の作業は R-3 まで着手しない |
 
 ---
 
@@ -162,7 +162,7 @@
 
 - [ ] R-1: 小さな issue で 1 本通す（設計書 §9-9）
 - [ ] R-2: 配布先 2 つ目に展開し、`install/` の過不足を洗う
-- [ ] R-3: 組織アカウント（`<org>`） へ移管する（K-1、K-6 の解除）。A-4 / A-5 で明示した箇所を Organization スコープに戻し、`approvers` に `MEMBER` を戻す。App を org にインストールし直す
+- [ ] R-3: 組織アカウント（`<org>`）へ移管する（K-1、K-6 の解除）。A-4 / A-5 で明示した箇所を Organization スコープに戻し、`approvers` に `MEMBER` を戻す。App を org にインストールし直す
 
 ---
 

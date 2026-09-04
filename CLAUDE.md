@@ -23,7 +23,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 `work/worklist.md` §0 が正。特に振る舞いに影響するもの:
 
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
-- **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`） には触らない
+- **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない
 - モデルは生成・レビュー共に `claude-opus-5`
 - `verification: manual` の受け入れ条件は developer が `evidence` 付きで `passed` にし、dev-reviewer が照合する
 
