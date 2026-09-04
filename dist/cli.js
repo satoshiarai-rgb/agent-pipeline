@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { readFileSync as readFileSync6 } from "node:fs";
+import { readFileSync as readFileSync7 } from "node:fs";
 import { parseArgs } from "node:util";
 
 // src/file/state-file.ts
@@ -462,7 +462,7 @@ function startRun(input) {
   return { record_path: saveRecord(dir, record) };
 }
 // src/commands/validate.ts
-import { existsSync as existsSync4, readFileSync as readFileSync5 } from "node:fs";
+import { existsSync as existsSync5, readFileSync as readFileSync6 } from "node:fs";
 import { join as join5 } from "node:path";
 
 // src/file/acceptance-file.ts
@@ -514,12 +514,32 @@ function hasAcceptance(dir) {
   return existsSync3(acceptancePath(dir));
 }
 
+// src/file/execution-log.ts
+import { existsSync as existsSync4, readFileSync as readFileSync5 } from "node:fs";
+function readResultEvent(path) {
+  if (!existsSync4(path))
+    return null;
+  const parsed = parseJson(readFileSync5(path, "utf8"), "execution_file");
+  const events = Array.isArray(parsed) ? parsed : [parsed];
+  const results = events.filter((e) => e?.type === "result");
+  return results.at(-1) ?? null;
+}
+function readApiErrorStatus(path) {
+  if (!path)
+    return null;
+  const result = readResultEvent(path);
+  if (!result)
+    return null;
+  const isApiError = result.terminal_reason === "api_error" || Boolean(result.api_error_status);
+  return isApiError ? result.api_error_status ?? 0 : null;
+}
+
 // src/commands/validate.ts
 var nonEmpty = (rel) => ({ dir }) => {
   const path = join5(dir, rel);
-  return existsSync4(path) && readFileSync5(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+  return existsSync5(path) && readFileSync6(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
 };
-var contains = (rel, needle) => ({ dir }) => readFileSync5(join5(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var contains = (rel, needle) => ({ dir }) => readFileSync6(join5(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
 var acceptanceSchema = ({ dir }) => {
   if (!hasAcceptance(dir))
     return "acceptance.json が無い";
@@ -545,7 +565,7 @@ var CONTRACT = {
   planner: {
     checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
     postProcess: ({ dir }) => {
-      const text = readFileSync5(join5(dir, "plan.md"), "utf8");
+      const text = readFileSync6(join5(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));
       return scale.includes("上限超過") ? { oversize: true } : {};
     }
@@ -568,7 +588,7 @@ var CONTRACT = {
 };
 function validateRun(input) {
   const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
-  const apiError = readApiError(execution_file);
+  const apiError = readApiErrorStatus(execution_file);
   if (apiError !== null)
     return { result: "api_error", api_error_status: apiError };
   if (agent_failed)
@@ -585,18 +605,6 @@ function validateRun(input) {
 function readLatestVerdict(dir, kind) {
   const path = latestReviewPath(dir, kind);
   return path ? readVerdict(path) : null;
-}
-function readApiError(path) {
-  if (!path || !existsSync4(path))
-    return null;
-  const events = parseJson(readFileSync5(path, "utf8"), "execution_file");
-  for (const e of Array.isArray(events) ? events : [events]) {
-    const ev = e;
-    if (ev?.type === "result" && (ev.terminal_reason === "api_error" || ev.api_error_status)) {
-      return ev.api_error_status ?? 0;
-    }
-  }
-  return null;
 }
 // src/defaults.ts
 var defaults = {
@@ -750,7 +758,7 @@ var run = () => {
         agent: need(values.agent, "agent"),
         agent_failed: values["agent-failed"],
         execution_file: values["execution-file"] ?? null,
-        changed_files: values["changed-files"] ? readFileSync6(values["changed-files"], "utf8").split(`
+        changed_files: values["changed-files"] ? readFileSync7(values["changed-files"], "utf8").split(`
 `).filter(Boolean) : []
       });
     default:

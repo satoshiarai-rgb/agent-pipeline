@@ -6,9 +6,9 @@ import {
   hasAcceptance,
   readAcceptance,
 } from "../file/acceptance-file.ts";
+import { readApiErrorStatus } from "../file/execution-log.ts";
 import { latestReviewPath, readVerdict } from "../file/review-file.ts";
 import type { AgentName } from "../types.ts";
-import { parseJson } from "../utils/parse-json.ts";
 import type { Outcome } from "./finish.ts";
 import type { CommandInput } from "./input.ts";
 
@@ -133,7 +133,7 @@ export function validateRun(
 ): Outcome {
   const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
 
-  const apiError = readApiError(execution_file);
+  const apiError = readApiErrorStatus(execution_file);
   if (apiError !== null) return { result: "api_error", api_error_status: apiError };
   if (agent_failed) return { result: "agent_failed" };
 
@@ -149,17 +149,4 @@ export function validateRun(
 function readLatestVerdict(dir: string, kind: "plan" | "dev") {
   const path = latestReviewPath(dir, kind);
   return path ? readVerdict(path) : null;
-}
-
-/** base-action の実行ログから API エラーのステータスを読む。無ければ null */
-function readApiError(path?: string | null): number | null {
-  if (!path || !existsSync(path)) return null;
-  const events = parseJson<unknown>(readFileSync(path, "utf8"), "execution_file");
-  for (const e of Array.isArray(events) ? events : [events]) {
-    const ev = e as { type?: string; terminal_reason?: string; api_error_status?: number };
-    if (ev?.type === "result" && (ev.terminal_reason === "api_error" || ev.api_error_status)) {
-      return ev.api_error_status ?? 0;
-    }
-  }
-  return null;
 }
