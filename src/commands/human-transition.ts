@@ -1,6 +1,6 @@
+import type { Config } from "../defaults.ts";
 import { nextPhase } from "../transitions.ts";
 import type { Phase } from "../types.ts";
-import type { Config } from "../utils/load-config.ts";
 
 export type HumanDecision = { ok: true; phase: Phase } | { ok: false; reason: string };
 

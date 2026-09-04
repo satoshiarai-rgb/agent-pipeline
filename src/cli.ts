@@ -1,11 +1,10 @@
 #!/usr/bin/env node
-import { readFileSync } from "node:fs";
 import { parseArgs } from "node:util";
 import {
   approveRun,
   blockRun,
+  defaults as config,
   finishRun,
-  loadConfig,
   type Outcome,
   requestChangesRun,
   routeRun,
@@ -28,7 +27,6 @@ commands:
   request-changes  /request-changes による差し戻し  --association --body
   block    phase を blocked にする            --reason
 
-共通: --defaults <path>（既定 defaults.yml）
 出力: 結果を JSON で標準出力に書く
 `;
 
@@ -36,7 +34,6 @@ const { positionals, values } = parseArgs({
   allowPositionals: true,
   options: {
     dir: { type: "string" },
-    defaults: { type: "string", default: "defaults.yml" },
     agent: { type: "string" },
     "run-id": { type: "string" },
     attempt: { type: "string", default: "1" },
@@ -64,7 +61,6 @@ const need = <T>(v: T | undefined, name: string): T => {
 
 const command = positionals[0];
 const dir = need(values.dir, "dir");
-const config = loadConfig(readFileSync(values.defaults ?? "defaults.yml", "utf8"));
 
 const outcome = (): Outcome => ({
   result: need(values.result, "result") as RunResult,

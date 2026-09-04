@@ -1,10 +1,11 @@
 # ハーネスの CLI を 1 つの action として公開する。
 #
 # リポジトリのルートに置いているのは、$GITHUB_ACTION_PATH がリポジトリ root を指し、
-# dist/cli.js と defaults.yml に直接届くため（サブディレクトリに置くと階層を数える必要がある）。
+# dist/cli.js に直接届くため（サブディレクトリに置くと階層を数える必要がある）。
 #
-# ランナーに同梱の node で dist/cli.js を実行する。依存はバンドルに含まれているので
+# ランナーに同梱の node で dist/cli.js を実行する。npm 依存はゼロなので
 # setup-node も bun のインストールも不要。dist/ は生成物だがコミットする（bun run build）。
+# 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
 description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / block）
@@ -20,14 +21,14 @@ inputs:
   agent: { description: "start: 実行するエージェント", required: false }
   run-id: { description: "start: GitHub Actions のラン ID", required: false }
   attempt: { description: "start: 再実行の回数", required: false }
-  model: { description: "start: モデル（既定は defaults.yml の models.default）", required: false }
+  model: { description: "start: モデル（既定は src/defaults.ts の models.default）", required: false }
   # finish
   record-path: { description: "finish: start が返したレコードのパス", required: false }
   result: { description: "finish: ok | invalid | agent_failed | api_error", required: false }
   verdict: { description: "finish: approve | request_changes", required: false }
   api-error-status: { description: "finish: api_error のときの HTTP ステータス", required: false }
   oversize: { description: "finish: planner の規模判定が上限超過なら true", required: false }
-  acceptance-passed: { description: "finish: acceptance.yml が全 passed なら true", required: false }
+  acceptance-passed: { description: "finish: acceptance.json が全 passed なら true", required: false }
   session-id: { description: "finish: base-action の session_id", required: false }
   # approve / request-changes
   association: { description: "コメント投稿者の author_association", required: false }

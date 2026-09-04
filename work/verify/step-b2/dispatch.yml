@@ -79,7 +79,7 @@ jobs:
           git config user.name "${SLUG}[bot]"
           git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
 
-      - name: ブランチと state.yml を作る
+      - name: ブランチと state.json を作る
         env:
           N: ${{ inputs.issue }}
           SCENARIO: ${{ inputs.scenario }}
@@ -92,14 +92,15 @@ jobs:
           git checkout -b "$BR"
           D="agent-work/issue-$N"
           mkdir -p "$D"
-          cat > "$D/state.yml" <<EOF
-          # この run の状態。復旧するときは phase を書き換えて push する
-          pipeline_version: 1
-          issue: $N
-          branch: $BR
-          phase: planning
-          blocked_reason: null
-          updated_at: null
+          cat > "$D/state.json" <<EOF
+          {
+            "pipeline_version": 1,
+            "issue": $N,
+            "branch": "$BR",
+            "phase": "planning",
+            "blocked_reason": null,
+            "updated_at": null
+          }
           EOF
           # ダミーエージェントの振る舞いもファイルで渡す（push で起動した job は
           # workflow_dispatch の入力を受け取れないため）
@@ -264,7 +265,19 @@ jobs:
           case "$PHASE" in
             planning)
               echo "# ダミー計画" > "$D/plan.md"
-              printf 'criteria:\n  - id: AC-1\n    description: ダミー\n    verification: manual\n    status: pending\n' > "$D/acceptance.yml"
+              cat > "$D/acceptance.json" <<'JSON'
+              {
+                "criteria": [
+                  {
+                    "id": "AC-1",
+                    "description": "ダミー",
+                    "verification": "manual",
+                    "status": "pending",
+                    "evidence": null
+                  }
+                ]
+              }
+              JSON
               ;;
             plan_review)
               first=$([ -d "$D/reviews" ] && ls "$D/reviews/plan-"*.md 2>/dev/null | wc -l || echo 0)
@@ -276,7 +289,19 @@ jobs:
             developing)
               mkdir -p dummy-src
               date -u > "dummy-src/change-${GITHUB_RUN_ID}.txt"
-              printf 'criteria:\n  - id: AC-1\n    description: ダミー\n    verification: manual\n    status: passed\n    evidence: ダミー実行\n' > "$D/acceptance.yml"
+              cat > "$D/acceptance.json" <<'JSON'
+              {
+                "criteria": [
+                  {
+                    "id": "AC-1",
+                    "description": "ダミー",
+                    "verification": "manual",
+                    "status": "passed",
+                    "evidence": "ダミー実行"
+                  }
+                ]
+              }
+              JSON
               ;;
             dev_review)
               first=$(ls "$D/reviews/dev-"*.md 2>/dev/null | wc -l || echo 0)

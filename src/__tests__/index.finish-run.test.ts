@@ -27,20 +27,21 @@ describe("finishRun", () => {
     return finishRun({ dir, config: c, record_path, outcome, session_id: `sess-${run_id}` });
   };
 
-  test("レコードを閉じて state.yml の phase を進める", () => {
+  test("レコードを閉じて state.json の phase を進める", () => {
     const dir = makeRun();
     const f = step(dir, "planner", "100", { result: "ok" });
     expect(f.phase).toBe("plan_review");
     expect(f.continue_chain).toBe(true);
 
-    const rec = parseRecord(readFileSync(join(dir, "runs/planner-100-1.yml"), "utf8"));
+    const rec = parseRecord(readFileSync(join(dir, "runs/planner-100-1.json"), "utf8"));
     expect(rec.finished_at).not.toBeNull();
     expect(rec.result).toBe("ok");
     expect(rec.session_id).toBe("sess-100");
 
     expect(phaseOf(dir).phase).toBe("plan_review");
-    // 人間が読むためのコメントが残っている
-    expect(readFileSync(join(dir, "state.yml"), "utf8")).toContain("# 復旧のしかた");
+    // 識別子は書き換えずに保つ
+    expect(phaseOf(dir).meta.issue).toBe(123);
+    expect(phaseOf(dir).meta.branch).toBe("claude/issue-123");
   });
 
   test("ラウンド上限は今回の実行を含めて数える（2 回目の差し戻しで blocked）", () => {

@@ -5,15 +5,17 @@ import { parseStateFile } from "../state-file.ts";
 
 const dirs: string[] = [];
 
-/** templates/state.yml を元に一時的な run ディレクトリを作る */
+/** templates/state.json を元に一時的な run ディレクトリを作る */
 export function makeRun(phase = "planning"): string {
   const dir = mkdtempSync(join(tmpdir(), "agent-run-"));
   dirs.push(dir);
-  const template = readFileSync(join(import.meta.dir, "../../templates/state.yml"), "utf8")
-    .replace("issue: 0", "issue: 123")
-    .replace('branch: ""', "branch: claude/issue-123")
-    .replace("phase: planning", `phase: ${phase}`);
-  writeFileSync(join(dir, "state.yml"), template);
+  const template = JSON.parse(
+    readFileSync(join(import.meta.dir, "../../templates/state.json"), "utf8"),
+  );
+  writeFileSync(
+    join(dir, "state.json"),
+    JSON.stringify({ ...template, issue: 123, branch: "claude/issue-123", phase }, null, 2),
+  );
   return dir;
 }
 
@@ -23,4 +25,4 @@ export function cleanupRuns(): void {
 }
 
 export const phaseOf = (dir: string) =>
-  parseStateFile(readFileSync(join(dir, "state.yml"), "utf8"));
+  parseStateFile(readFileSync(join(dir, "state.json"), "utf8"));

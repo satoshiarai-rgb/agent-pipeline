@@ -1,7 +1,11 @@
 {
   "name": "agent-pipeline",
+  "devDependencies": {
+    "@biomejs/biome": "^2.5.12",
+    "@types/bun": "latest",
+    "typescript": "^5.5.0"
+  },
   "private": true,
-  "type": "module",
   "scripts": {
     "build": "bun build src/cli.ts --target=node --outfile=dist/cli.js",
     "check:dist": "bun run build && git diff --exit-code -- dist",
@@ -10,13 +14,5 @@
     "format": "biome check --write",
     "lint": "biome check"
   },
-  "dependencies": {
-    "@actions/core": "^1.11.0",
-    "yaml": "^2.5.0"
-  },
-  "devDependencies": {
-    "@biomejs/biome": "^2.5.12",
-    "@types/bun": "latest",
-    "typescript": "^5.5.0"
-  }
+  "type": "module"
 }

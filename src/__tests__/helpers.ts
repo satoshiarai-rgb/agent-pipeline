@@ -1,11 +1,12 @@
-import { readFileSync } from "node:fs";
-import { join } from "node:path";
+import { type Config, defaults } from "../defaults.ts";
 import type { AgentName, Verdict } from "../types.ts";
-import { loadConfig } from "../utils/load-config.ts";
 import type { RunRecord } from "../utils/parse-record.ts";
 
-export const defaultsText = readFileSync(join(import.meta.dir, "../../defaults.yml"), "utf8");
-export const config = () => loadConfig(defaultsText);
+/**
+ * テスト用の設定。毎回複製して返す。
+ * defaults をそのまま返すと、遷移表を壊すテストの変更が他のテストに漏れる。
+ */
+export const config = (): Config => structuredClone(defaults);
 
 let seq = 0;
 export const rec = (agent: AgentName, over: Partial<RunRecord> = {}): RunRecord => ({

@@ -19,7 +19,7 @@ describe("startRun", () => {
       attempt: 1,
       model: "claude-opus-5",
     });
-    expect(record_path).toContain("runs/planner-100-1.yml");
+    expect(record_path).toContain("runs/planner-100-1.json");
 
     const rec = parseRecord(readFileSync(record_path, "utf8"));
     expect(rec.finished_at).toBeNull();

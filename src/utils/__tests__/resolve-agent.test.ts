@@ -21,7 +21,7 @@ describe("resolveAgent", () => {
     expect(resolveAgent(c2, "developer").model).toBe("claude-opus-5");
   });
 
-  test("defaults.yml は 5 エージェントと上限を定義している", () => {
+  test("defaults は 5 エージェントと上限を定義している", () => {
     for (const n of [
       "planner",
       "plan-reviewer",

@@ -8,21 +8,21 @@ let dir = "";
 afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
 const make = (records: string[]) => {
   dir = mkdtempSync(join(tmpdir(), "run-dir-"));
-  writeFileSync(join(dir, "state.yml"), "phase: planning\n");
+  writeFileSync(join(dir, "state.json"), '{"phase":"planning"}\n');
   if (records.length) mkdirSync(join(dir, "runs"), { recursive: true });
-  for (const [i, n] of records.entries()) writeFileSync(join(dir, "runs", n), `n: ${i}\n`);
+  for (const [i, n] of records.entries()) writeFileSync(join(dir, "runs", n), `{"n":${i}}\n`);
   return dir;
 };
 
 describe("readRunDir", () => {
-  test("state.yml を読み、runs/ が無ければレコードは空", () => {
+  test("state.json を読み、runs/ が無ければレコードは空", () => {
     const r = readRunDir(make([]));
-    expect(r.stateText).toContain("phase: planning");
+    expect(r.stateText).toContain('"phase":"planning"');
     expect(r.records).toEqual([]);
   });
 
-  test("runs/ の .yml だけを名前順に読む", () => {
-    const r = readRunDir(make(["b.yml", "a.yml", "notes.md"]));
-    expect(r.records.map((x) => x.path.split("/").pop())).toEqual(["a.yml", "b.yml"]);
+  test("runs/ の .json だけを名前順に読む", () => {
+    const r = readRunDir(make(["b.json", "a.json", "notes.md"]));
+    expect(r.records.map((x) => x.path.split("/").pop())).toEqual(["a.json", "b.json"]);
   });
 });

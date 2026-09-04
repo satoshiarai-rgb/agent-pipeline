@@ -17,8 +17,9 @@ describe("routeRun", () => {
 
   test("pipeline_version が合わなければ block", () => {
     const dir = makeRun();
-    const p = join(dir, "state.yml");
-    writeFileSync(p, readFileSync(p, "utf8").replace("pipeline_version: 1", "pipeline_version: 2"));
+    const p = join(dir, "state.json");
+    const state = JSON.parse(readFileSync(p, "utf8"));
+    writeFileSync(p, JSON.stringify({ ...state, pipeline_version: 2 }, null, 2));
     const r = routeRun({ dir, config: c });
     expect(r.action).toBe("block");
     expect(r.reason).toContain("pipeline_version_mismatch");

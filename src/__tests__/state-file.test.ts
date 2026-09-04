@@ -1,23 +1,25 @@
 import { describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
 import { join } from "node:path";
-import { applyStateFile, checkPipelineVersion, parseStateFile } from "../state-file.ts";
+import { checkPipelineVersion, parseStateFile, renderStateFile } from "../state-file.ts";
 import { config } from "./helpers.ts";
 
-const stateYaml = `# この run の状態。復旧するときは phase を書き換えて push する
-pipeline_version: 1
-issue: 123
-branch: claude/issue-123
-
-# bootstrap | planning | plan_review | awaiting_human | developing
-# | dev_review | completing | done | blocked
-phase: planning
-blocked_reason: null
-`;
+const stateJson = JSON.stringify(
+  {
+    pipeline_version: 1,
+    issue: 123,
+    branch: "claude/issue-123",
+    phase: "planning",
+    blocked_reason: null,
+    updated_at: null,
+  },
+  null,
+  2,
+);
 
 describe("parseStateFile", () => {
   test("識別子と phase を分けて返す", () => {
-    const f = parseStateFile(stateYaml);
+    const f = parseStateFile(stateJson);
     expect(f.phase).toBe("planning");
     expect(f.blocked_reason).toBeNull();
     expect(f.meta).toEqual({
@@ -29,50 +31,67 @@ describe("parseStateFile", () => {
   });
 
   test("issue か phase が無ければエラー", () => {
-    expect(() => parseStateFile("issue: 1\n")).toThrow(/issue か phase/);
-    expect(() => parseStateFile("phase: planning\n")).toThrow(/issue か phase/);
+    expect(() => parseStateFile('{"issue": 1}')).toThrow(/issue か phase/);
+    expect(() => parseStateFile('{"phase": "planning"}')).toThrow(/issue か phase/);
+  });
+
+  test("壊れた JSON はファイル名を添えて失敗する", () => {
+    expect(() => parseStateFile("{ phase: planning }")).toThrow(/state\.json の解析に失敗/);
   });
 });
 
-describe("applyStateFile", () => {
-  test("phase を書き換えてもコメントとキー順が保持される（人間が編集するファイル）", () => {
-    const out = applyStateFile(parseStateFile(stateYaml).doc, {
+describe("renderStateFile", () => {
+  test("phase と updated_at を書き換え、キー順は固定する", () => {
+    const out = renderStateFile(parseStateFile(stateJson), {
       phase: "plan_review",
       blocked_reason: null,
       now: new Date("2026-09-04T10:22:00Z"),
     });
-    expect(out).toContain("# この run の状態");
-    expect(out).toContain("# bootstrap | planning");
-    expect(out).toContain("phase: plan_review");
-    expect(out).toContain("updated_at: 2026-09-04T10:22:00Z");
-    expect(out.indexOf("issue:")).toBeLessThan(out.indexOf("phase:"));
+    expect(JSON.parse(out)).toEqual({
+      pipeline_version: 1,
+      issue: 123,
+      branch: "claude/issue-123",
+      phase: "plan_review",
+      blocked_reason: null,
+      updated_at: "2026-09-04T10:22:00Z",
+    });
+    // 差分を安定させるためキー順を固定している
+    expect(Object.keys(JSON.parse(out))).toEqual([
+      "pipeline_version",
+      "issue",
+      "branch",
+      "phase",
+      "blocked_reason",
+      "updated_at",
+    ]);
+    expect(out.endsWith("\n")).toBe(true);
   });
 
   test("blocked_reason を書ける", () => {
-    const out = applyStateFile(parseStateFile(stateYaml).doc, {
+    const out = renderStateFile(parseStateFile(stateJson), {
       phase: "blocked",
       blocked_reason: "total_steps_exceeded: 12/12",
       now: new Date(),
     });
-    expect(out).toContain('blocked_reason: "total_steps_exceeded: 12/12"');
+    expect(JSON.parse(out).blocked_reason).toBe("total_steps_exceeded: 12/12");
   });
 });
 
 describe("checkPipelineVersion", () => {
   test("一致すれば null", () => {
-    expect(checkPipelineVersion(parseStateFile(stateYaml).meta, config())).toBeNull();
+    expect(checkPipelineVersion(parseStateFile(stateJson).meta, config())).toBeNull();
   });
 
   test("不一致なら理由を返す（中央の破壊的変更から進行中の run を守る）", () => {
-    const meta = { ...parseStateFile(stateYaml).meta, pipeline_version: 2 };
+    const meta = { ...parseStateFile(stateJson).meta, pipeline_version: 2 };
     expect(checkPipelineVersion(meta, config())).toContain(
       "pipeline_version_mismatch: run=2 harness=1",
     );
   });
 });
 
-describe("templates/state.yml（bootstrap が使う雛形）", () => {
-  const text = readFileSync(join(import.meta.dir, "../../templates/state.yml"), "utf8");
+describe("templates/state.json（bootstrap が使う雛形）", () => {
+  const text = readFileSync(join(import.meta.dir, "../../templates/state.json"), "utf8");
   const file = parseStateFile(text);
 
   test("雛形は planning から始まる", () => {
@@ -85,8 +104,9 @@ describe("templates/state.yml（bootstrap が使う雛形）", () => {
   });
 
   test("導出する値は保存されていない（A-33 / A-16）", () => {
-    for (const key of ["total_steps:", "rounds:", "pr:", "last_run:"]) {
-      expect(text).not.toContain(`\n${key}`);
+    const keys = Object.keys(JSON.parse(text));
+    for (const key of ["total_steps", "rounds", "pr", "last_run"]) {
+      expect(keys).not.toContain(key);
     }
   });
 });

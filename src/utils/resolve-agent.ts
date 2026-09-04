@@ -1,5 +1,5 @@
+import type { Config } from "../defaults.ts";
 import type { AgentName } from "../types.ts";
-import type { Config } from "./load-config.ts";
 
 /**
  * エージェントの実行パラメータを解決する。
@@ -9,7 +9,7 @@ import type { Config } from "./load-config.ts";
  */
 export function resolveAgent(config: Config, agent: AgentName) {
   const a = config.agents[agent];
-  if (!a) throw new Error(`defaults.yml に agents.${agent} がありません`);
+  if (!a) throw new Error(`既定値に agents.${agent} がありません`);
   const tools = config.tool_profiles[a.tools];
   if (!tools) throw new Error(`tool_profiles に ${a.tools} がありません`);
   const isReviewer = agent === "plan-reviewer" || agent === "dev-reviewer";

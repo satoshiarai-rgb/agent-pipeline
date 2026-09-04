@@ -1,7 +1,7 @@
+import type { Config } from "../defaults.ts";
 import { isTerminal, nextPhase, roundKeyFor } from "../transitions.ts";
 import type { Phase, RunResult, Verdict } from "../types.ts";
 import { deriveRunStats } from "../utils/derive-run-stats.ts";
-import type { Config } from "../utils/load-config.ts";
 import type { RunRecord } from "../utils/parse-record.ts";
 
 /**
@@ -13,7 +13,7 @@ export interface Outcome {
   verdict?: Verdict | null;
   /** planner の規模判定が上限超過 */
   oversize?: boolean;
-  /** completing で acceptance.yml が全 passed だったか */
+  /** completing で acceptance.json が全 passed だったか */
   acceptance_passed?: boolean;
   /** A-31: 設定ミスとエージェントの失敗を区別するために残す */
   api_error_status?: number | null;
@@ -80,7 +80,7 @@ export function finish(input: {
     return advance(phase, "request_changes", config, `request_changes (${used}/${limit})`);
   }
 
-  // 3. completing: acceptance.yml が全 passed かで分岐
+  // 3. completing: acceptance.json が全 passed かで分岐
   const canPass = nextPhase(phase, "pass", config) !== null;
   if (canPass && !outcome.acceptance_passed) return blocked("acceptance_not_passed");
   if (canPass) return advance(phase, "pass", config, "acceptance_passed");

@@ -25,12 +25,11 @@ describe("requestChangesRun", () => {
   test("レビュー番号は既存ファイルの次を取る", () => {
     const dir = makeRun("awaiting_human");
     requestChangesRun({ dir, config: c, association: "OWNER", body: "1 回目" });
+    // 差し戻しで planning に落ちた phase を、2 回目のために戻す
+    const sp = join(dir, "state.json");
     writeFileSync(
-      join(dir, "state.yml"),
-      readFileSync(join(dir, "state.yml"), "utf8").replace(
-        "phase: planning",
-        "phase: awaiting_human",
-      ),
+      sp,
+      JSON.stringify({ ...JSON.parse(readFileSync(sp, "utf8")), phase: "awaiting_human" }, null, 2),
     );
     const r = requestChangesRun({ dir, config: c, association: "OWNER", body: "2 回目" });
     expect(r.ok && r.review_path).toContain("reviews/plan-02.md");

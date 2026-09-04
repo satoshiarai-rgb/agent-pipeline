@@ -3,7 +3,7 @@
 # 出力は JSON をそのままログに出しつつ、主要フィールドを個別の output に展開する。
 set -euo pipefail
 
-args=("$CLI_COMMAND" --dir "$CLI_DIR" --defaults "$GITHUB_ACTION_PATH/defaults.yml")
+args=("$CLI_COMMAND" --dir "$CLI_DIR")
 
 add() { # add <flag> <value>: 値が空なら渡さない
   [ -n "${2:-}" ] && args+=("$1" "$2")

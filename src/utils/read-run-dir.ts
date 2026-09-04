@@ -12,9 +12,9 @@ export function readRunDir(dir: string): {
   const runsDir = join(dir, "runs");
   const records = existsSync(runsDir)
     ? readdirSync(runsDir)
-        .filter((n) => n.endsWith(".yml"))
+        .filter((n) => n.endsWith(".json"))
         .sort()
         .map((n) => ({ path: join(runsDir, n), text: readFileSync(join(runsDir, n), "utf8") }))
     : [];
-  return { stateText: readFileSync(join(dir, "state.yml"), "utf8"), records };
+  return { stateText: readFileSync(join(dir, "state.json"), "utf8"), records };
 }

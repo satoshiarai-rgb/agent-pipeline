@@ -3,7 +3,7 @@ import type { RunRecord } from "./parse-record.ts";
 
 /**
  * 実行レコードから状態を導出する（A-33）。
- * カウントを state.yml に保存しないため、並行更新で取りこぼす値が存在しない。
+ * カウントを state.json に保存しないため、並行更新で取りこぼす値が存在しない。
  */
 export function deriveRunStats(records: RunRecord[]) {
   return {

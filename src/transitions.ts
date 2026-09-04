@@ -1,6 +1,6 @@
+import type { Config } from "./defaults.ts";
 import type { AgentName, Phase, RoundKey } from "./types.ts";
 import { deriveRunStats } from "./utils/derive-run-stats.ts";
-import type { Config } from "./utils/load-config.ts";
 import type { RunRecord } from "./utils/parse-record.ts";
 import { resolveAgent } from "./utils/resolve-agent.ts";
 

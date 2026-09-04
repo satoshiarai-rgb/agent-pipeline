@@ -3,20 +3,20 @@ import { join } from "node:path";
 import { approve } from "./commands/approve.ts";
 import { type FinishResult, finish, type Outcome } from "./commands/finish.ts";
 import { requestChanges } from "./commands/request-changes.ts";
-import { applyStateFile, checkPipelineVersion, parseStateFile } from "./state-file.ts";
+import type { Config } from "./defaults.ts";
+import { checkPipelineVersion, parseStateFile, renderStateFile } from "./state-file.ts";
 import { type RouteResult, reviewKindFor, route } from "./transitions.ts";
 import type { AgentName, Phase } from "./types.ts";
-import type { Config } from "./utils/load-config.ts";
 import { nextReviewNumber } from "./utils/next-review-number.ts";
 import { parseRecord, type RunRecord } from "./utils/parse-record.ts";
 import { readRunDir } from "./utils/read-run-dir.ts";
 import { renderReview } from "./utils/render-review.ts";
-import { stringifyYaml } from "./utils/stringify-yaml.ts";
+import { stringifyJson } from "./utils/stringify-json.ts";
 
 export type { FinishResult, Outcome } from "./commands/finish.ts";
+export type { Config } from "./defaults.ts";
+export { defaults } from "./defaults.ts";
 export type { RouteResult } from "./transitions.ts";
-export type { Config } from "./utils/load-config.ts";
-export { loadConfig } from "./utils/load-config.ts";
 
 interface Base {
   /** agent-work/issue-<n>/ */
@@ -31,14 +31,14 @@ const load = (dir: string) => {
 };
 
 const recordName = (r: { agent: string; run_id: string; attempt: number }) =>
-  `${r.agent}-${r.run_id}-${r.attempt}.yml`;
+  `${r.agent}-${r.run_id}-${r.attempt}.json`;
 
 const writeState = (
   dir: string,
   file: ReturnType<typeof parseStateFile>,
   patch: { phase: Phase; blocked_reason: string | null },
   now: Date,
-) => writeFileSync(join(dir, "state.yml"), applyStateFile(file.doc, { ...patch, now }));
+) => writeFileSync(join(dir, "state.json"), renderStateFile(file, { ...patch, now }));
 
 /**
  * エージェント実行の開始を記録する（dispatch.yml の state-start ステップ）。
@@ -63,7 +63,7 @@ export function startRun(
   };
   const path = join(dir, "runs", recordName({ agent, run_id, attempt }));
   mkdirSync(join(dir, "runs"), { recursive: true });
-  writeFileSync(path, stringifyYaml(record));
+  writeFileSync(path, stringifyJson(record));
   return { record_path: path };
 }
 
@@ -87,7 +87,7 @@ export function routeRun(input: Base): RouteResult {
 }
 
 /**
- * エージェント実行の結末を書き、次の phase を決めて state.yml を更新する
+ * エージェント実行の結末を書き、次の phase を決めて state.json を更新する
  * （dispatch.yml の finalize ステップ）。
  * レコードの更新を先に行うのは、ラウンド上限が今回の実行を含めて数えるため。
  */
@@ -108,7 +108,7 @@ export function finishRun(
   };
   writeFileSync(
     record_path,
-    stringifyYaml({ ...updated, api_error_status: outcome.api_error_status ?? null }),
+    stringifyJson({ ...updated, api_error_status: outcome.api_error_status ?? null }),
   );
 
   const records = before.records.map((r) => (r === current ? updated : r));

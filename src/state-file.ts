@@ -1,10 +1,9 @@
-import type { Document } from "yaml";
+import type { Config } from "./defaults.ts";
 import type { Phase } from "./types.ts";
-import type { Config } from "./utils/load-config.ts";
-import { parseYamlDocument } from "./utils/parse-yaml-document.ts";
-import { setYamlFields } from "./utils/set-yaml-fields.ts";
+import { parseJson } from "./utils/parse-json.ts";
+import { stringifyJson } from "./utils/stringify-json.ts";
 
-/** state.yml のうち、遷移判断に使わない識別子とメタ情報 */
+/** state.json のうち、遷移判断に使わない識別子とメタ情報 */
 export interface RunMeta {
   pipeline_version: number;
   issue: number;
@@ -13,38 +12,43 @@ export interface RunMeta {
 }
 
 export interface StateFile {
-  /** コメントとキー順を保持して書き戻すための Document */
-  doc: Document;
   meta: RunMeta;
   phase: Phase;
   blocked_reason: string | null;
 }
 
 export function parseStateFile(text: string): StateFile {
-  const doc = parseYamlDocument(text);
-  const raw = doc.toJS() as Record<string, unknown> | null;
-  if (!raw || typeof raw.phase !== "string" || typeof raw.issue !== "number") {
-    throw new Error("state.yml に issue か phase がありません");
+  const raw = parseJson<Partial<RunMeta & { phase: Phase; blocked_reason: string | null }>>(
+    text,
+    "state.json",
+  );
+  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
+    throw new Error("state.json に issue か phase がありません");
   }
   return {
-    doc,
     meta: {
       pipeline_version: Number(raw.pipeline_version ?? 0),
       issue: raw.issue,
       branch: typeof raw.branch === "string" ? raw.branch : "",
       updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null,
     },
-    phase: raw.phase as Phase,
+    phase: raw.phase,
     blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null,
   };
 }
 
-/** phase / blocked_reason / updated_at だけを書き換える */
-export function applyStateFile(
-  doc: Document,
+/**
+ * state.json を組み立てる。キー順を固定して差分を安定させる。
+ * 可変値は phase と blocked_reason だけ（rounds と total_steps は導出する / A-33）。
+ */
+export function renderStateFile(
+  file: StateFile,
   patch: { phase: Phase; blocked_reason: string | null; now: Date },
 ): string {
-  return setYamlFields(doc, {
+  return stringifyJson({
+    pipeline_version: file.meta.pipeline_version,
+    issue: file.meta.issue,
+    branch: file.meta.branch,
     phase: patch.phase,
     blocked_reason: patch.blocked_reason,
     updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z"),
@@ -53,7 +57,7 @@ export function applyStateFile(
 
 /**
  * 中央の破壊的変更が進行中の run を壊さないための前提チェック。
- * 遷移の規則ではないため state.ts ではなくこの層に置く。不一致なら理由を返す。
+ * 遷移の規則ではないためこの層に置く。不一致なら理由を返す。
  */
 export function checkPipelineVersion(meta: RunMeta, config: Config): string | null {
   return meta.pipeline_version === config.pipeline_version

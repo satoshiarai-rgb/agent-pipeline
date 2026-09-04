@@ -1,0 +1,19 @@
+{
+  "criteria": [
+    {
+      "id": "AC-1",
+      "description": "未ログインで /settings にアクセスするとログイン画面へ遷移する",
+      "verification": "automated",
+      "command": "npm test -- auth-redirect",
+      "status": "pending",
+      "evidence": null
+    },
+    {
+      "id": "AC-2",
+      "description": "既存セッションの挙動が変わらない",
+      "verification": "manual",
+      "status": "pending",
+      "evidence": null
+    }
+  ]
+}

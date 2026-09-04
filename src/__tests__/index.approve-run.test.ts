@@ -7,7 +7,7 @@ const c = config();
 afterEach(cleanupRuns);
 
 describe("approveRun", () => {
-  test("awaiting_human 以外では state.yml を書き換えない", () => {
+  test("awaiting_human 以外では state.json を書き換えない", () => {
     const dir = makeRun("planning");
     const r = approveRun({ dir, config: c, association: "OWNER" });
     expect(r.ok).toBe(false);
