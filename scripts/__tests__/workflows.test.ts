@@ -42,13 +42,15 @@ function workflows(): Workflow[] {
     ...readdirSync(CENTRAL)
       .filter((f) => f.endsWith(".yml"))
       .map((f) => join(CENTRAL, f)),
-    ...readdirSync(VERIFY, { withFileTypes: true })
-      .filter((d) => d.isDirectory())
-      .flatMap((d) =>
-        readdirSync(join(VERIFY, d.name))
-          .filter((f) => f.endsWith(".yml"))
-          .map((f) => join(VERIFY, d.name, f)),
-      ),
+    ...readdirSync(VERIFY, { withFileTypes: true }).flatMap((d) =>
+      d.isDirectory()
+        ? readdirSync(join(VERIFY, d.name))
+            .filter((f) => f.endsWith(".yml"))
+            .map((f) => join(VERIFY, d.name, f))
+        : d.name.endsWith(".yml")
+          ? [join(VERIFY, d.name)]
+          : [],
+    ),
   ];
   return files.map((path) => ({
     name: basename(path),

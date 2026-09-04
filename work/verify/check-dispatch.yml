@@ -1,4 +1,4 @@
-# 配布先の薄いラッパー（Step B-4）
+# 配布先の薄いラッパー（Step B-4 以降、ステップが進むごとに育つ）
 #
 # 置き場所: 検証用リポジトリの .github/workflows/check-dispatch.yml
 # ロジックは中央（satoshiarai-rgb/agent-pipeline）の reusable workflow にある。
@@ -8,12 +8,13 @@
 #       （secrets: inherit で中央の reusable workflow に渡る）
 #
 # 使い方:
-#   op=bootstrap issue=1 scenario=happy   → planning から awaiting_human まで自走
-#   op=approve   issue=1                  → developing 以降が自走して done まで
-#   scenario は dry run のダミーエージェントの振る舞い
-#   （happy / plan-changes / dev-changes / plan-loop）
+#   本番の入口:
+#     issue に agent:go ラベルを付ける → bootstrap（ラベルの付与には write / triage が必要）
+#   手動起動（シナリオを変えて試すため。C-1 以降も残す）:
+#     op=bootstrap issue=1 scenario=plan-loop
+#     op=approve   issue=1
 #
-# C-1 / C-2 で、手動起動を issue のラベルと /approve コメントに置き換える。
+# C-2 で PR コメント（/agent approve、/agent request-changes）を入口に足す。
 
 name: check-dispatch
 
@@ -33,6 +34,8 @@ on:
         type: choice
         default: happy
         options: [happy, plan-changes, dev-changes, plan-loop]
+  issues:
+    types: [labeled]
   push:
     branches: ["claude/**"]
     paths: ["agent-work/**"]
@@ -42,15 +45,27 @@ permissions:
 
 # 同一ブランチの push を直列化する。実行中は止めずにキューする
 concurrency:
-  group: agent-${{ github.event.inputs.issue || github.ref_name }}
+  group: agent-${{ github.event.issue.number || github.event.inputs.issue || github.ref_name }}
   cancel-in-progress: false
 
 jobs:
+  # 本番の入口: agent:go ラベルで起動する
   bootstrap:
+    if: github.event_name == 'issues' && github.event.label.name == 'agent:go'
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/bootstrap.yml@main
+    with:
+      issue: ${{ github.event.issue.number }}
+      actor: ${{ github.actor }}
+      scenario: happy # dry run のダミーエージェントの振る舞い
+    secrets: inherit
+
+  # 手動起動: シナリオを変えて試すため
+  bootstrap-manual:
     if: github.event_name == 'workflow_dispatch' && inputs.op == 'bootstrap'
     uses: satoshiarai-rgb/agent-pipeline/.github/workflows/bootstrap.yml@main
     with:
       issue: ${{ inputs.issue }}
+      actor: ${{ github.actor }}
       scenario: ${{ inputs.scenario }}
     secrets: inherit
 

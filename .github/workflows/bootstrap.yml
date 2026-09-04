@@ -12,6 +12,14 @@ on:
         description: issue 番号
         required: true
         type: string
+      actor:
+        description: |
+          起動した人の login。ラベルの付与には write / triage 権限が必要なので
+          イベント自体が認可を含んでいるが、念のため push 権限を確認する。
+          （issues.labeled の author_association は issue の作成者のもので、
+          ラベルを付けた人ではないため使えない）
+        required: true
+        type: string
       scenario:
         description: "ダミー実行の振る舞い（dry run のときだけ使う）"
         required: false
@@ -32,11 +40,30 @@ jobs:
           client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
           private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
 
+      - name: 起動した人の権限を確認する
+        id: authorize
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          ACTOR: ${{ inputs.actor }}
+        run: |
+          set -euo pipefail
+          PERM=$(gh api "repos/${GITHUB_REPOSITORY}/collaborators/${ACTOR}/permission" --jq .permission 2>/dev/null || echo none)
+          echo "permission=$PERM" >> "$GITHUB_OUTPUT"
+          case "$PERM" in
+            admin | maintain | write) echo "::notice::$ACTOR ($PERM) が起動" ;;
+            *)
+              echo "::warning::$ACTOR には push 権限が無い（$PERM）ので何もしない"
+              echo "skip=true" >> "$GITHUB_OUTPUT"
+              ;;
+          esac
+
       - uses: actions/checkout@v7
+        if: steps.authorize.outputs.skip != 'true'
         with:
           token: ${{ steps.app.outputs.token }}
 
       - name: git identity を App の bot にする
+        if: steps.authorize.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           SLUG: ${{ steps.app.outputs.app-slug }}
@@ -46,15 +73,17 @@ jobs:
           git config user.name "${SLUG}[bot]"
           git config user.email "${BOT_ID}+${SLUG}[bot]@users.noreply.github.com"
 
-      - name: ブランチと state.json を作る（冪等）
+      - name: ブランチと state.json を作り、draft PR を開く（冪等）
+        if: steps.authorize.outputs.skip != 'true'
         env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
           N: ${{ inputs.issue }}
           SCENARIO: ${{ inputs.scenario }}
         run: |
           set -euo pipefail
           BR="claude/issue-$N"
           if git ls-remote --exit-code --heads origin "$BR"; then
-            echo "::notice::$BR は既にある（何もしない）"
+            echo "::notice::$BR は既にある（何もしない）。作り直すなら新しい issue を起票する"
             exit 0
           fi
           git checkout -b "$BR"
@@ -76,4 +105,33 @@ jobs:
           git add "$D"
           git commit -m "agent: bootstrap issue #$N"
           git push -u origin "$BR"   # ← この push で dispatch が起動する
-          echo "### bootstrap: $BR を作成" >> "$GITHUB_STEP_SUMMARY"
+
+          # draft PR を開く。人間の承認・差し戻しは PR 側のコメントで受け付ける（K-12）
+          cat > /tmp/pr-body.md <<EOF
+          Closes #$N
+
+          このパイプラインが計画→レビュー→実装→レビューを行い、完了報告までを PR に積みます。
+
+          ## 進行状況
+
+          - 状態: \`$D/state.json\` の \`phase\`
+          - 計画: \`$D/plan.md\`
+          - 受け入れ条件: \`$D/acceptance.json\`
+          - レビュー: \`$D/reviews/\`
+          - 実行履歴: \`$D/runs/\`
+
+          ## この PR でできること
+
+          計画ができると \`awaiting_human\` で停止します。**この PR にコメント**してください。
+
+          | コメント | 動作 |
+          |---|---|
+          | \`/agent approve\` | 計画を承認して実装に進む |
+          | \`/agent request-changes <理由>\` | 計画を差し戻す（理由がレビューとして残り、次の計画に反映される） |
+
+          issue 側のコメントは見ていません。
+          EOF
+          gh pr create --draft --head "$BR" \
+            --title "$(gh issue view "$N" --json title -q .title)" \
+            --body-file /tmp/pr-body.md
+          echo "### bootstrap: $BR と draft PR を作成" >> "$GITHUB_STEP_SUMMARY"
