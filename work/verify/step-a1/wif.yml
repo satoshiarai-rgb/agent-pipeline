@@ -1,0 +1,79 @@
+# Step A-1: WIF で Claude を 1 回呼ぶ
+#
+# 置き場所: 検証用リポジトリの .github/workflows/wif.yml
+#   （このファイルは中央リポジトリ側の原本。検証用リポジトリにコピーして使う）
+#
+# 前提:
+#   - Anthropic Console でフェデレーションルールを作成済み（手順は steps.md の Step A-1）
+#   - リポジトリ Variables（Secrets ではない）に ANTHROPIC_FDRL / ANTHROPIC_ORG_ID / ANTHROPIC_SVAC を登録済み
+#   - リポジトリ Secrets / Variables に ANTHROPIC_API_KEY を置いていないこと
+#     （API キーは WIF より優先されるため、置くと federation が使われず、action が警告を出して素通りする）
+#
+# このステップでは GitHub App は不要。App トークンが必要になるのは Step B-1 以降。
+
+name: wif-hello
+
+on:
+  workflow_dispatch:
+    inputs:
+      debug_claims:
+        description: "OIDC トークンの claim を表示する（認証が失敗したときの切り分け用）"
+        type: boolean
+        default: false
+
+# permissions は「この実行に配られる GITHUB_TOKEN の権限」と「OIDC を要求できるか」を決める。
+# id-token: write が無いと OIDC トークンを取得できず、base-action は
+# 「Did you remember to add `id-token: write` ...」というエラーで落ちる。
+permissions:
+  contents: read
+  id-token: write
+
+jobs:
+  hello:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      # 認証が通らないときの切り分け用。
+      # ここで出た sub / repository_owner / aud が、Console 側のルールの
+      # subject_prefix / claims / audience と一致しているかを目で確認する。
+      # job_workflow_ref は Step B-5（案B の検証）で使う値。
+      - name: OIDC トークンの claim を表示
+        if: ${{ inputs.debug_claims }}
+        uses: actions/github-script@v8
+        with:
+          script: |
+            const token = await core.getIDToken('https://api.anthropic.com');
+            const payload = JSON.parse(
+              Buffer.from(token.split('.')[1], 'base64url').toString()
+            );
+            core.info(JSON.stringify({
+              iss: payload.iss,
+              sub: payload.sub,
+              aud: payload.aud,
+              repository: payload.repository,
+              repository_owner: payload.repository_owner,
+              ref: payload.ref,
+              event_name: payload.event_name,
+              workflow_ref: payload.workflow_ref,
+              job_workflow_ref: payload.job_workflow_ref,
+            }, null, 2));
+
+      # base-action は「Claude Code を 1 回動かすだけ」の部品。
+      # PR へのコメントや issue の操作といった GitHub 連携は持たない（そこは自分で書く）。
+      # @v1 は移動タグなので、検証の再現性のためパッチ版に固定する。
+      - name: Claude を 1 回呼ぶ
+        uses: anthropics/claude-code-action/base-action@v1.0.215
+        with:
+          prompt: "Reply with exactly: WIF ok"
+          claude_args: "--model claude-opus-5 --max-turns 1"
+          show_full_output: "true"
+          # 以下 3 つが揃うと、action は静的な API キーではなく
+          # GitHub の OIDC トークンを交換して認証する。
+          anthropic_federation_rule_id: ${{ vars.ANTHROPIC_FDRL }}
+          anthropic_organization_id: ${{ vars.ANTHROPIC_ORG_ID }}
+          anthropic_service_account_id: ${{ vars.ANTHROPIC_SVAC }}
+          # ルールが複数ワークスペースを対象にする場合のみ必要。
+          # anthropic_workspace_id: ${{ vars.ANTHROPIC_WRKSPC }}
+          #
+          # audience の既定は https://api.anthropic.com。ルール側と一致していれば指定不要。
+          # anthropic_oidc_audience: "https://api.anthropic.com"
