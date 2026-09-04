@@ -146,12 +146,17 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 - **この段階では持ち込まない**: state.yml、YAML パース、エージェント。数字を数えるだけ
 - 対応: worklist V-5、V-6
 
-### Step B-2: `state.yml` と遷移表で「次に何をするか」を決める
+### Step B-2: `state.json` と遷移表で「次に何をするか」を決める ✅ 完了（2026-09-04）
 
 - **学ぶ概念**: step の `outputs` と step 間の値の受け渡し、`if:` 条件
 - **やること**: `scripts/state.py`（`read` / `start` / `finish`）と `defaults.yml` の宣言的な遷移表を書く。ワークフローは 1 job のまま、エージェントの位置は `echo` で成果物ファイルを作るダミーに置き換える。`planning → plan_review → ... → done` を一巡させる
 - **確認**: ダミーだけで `phase` が `bootstrap` から `done` まで進む。ラウンド上限と `total_steps` 上限で `blocked` になる
-- **完了条件**: 状態機械が実機で一巡し、上限で止まる
+- **完了条件**: 状態機械が実機で一巡し、上限で止まる → **達成**（検証リポジトリ `compass-wiki`、`claude/issue-1`）
+  - `bootstrap` → `planning` → `plan_review` → `awaiting_human` で停止（push ラン 3 本）
+  - `op=approve` → `developing` → `dev_review` → `completing` → `done`（push ラン 3 本）
+  - `runs/` に 5 件のレコード（全件 `finished_at` 済み・`result: ok`）、`state.json` は `phase: done`
+  - `done` の push は `[skip ci]` 付きで後続のランが立たない（`continue_chain=false`）
+  - **`uses:` で中央 action を呼べること、`$GITHUB_ACTION_PATH` がリポジトリ root を指すことを実機で確認**（V-10）
 - **ここに単体テストを集中させる**: `state.py` は git も GitHub API も触らない純関数に寄せ、遷移の網羅テストをローカルで回す。以降のステップで最も壊れやすいのが遷移なので、ここで固める
 - 対応: worklist I-1、A-19、A-21
 
