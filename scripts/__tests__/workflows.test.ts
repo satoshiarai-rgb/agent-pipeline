@@ -28,7 +28,11 @@ interface Job {
 }
 interface Doc {
   name?: string;
-  jobs?: Record<string, Job>;
+  permissions?: Record<string, string>;
+  jobs?: Record<string, CallerJob>;
+}
+interface CallerJob extends Job {
+  uses?: string;
 }
 interface Workflow {
   name: string;
@@ -256,4 +260,39 @@ describe("scripts/run-cli.sh（action の実体）", () => {
     // biome-ignore lint/suspicious/noTemplateCurlyInString: シェルの ${2:-} を文字列として検査する
     expect(sh).toContain('[ -n "${2:-}" ] && args+=("$1" "$2")');
   });
+});
+
+describe("呼び出し側の権限が中央のワークフローを満たしているか", () => {
+  // reusable workflow は呼び出し側より広い権限を要求できない。
+  // GitHub は実行時にしか教えてくれないので、ここで静的に確認する。
+  const level = (v?: string) => (v === "write" ? 2 : v === "read" ? 1 : 0);
+  const central = new Map<string, Record<string, string>>();
+  for (const wf of all.filter((w) => w.path.includes("/.github/workflows/"))) {
+    central.set(wf.name, wf.doc.permissions ?? {});
+  }
+
+  const callers = all.filter((w) => Object.values(w.doc.jobs ?? {}).some((j) => j.uses));
+
+  test("uses: で中央を呼ぶワークフローが存在する", () => {
+    expect(callers.length).toBeGreaterThan(0);
+  });
+
+  for (const caller of callers) {
+    for (const [job, cfg] of Object.entries(caller.doc.jobs ?? {})) {
+      const m = cfg.uses?.match(/\.github\/workflows\/([^@]+)@/);
+      if (!m) continue;
+      const callee = m[1] as string;
+      test(`${caller.name} の ${job} → ${callee}`, () => {
+        const need = central.get(callee);
+        expect(need, `${callee} が見つからない`).toBeDefined();
+        const have = caller.doc.permissions ?? {};
+        for (const [scope, want] of Object.entries(need ?? {})) {
+          expect(
+            level(have[scope]),
+            `${scope}: 呼び出し側が ${have[scope] ?? "none"}`,
+          ).toBeGreaterThanOrEqual(level(want));
+        }
+      });
+    }
+  }
 });

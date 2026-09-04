@@ -43,8 +43,15 @@ on:
     branches: ["claude/**"]
     paths: ["agent-work/**"]
 
+# reusable workflow は呼び出し側より広い権限を要求できないため、
+# 中央のワークフローが宣言する分をここで与える（設計書 §6.1）。
+# 実際の操作は App トークンで行うので GITHUB_TOKEN はほとんど使わないが、
+# 宣言は静的に検証される
 permissions:
   contents: write
+  pull-requests: write
+  issues: write
+  id-token: write # WIF に差し替えるとき（Step E-3）に必要
 
 # 同一ブランチの push を直列化する。実行中は止めずにキューする
 concurrency:
