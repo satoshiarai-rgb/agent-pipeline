@@ -51,11 +51,14 @@ jobs:
           PR: ${{ inputs.pr }}
         run: |
           set -euo pipefail
+          # GitHub のコメント本文は CRLF 改行。CR が残ると "approve\r" のようになり
+          # ステップの if 比較（== 'approve'）が一致しない
+          CLEAN=$(printf '%s' "$BODY" | tr -d '\r')
           # 1 行目だけをコマンドとして読む（本文の続きは理由として使う）
-          FIRST=$(printf '%s' "$BODY" | head -1)
+          FIRST=$(printf '%s' "$CLEAN" | head -1)
           CMD=$(printf '%s' "$FIRST" | awk '{print $2}')
           # /agent <command> の後ろ全部を理由とする（改行も含む）
-          REASON=$(printf '%s' "$BODY" | sed -E '1s@^/agent[[:space:]]+[a-z-]+[[:space:]]*@@')
+          REASON=$(printf '%s' "$CLEAN" | sed -E '1s@^/agent[[:space:]]+[a-z-]+[[:space:]]*@@')
 
           # PR のブランチから run のディレクトリを決める（route と同じ規則 / K-12）
           # このステップは checkout より前に走るため --repo が必須（git remote から推測できない）

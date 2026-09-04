@@ -310,3 +310,87 @@ describe("gh コマンドの書き方", () => {
     });
   }
 });
+
+describe("PR コメントの解析（人間が書いた文字列の境界）", () => {
+  const comment = all.find((w) => w.name === "comment.yml");
+  const parse = comment?.doc.jobs?.comment?.steps?.find((st) => st.id === "parse")?.run;
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  /** parse ステップを実行して GITHUB_OUTPUT を読む。gh はスタブに差し替える */
+  function runParse(body: string): Record<string, string> {
+    const dir = mkdtempSync(join(tmpdir(), "parse-"));
+    dirs.push(dir);
+    // gh pr view のスタブ（ネットワークに出ない）
+    const bin = join(dir, "bin");
+    spawnSync("mkdir", ["-p", bin]);
+    writeFileSync(join(bin, "gh"), "#!/bin/sh\necho claude/issue-1\n", { mode: 0o755 });
+    const out = join(dir, "out.txt");
+    writeFileSync(out, "");
+    const script = join(dir, "parse.sh");
+    writeFileSync(script, parse as string);
+    spawnSync("bash", [script], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        BODY: body,
+        PR: "2",
+        GH_TOKEN: "dummy",
+        GITHUB_REPOSITORY: "owner/repo",
+        GITHUB_OUTPUT: out,
+      },
+    });
+    // GITHUB_OUTPUT の key=value と、ヒアドキュメント形式の値を読む
+    const text = readFileSync(out, "utf8");
+    const result: Record<string, string> = {};
+    const lines = text.split("\n");
+    for (let i = 0; i < lines.length; i++) {
+      const line = lines[i] as string;
+      const heredoc = line.match(/^(\w+)<<(\w+)$/);
+      if (heredoc) {
+        const [, key, delim] = heredoc;
+        const body: string[] = [];
+        while (++i < lines.length && lines[i] !== delim) body.push(lines[i] as string);
+        result[key as string] = body.join("\n");
+        continue;
+      }
+      const kv = line.match(/^(\w+)=(.*)$/);
+      if (kv) result[kv[1] as string] = kv[2] as string;
+    }
+    return result;
+  }
+
+  test("ステップが取り出せている", () => {
+    expect(parse).toBeString();
+  });
+
+  test("CRLF 改行でもコマンドを取り出せる（GitHub のコメントは CRLF）", () => {
+    expect(runParse("/agent approve\r\n").command).toBe("approve");
+    expect(runParse("/agent request-changes 理由\r\n").command).toBe("request-changes");
+  });
+
+  test("run のディレクトリを PR のブランチから導出する", () => {
+    expect(runParse("/agent approve").dir).toBe("agent-work/issue-1");
+    expect(runParse("/agent approve").branch).toBe("claude/issue-1");
+  });
+
+  test("理由は 1 行目のコマンド以降すべて（改行を含む）", () => {
+    const r = runParse("/agent request-changes 1 行目\r\n2 行目\r\n");
+    expect(r.command).toBe("request-changes");
+    expect(r.reason).toContain("1 行目");
+    expect(r.reason).toContain("2 行目");
+    expect(r.reason).not.toContain("\r");
+  });
+
+  test("理由が空の request-changes は no-reason として弾く", () => {
+    expect(runParse("/agent request-changes\r\n").command).toBe("no-reason");
+    expect(runParse("/agent request-changes   ").command).toBe("no-reason");
+  });
+
+  test("知らないコマンドはそのまま返して応答側で扱う", () => {
+    expect(runParse("/agent foo").command).toBe("foo");
+  });
+});
