@@ -6,6 +6,8 @@
  */
 export { approveRun } from "./commands/approve.ts";
 export { blockRun } from "./commands/block.ts";
+export type { ComposeResult } from "./commands/compose.ts";
+export { composeRun } from "./commands/compose.ts";
 export type { FinishResult, Outcome } from "./commands/finish.ts";
 export { finishRun } from "./commands/finish.ts";
 export { labelRun } from "./commands/label.ts";

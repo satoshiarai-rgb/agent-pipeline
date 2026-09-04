@@ -4,6 +4,7 @@ import { parseArgs } from "node:util";
 import {
   approveRun,
   blockRun,
+  composeRun,
   defaults as config,
   finishRun,
   labelRun,
@@ -32,6 +33,7 @@ commands:
   label    いま付いているべきラベルを返す
   validate 成果物が契約を満たすか検証し Outcome を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
+  compose  エージェントに渡すプロンプトを組み立てる --agent --central --out [--repo]
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -58,6 +60,9 @@ const { positionals, values } = parseArgs({
     "changed-files": { type: "string" },
     body: { type: "string" },
     reason: { type: "string" },
+    repo: { type: "string" },
+    central: { type: "string" },
+    out: { type: "string" },
   },
 });
 
@@ -126,6 +131,15 @@ const run = () => {
         changed_files: values["changed-files"]
           ? readFileSync(values["changed-files"], "utf8").split("\n").filter(Boolean)
           : [],
+      });
+    case "compose":
+      return composeRun({
+        dir,
+        config,
+        agent: need(values.agent, "agent") as AgentName,
+        repo: values.repo ?? ".",
+        central: need(values.central, "central"),
+        out: need(values.out, "out"),
       });
     default:
       console.error(`不明なコマンド: ${command ?? "(なし)"}\n\n${USAGE}`);

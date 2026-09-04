@@ -8,11 +8,11 @@
 # 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
-description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / block / label）
+description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / block / label / validate / compose）
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | block | label | validate"
+    description: "start | route | finish | approve | request-changes | block | label | validate | compose"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
@@ -35,6 +35,10 @@ inputs:
   oversize: { description: "finish: planner の規模判定が上限超過なら true", required: false }
   acceptance-passed: { description: "finish: acceptance.json が全 passed なら true", required: false }
   session-id: { description: "finish: base-action の session_id", required: false }
+  # compose
+  repo: { description: "compose: 配布先のチェックアウト（既定はカレント）", required: false }
+  central: { description: "compose: 中央リポジトリのパス（既定は action 自身の展開先）", required: false }
+  out: { description: "compose: 組み立てたプロンプトの書き出し先（既定は $RUNNER_TEMP/agent-prompt.md）", required: false }
   # approve / request-changes
   association: { description: "コメント投稿者の author_association", required: false }
   body: { description: "request-changes: コメント本文", required: false }
@@ -42,6 +46,18 @@ inputs:
   reason: { description: "block: blocked_reason に残す理由", required: false }
 
 outputs:
+  prompt_path:
+    description: "compose: 組み立てたプロンプト（base-action の prompt_file に渡す）"
+    value: ${{ steps.run.outputs.prompt_path }}
+  role_prompt:
+    description: "compose: 使った役割プロンプト（配布先の上書きか中央の既定か）"
+    value: ${{ steps.run.outputs.role_prompt }}
+  review_path:
+    description: "compose / request-changes: レビューファイルのパス"
+    value: ${{ steps.run.outputs.review_path }}
+  result:
+    description: "validate: ok | invalid | agent_failed | api_error（finish にそのまま渡す）"
+    value: ${{ steps.run.outputs.result }}
   detail:
     description: "validate: 契約を満たさない理由"
     value: ${{ steps.run.outputs.detail }}
@@ -87,9 +103,6 @@ outputs:
   record_path:
     description: "start: 作成した実行レコードのパス"
     value: ${{ steps.run.outputs.record_path }}
-  review_path:
-    description: "request-changes: 書いたレビューファイルのパス"
-    value: ${{ steps.run.outputs.review_path }}
   ok:
     description: "approve / request-changes: 遷移したかどうか"
     value: ${{ steps.run.outputs.ok }}
@@ -108,6 +121,9 @@ outputs:
   tools:
     description: "route: --tools に渡す値"
     value: ${{ steps.run.outputs.tools }}
+  claude_args:
+    description: "route: base-action の claude_args に渡すフラグ列（モデル・上限・ツール）"
+    value: ${{ steps.run.outputs.claude_args }}
 
 runs:
   using: composite
@@ -135,4 +151,7 @@ runs:
         CLI_EXECUTION_FILE: ${{ inputs.execution-file }}
         CLI_CHANGED_FILES: ${{ inputs.changed-files }}
         CLI_DETAIL: ${{ inputs.detail }}
+        CLI_REPO: ${{ inputs.repo }}
+        CLI_CENTRAL: ${{ inputs.central }}
+        CLI_OUT: ${{ inputs.out }}
       run: bash "$GITHUB_ACTION_PATH/scripts/run-cli.sh"

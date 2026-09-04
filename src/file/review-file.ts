@@ -56,15 +56,23 @@ export function saveReview(input: {
   return path;
 }
 
+/**
+ * reviews/ のファイルを名前順に返す。kind を省略すると全種別。
+ * 番号は 0 埋めなので名前順がそのまま古い順になる。
+ */
+export function reviewPaths(dir: string, kind?: "plan" | "dev"): string[] {
+  const reviews = join(dir, "reviews");
+  if (!existsSync(reviews)) return [];
+  const prefix = kind ? `${kind}-` : "";
+  return readdirSync(reviews)
+    .filter((n) => n.startsWith(prefix) && n.endsWith(".md"))
+    .sort()
+    .map((n) => join(reviews, n));
+}
+
 /** 直近のレビューファイルのパス。無ければ null */
 export function latestReviewPath(dir: string, kind: "plan" | "dev"): string | null {
-  const reviews = join(dir, "reviews");
-  if (!existsSync(reviews)) return null;
-  const files = readdirSync(reviews)
-    .filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md"))
-    .sort();
-  const last = files.at(-1);
-  return last ? join(reviews, last) : null;
+  return reviewPaths(dir, kind).at(-1) ?? null;
 }
 
 /**

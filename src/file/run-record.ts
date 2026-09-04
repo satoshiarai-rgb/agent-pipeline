@@ -124,14 +124,19 @@ export function recordPath(dir: string, r: Parameters<typeof recordFileName>[0])
   return join(dir, "runs", recordFileName(r));
 }
 
-/** runs/ のレコードを名前順に読む。ディレクトリが無ければ空 */
-export function readRecords(dir: string): RunRecord[] {
+/** runs/ のレコードのパスを名前順に返す。ディレクトリが無ければ空 */
+export function recordPaths(dir: string): string[] {
   const runs = join(dir, "runs");
   if (!existsSync(runs)) return [];
   return readdirSync(runs)
     .filter((n) => n.endsWith(".json"))
     .sort()
-    .map((n) => parseRecord(readFileSync(join(runs, n), "utf8")));
+    .map((n) => join(runs, n));
+}
+
+/** runs/ のレコードを名前順に読む。ディレクトリが無ければ空 */
+export function readRecords(dir: string): RunRecord[] {
+  return recordPaths(dir).map((p) => parseRecord(readFileSync(p, "utf8")));
 }
 
 /** 実行レコードを書き、そのパスを返す */
