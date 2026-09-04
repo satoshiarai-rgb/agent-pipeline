@@ -3,6 +3,8 @@
   "private": true,
   "type": "module",
   "scripts": {
+    "build": "bun build src/cli.ts --target=node --outfile=dist/cli.js",
+    "check:dist": "bun run build && git diff --exit-code -- dist",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "format": "biome check --write",
