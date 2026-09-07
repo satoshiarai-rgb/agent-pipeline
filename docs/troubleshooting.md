@@ -79,7 +79,7 @@ git push
 | コメントが効かない | **PR 側**にコメントしているか（issue 側は見ていません）。先頭が `/agent ` で始まっているか。使えるのは `/agent approve` / `/agent request-changes <理由>` / `/agent retry` の 3 つで、受け付けなかった場合は PR にその旨が返信されます |
 | 差し戻したのに同じ計画が返ってくる | `/agent request-changes` に理由を書いているか。理由がそのまま次の計画の入力になります |
 | 中身の無い run が並ぶ | 起動条件に合わないイベント（`agent:go` 以外のラベル、`/agent` 以外のコメント）でも run 自体は作られます。全ジョブが skipped なら無害です |
-| 認証で失敗する | `AGENT_APP_CLIENT_ID` に数値の App ID を入れていないか（正しくは `Iv23li...` の Client ID）。App が**あなたのリポジトリと本体の両方**にインストールされているか |
+| 認証で失敗する | `AGENT_APP_CLIENT_ID` に数値の App ID を入れていないか（正しくは `Iv23li...` の Client ID）。App が**そのリポジトリ**にインストールされているか（agent-pipeline 本体へのインストールは不要です） |
 | ワークフローが見つからない | agent-pipeline 本体が private になっていないか |
 | 実装が既存のファイルを壊した | PR の差分で確認できます。差し戻しではなく、そのまま通常の PR レビューとして修正を依頼するか、PR を閉じて issue を立て直してください |
 

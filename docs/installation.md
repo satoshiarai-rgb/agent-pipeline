@@ -2,7 +2,8 @@
 
 あなたのリポジトリでパイプラインを動かすための手順です。置くのは**ワークフロー 1 枚**と、
 必要なら固有の設定（`.agent/`）だけで、中身は実行時に agent-pipeline 本体を読みます。
-所要はおよそ 30 分（GitHub App の作成が大半）です。
+所要はおよそ 30 分で、その大半は GitHub App の作成です。App は一度作れば他のリポジトリでも
+使い回せるので、2 つ目以降は 10 分ほどで済みます。
 
 パイプラインが何をするものかは [overview.md](overview.md) を参照してください。
 
@@ -17,13 +18,21 @@
 
 ## 1. GitHub App を用意する
 
-1. App を作ります（Settings → Developer settings → GitHub Apps → New GitHub App）
+**App は 1 つを使い回します。** アカウント（または組織）に 1 つ作れば、あとは使いたい
+リポジトリごとにインストールするだけです。**2 つ目以降のリポジトリでは手順 4 だけ**を行い、
+手順 2 の Secrets も同じ値をそのまま使えます（組織なら Organization secrets に置けば、
+リポジトリごとの登録も要りません）。
+
+1. App を作ります（Settings → Developer settings → GitHub Apps → New GitHub App）。
+   Webhook は使わないので Active のチェックを外します
 2. Repository permissions を **Contents / Issues / Pull requests: Read & Write** にします。
    **Workflows 権限は与えないでください** — 与えると、エージェントが自分の起動条件
    （`.github/workflows/**`）を書き換えられてしまいます
-3. Webhook は使いません（Active のチェックを外す）
-4. 秘密鍵を生成して `.pem` をダウンロードします
-5. App を**あなたのリポジトリと agent-pipeline 本体の両方**にインストールします
+3. 秘密鍵を生成して `.pem` をダウンロードします
+4. App を**あなたのリポジトリ**にインストールします
+
+agent-pipeline 本体へのインストールは要りません。本体は public で、実行時の読み取りには
+GitHub 標準の `GITHUB_TOKEN` で足りるためです。
 
 ## 2. Secrets を設定する
 
