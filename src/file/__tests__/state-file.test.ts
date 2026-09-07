@@ -1,14 +1,10 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { config } from "../../__tests__/helpers.ts";
+import { config, rootOf } from "../../__tests__/helpers.ts";
 import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
-import {
-  checkPipelineVersion,
-  readStateFile,
-  stateFilePath,
-  writeStateFile,
-} from "../state-file.ts";
+import { selectNextAction, selectSnapshot } from "../../redux/selectors.ts";
+import { readStateFile, stateFilePath, writeStateFile } from "../state-file.ts";
 
 afterEach(cleanupRuns);
 
@@ -45,8 +41,7 @@ describe("writeStateFile", () => {
     const dir = makeRun();
     writeStateFile(
       dir,
-      readStateFile(dir),
-      { phase: "plan_review", blocked_reason: null },
+      selectSnapshot(rootOf({ phase: "plan_review" })),
       new Date("2026-09-04T10:22:00Z"),
     );
     const written = JSON.parse(readFileSync(stateFilePath(dir), "utf8"));
@@ -73,8 +68,7 @@ describe("writeStateFile", () => {
     const dir = makeRun();
     writeStateFile(
       dir,
-      readStateFile(dir),
-      { phase: "blocked", blocked_reason: "total_steps_exceeded: 12/12" },
+      selectSnapshot(rootOf({ phase: "blocked", blocked_reason: "total_steps_exceeded: 12/12" })),
       new Date(),
     );
     expect(readStateFile(dir).blocked_reason).toBe("total_steps_exceeded: 12/12");
@@ -82,21 +76,21 @@ describe("writeStateFile", () => {
 
   test("末尾に改行を付ける", () => {
     const dir = makeRun();
-    writeStateFile(dir, readStateFile(dir), { phase: "done", blocked_reason: null }, new Date());
+    writeStateFile(dir, selectSnapshot(rootOf({ phase: "done" })), new Date());
     expect(readFileSync(stateFilePath(dir), "utf8").endsWith("}\n")).toBe(true);
   });
 });
 
-describe("checkPipelineVersion", () => {
-  test("一致すれば null", () => {
-    expect(checkPipelineVersion(readStateFile(makeRun()).meta, config())).toBeNull();
+describe("版の一致（中央の破壊的変更から進行中の run を守る）", () => {
+  const versionOf = (pipeline_version: number) =>
+    selectNextAction(rootOf({ phase: "planning" }, { pipeline_version }), config()).reason;
+
+  test("一致すれば止めない", () => {
+    expect(versionOf(1)).toBe("dispatch");
   });
 
-  test("不一致なら理由を返す（中央の破壊的変更から進行中の run を守る）", () => {
-    const meta = { ...readStateFile(makeRun()).meta, pipeline_version: 2 };
-    expect(checkPipelineVersion(meta, config())).toContain(
-      "pipeline_version_mismatch: run=2 harness=1",
-    );
+  test("不一致なら理由を返す", () => {
+    expect(versionOf(2)).toContain("pipeline_version_mismatch: run=2 harness=1");
   });
 });
 
@@ -112,8 +106,6 @@ describe("templates/state.json（bootstrap が使う雛形）", () => {
   });
 
   test("雛形の pipeline_version はハーネスと一致する", () => {
-    const dir = makeRun();
-    writeFileSync(stateFilePath(dir), text.replace('"issue": 0', '"issue": 1'));
-    expect(checkPipelineVersion(readStateFile(dir).meta, config())).toBeNull();
+    expect(JSON.parse(text).pipeline_version).toBe(config().pipeline_version);
   });
 });

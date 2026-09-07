@@ -1,6 +1,5 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Config } from "../defaults.ts";
 import type { Phase } from "../types.ts";
 import { parseJson } from "../utils/parse-json.ts";
 import { pick } from "../utils/pick.ts";
@@ -53,33 +52,21 @@ const STATE_KEYS = [
 /** state.json の平坦な形（読むときは meta と phase に分けるが、書くときはこの形） */
 type StateFileShape = RunMeta & { phase: Phase; blocked_reason: string | null };
 
+/** 書き出す内容。`updated_at` は書くときに入れる */
+export type Snapshot = Omit<StateFileShape, "updated_at">;
+
 /**
  * state.json を組み立てる。キー順を固定して差分を安定させる。
  * 可変値は phase と blocked_reason だけ（rounds と total_steps は導出する / A-33）。
  */
-function renderStateFile(
-  file: StateFile,
-  patch: { phase: Phase; blocked_reason: string | null; now: Date },
-): string {
+function renderStateFile(snapshot: Snapshot, now: Date): string {
   const shape: StateFileShape = {
-    ...file.meta,
-    phase: patch.phase,
-    blocked_reason: patch.blocked_reason,
-    updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z"),
+    ...snapshot,
+    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z"),
   };
   // 注釈が網羅チェックを兼ねる: STATE_KEYS に書き忘れたキーがあると代入できない
   const ordered: StateFileShape = pick(shape, STATE_KEYS);
   return stringifyJson(ordered);
-}
-
-/**
- * 中央の破壊的変更が進行中の run を壊さないための前提チェック。
- * 遷移の規則ではないためこの層に置く。不一致なら理由を返す。
- */
-export function checkPipelineVersion(meta: RunMeta, config: Config): string | null {
-  return meta.pipeline_version === config.pipeline_version
-    ? null
-    : `pipeline_version_mismatch: run=${meta.pipeline_version} harness=${config.pipeline_version}`;
 }
 
 /** state.json のパス */
@@ -92,12 +79,10 @@ export function readStateFile(dir: string): StateFile {
   return parseStateFile(readFileSync(stateFilePath(dir), "utf8"));
 }
 
-/** state.json を書く。書き換わるのは phase / blocked_reason / updated_at だけ */
-export function writeStateFile(
-  dir: string,
-  file: StateFile,
-  patch: { phase: Phase; blocked_reason: string | null },
-  now: Date,
-): void {
-  writeFileSync(stateFilePath(dir), renderStateFile(file, { ...patch, now }));
+/**
+ * state.json を書く。**中身は状態の射影**（`selectSnapshot`）で、書くのは
+ * `snapshot` middleware だけ。書き換わるのは phase / blocked_reason / updated_at。
+ */
+export function writeStateFile(dir: string, snapshot: Snapshot, now: Date): void {
+  writeFileSync(stateFilePath(dir), renderStateFile(snapshot, now));
 }

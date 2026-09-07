@@ -15,5 +15,8 @@
     "format": "biome check --write",
     "lint": "biome check"
   },
-  "type": "module"
+  "type": "module",
+  "dependencies": {
+    "redux": "5.0.1"
+  }
 }

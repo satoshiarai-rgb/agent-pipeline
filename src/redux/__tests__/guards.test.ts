@@ -1,17 +1,25 @@
 import { afterEach, describe, expect, test } from "bun:test";
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { config } from "../../__tests__/helpers.ts";
-import { cleanupRuns, makeRun, phaseOf, runOnce } from "../../__tests__/run-dir-fixture.ts";
-import { approveRun } from "../approve.ts";
-import { blockRun } from "../block.ts";
-import { retryRun } from "../retry.ts";
-import { startRun } from "../start.ts";
+import {
+  approve,
+  block,
+  cleanupRuns,
+  makeRun,
+  phaseOf,
+  requestChanges,
+  retry as retryCmd,
+  runOnce,
+  start,
+} from "../../__tests__/run-dir-fixture.ts";
 
 const c = config();
 afterEach(cleanupRuns);
 
-const retry = (dir: string, association = "OWNER") => retryRun({ dir, config: c, association });
+const retry = (dir: string, association = "OWNER") => retryCmd(dir, association, c);
 
-describe("retry: 戻る先は履歴が決める（K-23）", () => {
+describe("retry: 戻る先（K-23 → K-27 で表に移る）", () => {
   test("completing で止まったら completing に戻る（実機で手で直した操作）", () => {
     // acceptance が全 passed でないと completing は blocked になる。
     // 人間が条件を満たしてから、同じフェーズをやり直す
@@ -35,7 +43,7 @@ describe("retry: 戻る先は履歴が決める（K-23）", () => {
     const dir = makeRun();
     runOnce(dir, "planner", { result: "ok" });
     runOnce(dir, "plan-reviewer", { result: "ok", verdict: "approve" });
-    approveRun({ dir, config: c, association: "OWNER" });
+    approve(dir, "OWNER", c);
     runOnce(dir, "developer", { result: "agent_failed" });
 
     expect(retry(dir)).toMatchObject({ phase: "developing", agent: "developer" });
@@ -94,8 +102,8 @@ describe("retry: 受け付けないもの", () => {
   test("直前のレコードが閉じていなければ断る（戻しても route が動かさない）", () => {
     const dir = makeRun("developing");
     // start だけして finish していない状態（job タイムアウトや stale の途中）
-    startRun({ dir, config: c, agent: "developer", run_id: "1", attempt: 1, model: "m" });
-    blockRun({ dir, config: c, reason: "stale" });
+    start(dir, "developer", "1", c);
+    block(dir, "stale", c);
 
     const r = retry(dir);
     expect(r.ok).toBe(false);
@@ -108,5 +116,45 @@ describe("retry: 受け付けないもの", () => {
     runOnce(dir, "completion", { result: "ok", acceptance_passed: false });
     expect(retry(dir, "NONE")).toEqual({ ok: false, reason: "not_authorized: NONE" });
     expect(phaseOf(dir).phase).toBe("blocked");
+  });
+});
+
+describe("人間の action の認可（入口でのみ見る / 設計書 §7.3）", () => {
+  test("approvers に無い association は拒否し、状態を書き換えない", () => {
+    const dir = makeRun("awaiting_human");
+    expect(approve(dir, "NONE", c)).toEqual({ ok: false, reason: "not_authorized: NONE" });
+    expect(phaseOf(dir).phase).toBe("awaiting_human");
+  });
+
+  test("認可を先に見る（対象外のフェーズでも認可エラーを返す）", () => {
+    expect(approve(makeRun("planning"), "NONE", c)).toEqual({
+      ok: false,
+      reason: "not_authorized: NONE",
+    });
+  });
+
+  test("awaiting_human 以外での /agent approve は何もしない", () => {
+    for (const phase of ["planning", "dev_review", "done", "blocked"] as const) {
+      const dir = makeRun(phase);
+      const r = approve(dir, "OWNER", c);
+      expect(r.ok).toBe(false);
+      expect(r.ok === false && r.reason).toContain("not_awaiting_approval");
+      expect(phaseOf(dir).phase).toBe(phase);
+    }
+  });
+
+  test("done は終端なので差し戻せない（K-10: 作り直しは新しい issue で）", () => {
+    const dir = makeRun("done");
+    const r = requestChanges(dir, "OWNER", "直して", c);
+    expect(r.ok).toBe(false);
+    expect(r.ok === false && r.reason).toContain("not_awaiting_approval: phase=done");
+    expect(existsSync(join(dir, "reviews"))).toBe(false);
+  });
+
+  test("認可されない差し戻しは何も書かない", () => {
+    const dir = makeRun("awaiting_human");
+    expect(requestChanges(dir, "NONE", "x", c).ok).toBe(false);
+    expect(existsSync(join(dir, "reviews"))).toBe(false);
+    expect(phaseOf(dir).phase).toBe("awaiting_human");
   });
 });

@@ -23,7 +23,6 @@ inputs:
   attempt: { description: "start / compose: 再実行の回数", required: false }
   model: { description: "start: モデル（既定は src/defaults.ts の models.default）", required: false }
   # finish
-  record-path: { description: "finish: start が返したレコードのパス", required: false }
   result: { description: "finish: ok | invalid | agent_failed | api_error（validate の出力を渡す）", required: false }
   # validate
   agent-failed: { description: "validate: エージェントの step が失敗したなら true", required: false }
@@ -143,7 +142,6 @@ runs:
         CLI_RUN_ID: ${{ inputs.run-id }}
         CLI_ATTEMPT: ${{ inputs.attempt }}
         CLI_MODEL: ${{ inputs.model }}
-        CLI_RECORD_PATH: ${{ inputs.record-path }}
         CLI_RESULT: ${{ inputs.result }}
         CLI_VERDICT: ${{ inputs.verdict }}
         CLI_API_ERROR_STATUS: ${{ inputs.api-error-status }}

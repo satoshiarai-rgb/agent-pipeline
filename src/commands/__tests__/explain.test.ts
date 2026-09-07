@@ -2,19 +2,19 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../../__tests__/helpers.ts";
-import { cleanupRuns, makeRun, runOnce } from "../../__tests__/run-dir-fixture.ts";
-import { blockRun } from "../block.ts";
-import { explainRun } from "../explain.ts";
+import { block, cleanupRuns, cli, makeRun, runOnce } from "../../__tests__/run-dir-fixture.ts";
 
 const c = config();
 afterEach(cleanupRuns);
 
-const explain = (dir: string) => explainRun({ dir, config: c });
+/** CLI と同じ経路で読む（store がスナップショットから状態を組み立てる） */
+const explain = (dir: string) =>
+  cli("explain", { dir }, c) as { markdown: string; reason: string } | null;
 
 /** 理由を直接与えて案内だけを見る */
 const blocked = (reason: string) => {
   const dir = makeRun();
-  blockRun({ dir, config: c, reason });
+  block(dir, reason, c);
   return dir;
 };
 

@@ -1,233 +1,172 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { readFileSync as readFileSync10 } from "node:fs";
 import { parseArgs } from "node:util";
 
-// src/file/state-file.ts
-import { readFileSync, writeFileSync } from "node:fs";
+// src/file/config-file.ts
+import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// src/utils/parse-json.ts
-function parseJson(text, source = "JSON") {
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`${source} の解析に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
-
-// src/utils/pick.ts
-function pick(source, keys) {
-  const out = {};
-  for (const key of keys) {
-    if (source[key] !== undefined)
-      out[key] = source[key];
-  }
-  return out;
-}
-
-// src/utils/stringify-json.ts
-function stringifyJson(value) {
-  return `${JSON.stringify(value, null, 2)}
-`;
-}
-
-// src/file/state-file.ts
-function parseStateFile(text) {
-  const raw = parseJson(text, "state.json");
-  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
-    throw new Error("state.json に issue か phase がありません");
-  }
-  return {
-    meta: {
-      pipeline_version: Number(raw.pipeline_version ?? 0),
-      issue: raw.issue,
-      branch: typeof raw.branch === "string" ? raw.branch : "",
-      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
+// src/defaults.ts
+var defaults = {
+  pipeline_version: 1,
+  models: {
+    default: "claude-opus-5",
+    reviewer: null
+  },
+  limits: {
+    plan_review_rounds: 5,
+    dev_review_rounds: 5,
+    total_steps: 24
+  },
+  tool_profiles: {
+    readonly: "Read,Glob,Grep,Write",
+    exec: "Read,Glob,Grep,Write,Edit,Bash"
+  },
+  agents: {
+    planner: { max_turns: 35, timeout_minutes: 20, tools: "readonly" },
+    "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
+    developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
+    "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
+    completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" }
+  },
+  approvers: ["OWNER", "COLLABORATOR"],
+  labels: {
+    prefix: "agent:",
+    trigger: "agent:go"
+  },
+  transitions: {
+    planning: { agent: "planner", on_ok: "plan_review" },
+    plan_review: {
+      agent: "plan-reviewer",
+      round_key: "plan_review",
+      on_approve: "awaiting_human",
+      on_request_changes: "planning"
     },
-    phase: raw.phase,
-    blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
-  };
-}
-var STATE_KEYS = [
-  "pipeline_version",
-  "issue",
-  "branch",
-  "phase",
-  "blocked_reason",
-  "updated_at"
+    developing: { agent: "developer", on_ok: "dev_review" },
+    dev_review: {
+      agent: "dev-reviewer",
+      round_key: "dev_review",
+      on_approve: "completing",
+      on_request_changes: "developing"
+    },
+    completing: { agent: "completion", on_pass: "done", on_fail: "blocked" },
+    awaiting_human: {
+      on_approval: "developing",
+      on_request_changes: "planning",
+      review_kind: "plan"
+    }
+  }
+};
+
+// src/utils/merge-config.ts
+var OVERRIDABLE = [
+  "models",
+  "limits",
+  "tool_profiles",
+  "agents",
+  "approvers",
+  "labels"
 ];
-function renderStateFile(file, patch) {
-  const shape = {
-    ...file.meta,
-    phase: patch.phase,
-    blocked_reason: patch.blocked_reason,
-    updated_at: patch.now.toISOString().replace(/\.\d{3}Z$/, "Z")
-  };
-  const ordered = pick(shape, STATE_KEYS);
-  return stringifyJson(ordered);
-}
-function checkPipelineVersion(meta, config) {
-  return meta.pipeline_version === config.pipeline_version ? null : `pipeline_version_mismatch: run=${meta.pipeline_version} harness=${config.pipeline_version}`;
-}
-function stateFilePath(dir) {
-  return join(dir, "state.json");
-}
-function readStateFile(dir) {
-  return parseStateFile(readFileSync(stateFilePath(dir), "utf8"));
-}
-function writeStateFile(dir, file, patch, now) {
-  writeFileSync(stateFilePath(dir), renderStateFile(file, { ...patch, now }));
-}
-
-// src/utils/derive-run-stats.ts
-function deriveRunStats(records) {
-  return {
-    total_steps: records.length,
-    rounds: {
-      plan_review: records.filter((r) => r.agent === "plan-reviewer").length,
-      dev_review: records.filter((r) => r.agent === "dev-reviewer").length
-    },
-    in_flight: records.find((r) => r.finished_at === null) ?? null
-  };
-}
-
-// src/utils/resolve-agent.ts
-function resolveAgent(config, agent) {
-  const a = config.agents[agent];
-  if (!a)
-    throw new Error(`既定値に agents.${agent} がありません`);
-  const tools = config.tool_profiles[a.tools];
-  if (!tools)
-    throw new Error(`tool_profiles に ${a.tools} がありません`);
-  const isReviewer = agent === "plan-reviewer" || agent === "dev-reviewer";
-  const model = (isReviewer ? config.models.reviewer : null) ?? config.models.default;
-  return {
-    agent,
-    model,
-    max_turns: a.max_turns,
-    timeout_minutes: a.timeout_minutes,
-    job_timeout_minutes: a.timeout_minutes + 10,
-    tools,
-    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools })
-  };
-}
-function claudeArgs(a) {
-  const denied = a.tools.split(",").includes("Bash") ? [] : ["Bash"];
-  return [
-    `--model ${a.model}`,
-    `--max-turns ${a.max_turns}`,
-    `--tools ${a.tools}`,
-    `--allowed-tools ${a.tools}`,
-    ...denied.map((d) => `--disallowed-tools ${d}`)
-  ].join(" ");
-}
-
-// src/transitions.ts
-var IDLE_PHASES = ["bootstrap", "awaiting_human", "done", "blocked"];
-var isIdle = (phase) => IDLE_PHASES.includes(phase);
-function agentFor(phase, config) {
-  return config.transitions[phase]?.agent ?? null;
-}
-function reviewKindFor(phase, config) {
-  return config.transitions[phase]?.review_kind ?? null;
-}
-function roundKeyFor(phase, config) {
-  return config.transitions[phase]?.round_key ?? null;
-}
-function nextPhase(phase, event, config) {
-  const t = config.transitions[phase];
-  if (!t)
-    return null;
-  switch (event) {
-    case "ok":
-      return t.on_ok ?? null;
-    case "approve":
-      return t.on_approve ?? null;
-    case "request_changes":
-      return t.on_request_changes ?? null;
-    case "pass":
-      return t.on_pass ?? null;
-    case "fail":
-      return t.on_fail ?? null;
-    case "approval":
-      return t.on_approval ?? null;
+var CONSISTENCY = [
+  (c) => {
+    const dangling = Object.entries(c.agents).filter(([, a]) => !(a.tools in c.tool_profiles)).map(([name, a]) => `agents.${name}.tools=${a.tools}`);
+    return dangling.length === 0 ? null : `tool_profiles に無いプロファイルを指しています: ${dangling.join(", ")}（使えるのは ${Object.keys(c.tool_profiles).join(" / ")}）`;
   }
+];
+var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+function mergeValue(path, base, over, errors) {
+  if (over === null)
+    return base;
+  if (base === null)
+    return over;
+  if (isRecord(base)) {
+    if (!isRecord(over)) {
+      errors.push(`${path}: オブジェクトを書いてください`);
+      return base;
+    }
+    const merged = { ...base };
+    for (const [key, value] of Object.entries(over)) {
+      if (!(key in base)) {
+        errors.push(`${path}.${key}: 既定にないキーです（使えるのは ${Object.keys(base).join(" / ")}）`);
+        continue;
+      }
+      merged[key] = mergeValue(`${path}.${key}`, base[key], value, errors);
+    }
+    return merged;
+  }
+  if (Array.isArray(base)) {
+    if (!Array.isArray(over)) {
+      errors.push(`${path}: 配列を書いてください`);
+      return base;
+    }
+    const wrong = over.filter((v) => typeof v !== typeof base[0]);
+    if (wrong.length > 0) {
+      errors.push(`${path}: 要素は ${typeof base[0]} で書いてください`);
+      return base;
+    }
+    return over;
+  }
+  if (typeof base !== typeof over) {
+    errors.push(`${path}: ${typeof base} で書いてください（いまは ${typeof over}）`);
+    return base;
+  }
+  if (typeof over === "number" && (!Number.isInteger(over) || over < 1)) {
+    errors.push(`${path}: 1 以上の整数で書いてください（いまは ${over}）`);
+    return base;
+  }
+  return over;
 }
-function route(input) {
-  const { phase, records, config } = input;
-  const stats = deriveRunStats(records);
-  const base = { phase, total_steps: stats.total_steps, rounds: stats.rounds };
-  if (isIdle(phase))
-    return { ...base, action: "none", reason: `phase_${phase}` };
-  if (stats.in_flight) {
+function mergeConfig(base, override) {
+  const errors = [];
+  if (!isRecord(override))
+    return { config: base, errors: ["最上位はオブジェクトで書いてください"] };
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (!OVERRIDABLE.includes(key)) {
+      errors.push(`${key}: 配布先では上書きできません（上書きできるのは ${OVERRIDABLE.join(" / ")}）`);
+      continue;
+    }
+    merged[key] = mergeValue(key, merged[key], value, errors);
+  }
+  const config = merged;
+  errors.push(...CONSISTENCY.map((check) => check(config)).filter((e) => e !== null));
+  return errors.length > 0 ? { config: base, errors } : { config, errors };
+}
+
+// src/file/config-file.ts
+var CONFIG_PATH = join(".agent", "config.json");
+function readConfig(repo) {
+  const path = join(repo, CONFIG_PATH);
+  if (!existsSync(path))
+    return { config: defaults, source: null, error: null };
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync(path, "utf8"));
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
     return {
-      ...base,
-      action: "none",
-      reason: `run_in_progress: ${stats.in_flight.agent} run=${stats.in_flight.run_id}`
+      config: defaults,
+      source: path,
+      error: `${CONFIG_PATH} が JSON として壊れています: ${detail}`
     };
   }
-  if (stats.total_steps >= config.limits.total_steps) {
-    return {
-      ...base,
-      action: "block",
-      reason: `total_steps_exceeded: ${stats.total_steps}/${config.limits.total_steps}`
-    };
+  const { config, errors } = mergeConfig(defaults, raw);
+  if (errors.length > 0) {
+    return { config: defaults, source: path, error: `${CONFIG_PATH}: ${errors.join(" / ")}` };
   }
-  const agent = agentFor(phase, config);
-  if (!agent)
-    return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
-  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
+  return { config, source: path, error: null };
 }
 
-// src/commands/human-transition.ts
-function authorized(association, config) {
-  return config.approvers.includes(association);
-}
-function humanTransition(input) {
-  const { phase, association, config, event } = input;
-  if (!authorized(association, config)) {
-    return { ok: false, reason: `not_authorized: ${association}` };
-  }
-  const next = nextPhase(phase, event, config);
-  if (!next)
-    return { ok: false, reason: `not_awaiting_approval: phase=${phase}` };
-  return { ok: true, phase: next };
-}
+// src/redux/commands.ts
+import { readFileSync as readFileSync10 } from "node:fs";
 
-// src/commands/approve.ts
-function approve(input) {
-  return humanTransition({ ...input, event: "approval" });
-}
-function approveRun(input) {
-  const { dir, association, config, now = new Date } = input;
-  const file = readStateFile(dir);
-  const decision = approve({ phase: file.phase, association, config });
-  if (!decision.ok)
-    return decision;
-  writeStateFile(dir, file, { phase: decision.phase, blocked_reason: null }, now);
-  return decision;
-}
-// src/commands/block.ts
-function blockRun(input) {
-  const { dir, reason, now = new Date } = input;
-  const file = readStateFile(dir);
-  const result = {
-    phase: "blocked",
-    blocked_reason: reason,
-    continue_chain: false,
-    reason
-  };
-  writeStateFile(dir, file, result, now);
-  return result;
-}
 // src/commands/compose.ts
-import { existsSync as existsSync5 } from "node:fs";
+import { existsSync as existsSync6 } from "node:fs";
 import { join as join6 } from "node:path";
 
 // src/file/decision-records.ts
-import { existsSync, readdirSync, readFileSync as readFileSync2 } from "node:fs";
+import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync2 } from "node:fs";
 import { basename, join as join2 } from "node:path";
 
 // src/utils/frontmatter.ts
@@ -258,7 +197,7 @@ function decisionRecordPath(dir, run, slug) {
 }
 function decisionRecordPaths(dir) {
   const base = decisionRecordsDir(dir);
-  if (!existsSync(base))
+  if (!existsSync2(base))
     return [];
   return readdirSync(base).sort(byExecution).map((name) => join2(base, name));
 }
@@ -287,7 +226,7 @@ function byExecution(a, b) {
 var execution = (name) => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);
 
 // src/file/prompt-file.ts
-import { existsSync as existsSync2, mkdirSync, readFileSync as readFileSync3, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, writeFileSync } from "node:fs";
 import { dirname, join as join3 } from "node:path";
 function promptCandidates(agent, roots) {
   return [
@@ -297,7 +236,7 @@ function promptCandidates(agent, roots) {
 }
 function readPrompt(agent, roots) {
   const candidates = promptCandidates(agent, roots);
-  const path = candidates.find((p) => existsSync2(p));
+  const path = candidates.find((p) => existsSync3(p));
   if (!path) {
     throw new Error(`${agent} のプロンプトがありません（探した順: ${candidates.join(" → ")}）`);
   }
@@ -305,20 +244,20 @@ function readPrompt(agent, roots) {
 }
 function readConventions(repo) {
   const path = join3(repo, ".agent", "conventions.md");
-  if (!existsSync2(path))
+  if (!existsSync3(path))
     return null;
   const text = readFileSync3(path, "utf8").trim();
   return text === "" ? null : { path, text };
 }
 function writeComposedPrompt(path, text) {
   mkdirSync(dirname(path), { recursive: true });
-  writeFileSync2(path, `${text.trimEnd()}
+  writeFileSync(path, `${text.trimEnd()}
 `);
   return path;
 }
 
 // src/file/review-file.ts
-import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join4 } from "node:path";
 function renderReview(input) {
   const { verdict, round, reviewer, body } = input;
@@ -333,7 +272,7 @@ ${body.trim()}
 }
 function nextReviewNumber(dir, kind) {
   const reviews = join4(dir, "reviews");
-  if (!existsSync3(reviews))
+  if (!existsSync4(reviews))
     return 1;
   return readdirSync2(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).length + 1;
 }
@@ -345,12 +284,12 @@ function saveReview(input) {
   const round = nextReviewNumber(dir, kind);
   const path = reviewPath(dir, kind, round);
   mkdirSync2(join4(dir, "reviews"), { recursive: true });
-  writeFileSync3(path, renderReview({ verdict, round, reviewer, body }));
+  writeFileSync2(path, renderReview({ verdict, round, reviewer, body }));
   return path;
 }
 function reviewPaths(dir, kind) {
   const reviews = join4(dir, "reviews");
-  if (!existsSync3(reviews))
+  if (!existsSync4(reviews))
     return [];
   const prefix = kind ? `${kind}-` : "";
   return readdirSync2(reviews).filter((n) => n.startsWith(prefix) && n.endsWith(".md")).sort().map((n) => join4(reviews, n));
@@ -364,8 +303,35 @@ function readVerdict(path) {
 }
 
 // src/file/run-record.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync4 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join5 } from "node:path";
+
+// src/utils/parse-json.ts
+function parseJson(text, source = "JSON") {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${source} の解析に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+// src/utils/pick.ts
+function pick(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (source[key] !== undefined)
+      out[key] = source[key];
+  }
+  return out;
+}
+
+// src/utils/stringify-json.ts
+function stringifyJson(value) {
+  return `${JSON.stringify(value, null, 2)}
+`;
+}
+
+// src/file/run-record.ts
 function normalizeRecord(r) {
   return {
     agent: r.agent,
@@ -425,7 +391,7 @@ function recordPath(dir, r) {
 }
 function recordPaths(dir) {
   const runs = join5(dir, "runs");
-  if (!existsSync4(runs))
+  if (!existsSync5(runs))
     return [];
   return readdirSync3(runs).filter((n) => n.endsWith(".json")).sort().map((n) => join5(runs, n));
 }
@@ -435,20 +401,14 @@ function readRecords(dir) {
 function saveRecord(dir, record) {
   const path = recordPath(dir, record);
   mkdirSync3(join5(dir, "runs"), { recursive: true });
-  writeFileSync4(path, renderRecord(record));
+  writeFileSync3(path, renderRecord(record));
   return path;
-}
-function latestRecord(records) {
-  return records.reduce((latest, r) => !latest || r.started_at > latest.started_at ? r : latest, undefined);
-}
-function findRecord(records, path) {
-  return records.find((r) => path.endsWith(recordFileName(r)));
 }
 
 // src/commands/compose.ts
 var file = (label, rel) => ({
   label,
-  find: (dir) => existsSync5(join6(dir, rel)) ? [join6(dir, rel)] : []
+  find: (dir) => existsSync6(join6(dir, rel)) ? [join6(dir, rel)] : []
 });
 var latest = (label, kind) => ({
   label,
@@ -515,8 +475,9 @@ function composeRun(input) {
     review_path: review
   };
 }
+
 // src/file/acceptance-file.ts
-import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
+import { existsSync as existsSync7, readFileSync as readFileSync6 } from "node:fs";
 import { join as join7 } from "node:path";
 function acceptancePath(dir) {
   return join7(dir, "acceptance.json");
@@ -561,7 +522,323 @@ function allPassed(file2) {
   return file2.criteria.length > 0 && file2.criteria.every((c) => c.status === "passed");
 }
 function hasAcceptance(dir) {
-  return existsSync6(acceptancePath(dir));
+  return existsSync7(acceptancePath(dir));
+}
+
+// src/utils/resolve-agent.ts
+function resolveAgent(config, agent) {
+  const a = config.agents[agent];
+  if (!a)
+    throw new Error(`既定値に agents.${agent} がありません`);
+  const tools = config.tool_profiles[a.tools];
+  if (!tools)
+    throw new Error(`tool_profiles に ${a.tools} がありません`);
+  const isReviewer = agent === "plan-reviewer" || agent === "dev-reviewer";
+  const model = (isReviewer ? config.models.reviewer : null) ?? config.models.default;
+  return {
+    agent,
+    model,
+    max_turns: a.max_turns,
+    timeout_minutes: a.timeout_minutes,
+    job_timeout_minutes: a.timeout_minutes + 10,
+    tools,
+    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools })
+  };
+}
+function claudeArgs(a) {
+  const denied = a.tools.split(",").includes("Bash") ? [] : ["Bash"];
+  return [
+    `--model ${a.model}`,
+    `--max-turns ${a.max_turns}`,
+    `--tools ${a.tools}`,
+    `--allowed-tools ${a.tools}`,
+    ...denied.map((d) => `--disallowed-tools ${d}`)
+  ].join(" ");
+}
+
+// src/utils/typescript-fsa-reducers.ts
+function reducerWithInitialState(initialState) {
+  return makeReducer(initialState);
+}
+function makeReducer(initialState) {
+  const handlersByActionType = {};
+  const reducer = getReducerFunction(initialState, handlersByActionType);
+  reducer.caseWithAction = (actionCreator, handler) => {
+    handlersByActionType[actionCreator.type] = handler;
+    return reducer;
+  };
+  reducer.case = (actionCreator, handler) => reducer.caseWithAction(actionCreator, (state, action) => handler(state, action.payload));
+  reducer.casesWithAction = (actionCreators, handler) => {
+    for (const actionCreator of actionCreators) {
+      reducer.caseWithAction(actionCreator, handler);
+    }
+    return reducer;
+  };
+  reducer.cases = (actionCreators, handler) => reducer.casesWithAction(actionCreators, (state, action) => handler(state, action.payload));
+  reducer.withHandling = (updateBuilder) => updateBuilder(reducer);
+  reducer.default = (defaultHandler) => getReducerFunction(initialState, { ...handlersByActionType }, defaultHandler);
+  reducer.build = () => getReducerFunction(initialState, { ...handlersByActionType });
+  return reducer;
+}
+function getReducerFunction(initialState, handlersByActionType, defaultHandler) {
+  return (passedState, action) => {
+    const state = passedState !== undefined ? passedState : initialState;
+    const handler = handlersByActionType[action.type] || defaultHandler;
+    return handler ? handler(state, action) : state;
+  };
+}
+
+// src/utils/typescript-fsa.ts
+function actionCreatorFactory(prefix, defaultIsError = (p) => p instanceof Error) {
+  const actionTypes = {};
+  const base = prefix ? `${prefix}/` : "";
+  function actionCreator(type, commonMeta, isError = defaultIsError) {
+    const fullType = base + type;
+    if (true) {
+      if (actionTypes[fullType])
+        throw new Error(`Duplicate action type: ${fullType}`);
+      actionTypes[fullType] = true;
+    }
+    return Object.assign((payload, meta) => {
+      const action = {
+        type: fullType,
+        payload
+      };
+      if (commonMeta || meta) {
+        action.meta = Object.assign({}, commonMeta, meta);
+      }
+      if (isError && (typeof isError === "boolean" || isError(payload))) {
+        action.error = true;
+      }
+      return action;
+    }, {
+      type: fullType,
+      toString: () => fullType,
+      match: (action) => action.type === fullType
+    });
+  }
+  function asyncActionCreators(type, commonMeta) {
+    return {
+      type: base + type,
+      started: actionCreator(`${type}_STARTED`, commonMeta, false),
+      done: actionCreator(`${type}_DONE`, commonMeta, false),
+      failed: actionCreator(`${type}_FAILED`, commonMeta, true)
+    };
+  }
+  return Object.assign(actionCreator, { async: asyncActionCreators });
+}
+var typescript_fsa_default = actionCreatorFactory;
+
+// src/redux/actions.ts
+var create = typescript_fsa_default("agent-pipeline");
+var init = create("INIT", { hydrate: true });
+var restore = create("RESTORE", { hydrate: true });
+
+// src/redux/app/actions.ts
+var create2 = typescript_fsa_default("agent-pipeline/app");
+var agentStarted = create2("AGENT_STARTED");
+var agentOk = create2("AGENT_OK");
+var review = create2("REVIEW");
+var agentFailed = create2("AGENT_FAILED", undefined, true);
+var humanApproval = create2("HUMAN_APPROVAL");
+var humanRequestChanges = create2("HUMAN_REQUEST_CHANGES");
+var retry = create2("RETRY");
+var block = create2("BLOCK", undefined, true);
+var APP_ACTIONS = [
+  agentStarted,
+  agentOk,
+  review,
+  agentFailed,
+  humanApproval,
+  humanRequestChanges,
+  retry,
+  block
+];
+var isFailure = (a) => agentFailed.match(a) || block.match(a);
+
+// src/redux/app/reducer.ts
+var initialApp = {
+  phase: "bootstrap",
+  blocked_reason: null,
+  blocked_from: null,
+  counts: { total_steps: 0, rounds: { plan_review: 0, dev_review: 0 } },
+  in_flight: null,
+  last_reason: null
+};
+function nextPhase(phase, event, config) {
+  const t = config.transitions[phase];
+  if (!t)
+    return null;
+  const edges = {
+    ok: t.on_ok,
+    approve: t.on_approve,
+    request_changes: t.on_request_changes,
+    pass: t.on_pass,
+    fail: t.on_fail,
+    approval: t.on_approval
+  };
+  return edges[event] ?? null;
+}
+var IDLE_PHASES = ["bootstrap", "awaiting_human", "done", "blocked"];
+var isIdle = (phase) => IDLE_PHASES.includes(phase);
+var agentFor = (phase, config) => config.transitions[phase]?.agent ?? null;
+var reviewKindFor = (phase, config) => config.transitions[phase]?.review_kind ?? null;
+var roundKeyFor = (phase, config) => config.transitions[phase]?.round_key ?? null;
+var RETRY_TO = {
+  bootstrap: "bootstrap",
+  planning: "planning",
+  plan_review: "plan_review",
+  awaiting_human: "awaiting_human",
+  developing: "developing",
+  dev_review: "dev_review",
+  completing: "completing",
+  done: "done",
+  blocked: "blocked"
+};
+var NONE = { total_steps: 0, rounds: 0 };
+var COUNTS = {
+  [agentStarted.type]: { total_steps: 1, rounds: 1 }
+};
+function nextCounts(s, a, c) {
+  const rule = COUNTS[a.type] ?? NONE;
+  const key = roundKeyFor(s.phase, c);
+  return {
+    total_steps: s.counts.total_steps + rule.total_steps,
+    rounds: key && rule.rounds ? { ...s.counts.rounds, [key]: s.counts.rounds[key] + rule.rounds } : s.counts.rounds
+  };
+}
+var blocked = (reason) => ({
+  phase: "blocked",
+  blocked_reason: reason,
+  reason
+});
+function advance(s, event, c, reason) {
+  const next = nextPhase(s.phase, event, c);
+  if (!next)
+    return blocked(`transition_incomplete: ${s.phase} (${event})`);
+  return { phase: next, blocked_reason: null, reason };
+}
+var EVENT_OF = {
+  [agentOk.type]: "ok",
+  [review.type]: (a) => review.match(a) ? a.payload.verdict : "ok",
+  [humanApproval.type]: "approval",
+  [humanRequestChanges.type]: "request_changes"
+};
+var RULES = [
+  (s, a) => agentStarted.match(a) ? { ...s, reason: "started" } : null,
+  (_s, a) => isFailure(a) ? blocked(a.payload.reason) : null,
+  (s, a) => retry.match(a) && s.blocked_from ? {
+    phase: RETRY_TO[s.blocked_from],
+    blocked_reason: null,
+    reason: `retry: ${s.blocked_from}`
+  } : null,
+  (s, a, c) => {
+    const key = roundKeyFor(s.phase, c);
+    if (!key)
+      return null;
+    if (review.match(a) && a.payload.verdict === "approve")
+      return advance(s, "approve", c, "approve");
+    if (!review.match(a))
+      return blocked("missing_verdict");
+    const used = s.counts.rounds[key];
+    const limit = c.limits[`${key}_rounds`];
+    if (used >= limit)
+      return blocked(`${key}_rounds_exceeded: ${used}/${limit}`);
+    return advance(s, "request_changes", c, `request_changes (${used}/${limit})`);
+  },
+  (s, a, c) => {
+    if (!agentOk.match(a) || nextPhase(s.phase, "pass", c) === null)
+      return null;
+    if (!a.payload.acceptance_passed)
+      return blocked("acceptance_not_passed");
+    return advance(s, "pass", c, "acceptance_passed");
+  },
+  (s, a, c) => {
+    const e = EVENT_OF[a.type];
+    if (!e)
+      return null;
+    const event = typeof e === "function" ? e(a) : e;
+    return advance(s, event, c, event);
+  }
+];
+function nextTransition(s, a, c) {
+  for (const rule of RULES) {
+    const t = rule(s, a, c);
+    if (t)
+      return t;
+  }
+  return { ...s, reason: "no_rule" };
+}
+function nextInFlight(s, a) {
+  if (agentStarted.match(a))
+    return { agent: a.payload.agent, run_id: a.payload.run_id };
+  const closes = agentOk.match(a) || review.match(a) || agentFailed.match(a);
+  return closes ? null : s.in_flight;
+}
+function nextBlockedFrom(s, t) {
+  if (t.phase !== "blocked")
+    return null;
+  return s.phase === "blocked" ? s.blocked_from : s.phase;
+}
+var step = (config) => (state, action) => {
+  const t = nextTransition(state, action, config);
+  return {
+    phase: t.phase,
+    blocked_reason: t.blocked_reason,
+    blocked_from: nextBlockedFrom(state, t),
+    counts: nextCounts(state, action, config),
+    in_flight: nextInFlight(state, action),
+    last_reason: t.reason
+  };
+};
+var createAppReducer = (config) => APP_ACTIONS.reduce((builder, creator) => builder.caseWithAction(creator, step(config)), reducerWithInitialState(initialApp).caseWithAction(restore, (s, a) => ({
+  ...s,
+  ...a.payload.app
+}))).build();
+
+// src/redux/selectors.ts
+var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
+function selectLabel(root, config) {
+  const { prefix, trigger } = config.labels;
+  return {
+    label: labelFor(root.app.phase, prefix),
+    issue: root.info.issue ?? 0,
+    phase: root.app.phase,
+    prefix,
+    trigger
+  };
+}
+var selectContinueChain = (root) => !isIdle(root.app.phase);
+var selectSnapshot = (root) => ({
+  pipeline_version: root.info.pipeline_version ?? 0,
+  issue: root.info.issue ?? 0,
+  branch: root.info.branch ?? "",
+  phase: root.app.phase,
+  blocked_reason: root.app.blocked_reason
+});
+var selectBlocked = (root) => root.app.phase === "blocked" ? { blocked: true, reason: root.app.blocked_reason ?? "（理由が記録されていません）" } : { blocked: false, reason: null };
+var versionMismatch = (root, config) => root.info.pipeline_version === config.pipeline_version ? null : `pipeline_version_mismatch: run=${root.info.pipeline_version} harness=${config.pipeline_version}`;
+function selectNextAction(root, config, config_error = null) {
+  const { phase, counts, in_flight } = root.app;
+  const base = { phase, total_steps: counts.total_steps, rounds: counts.rounds };
+  const block2 = (reason) => ({ ...base, action: "block", reason });
+  const none = (reason) => ({ ...base, action: "none", reason });
+  if (config_error)
+    return block2(`config_invalid: ${config_error}`);
+  const mismatch = versionMismatch(root, config);
+  if (mismatch)
+    return block2(mismatch);
+  if (isIdle(phase))
+    return none(`phase_${phase}`);
+  if (in_flight)
+    return none(`run_in_progress: ${in_flight.agent} run=${in_flight.run_id}`);
+  if (counts.total_steps >= config.limits.total_steps) {
+    return block2(`total_steps_exceeded: ${counts.total_steps}/${config.limits.total_steps}`);
+  }
+  const agent = agentFor(phase, config);
+  if (!agent)
+    return block2(`no_transition_for_phase: ${phase}`);
+  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
 }
 
 // src/commands/explain.ts
@@ -670,12 +947,11 @@ var FALLBACK = {
 2. 原因を直す
 3. ${retryLine}`
 };
-function explainRun(input) {
-  const { dir } = input;
-  const file2 = readStateFile(dir);
-  if (file2.phase !== "blocked")
+function explainRun(root, dir) {
+  const blocked2 = selectBlocked(root);
+  if (!blocked2.blocked)
     return null;
-  const reason = file2.blocked_reason ?? "（理由が記録されていません）";
+  const reason = blocked2.reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   const context = { dir, reason };
   return {
@@ -689,161 +965,15 @@ blocked_reason: ${reason}
 ${advice.body(context)}`
   };
 }
-// src/commands/finish.ts
-function blocked(reason) {
-  return { phase: "blocked", blocked_reason: reason, continue_chain: false, reason };
-}
-function advance(phase, event, config, reason) {
-  const next = nextPhase(phase, event, config);
-  if (!next)
-    return blocked(`transition_incomplete: ${phase} (${event})`);
-  return { phase: next, blocked_reason: null, continue_chain: !isIdle(next), reason };
-}
-function finish(input) {
-  const { phase, records, config, outcome } = input;
-  if (outcome.result === "api_error") {
-    return blocked(`api_error:${outcome.api_error_status ?? "unknown"}`);
-  }
-  if (outcome.result === "invalid") {
-    return blocked(outcome.detail ? `invalid_artifacts: ${outcome.detail}` : "invalid_artifacts");
-  }
-  if (outcome.result === "agent_failed")
-    return blocked("agent_failed");
-  const roundKey = roundKeyFor(phase, config);
-  if (roundKey) {
-    if (outcome.verdict === "approve")
-      return advance(phase, "approve", config, "approve");
-    if (outcome.verdict !== "request_changes")
-      return blocked("missing_verdict");
-    const used = deriveRunStats(records).rounds[roundKey];
-    const limit = config.limits[`${roundKey}_rounds`];
-    if (used >= limit)
-      return blocked(`${roundKey}_rounds_exceeded: ${used}/${limit}`);
-    return advance(phase, "request_changes", config, `request_changes (${used}/${limit})`);
-  }
-  const canPass = nextPhase(phase, "pass", config) !== null;
-  if (canPass && !outcome.acceptance_passed)
-    return blocked("acceptance_not_passed");
-  if (canPass)
-    return advance(phase, "pass", config, "acceptance_passed");
-  return advance(phase, "ok", config, "ok");
-}
-function finishRun(input) {
-  const { dir, record_path, outcome, config, session_id = null, now = new Date } = input;
-  const file2 = readStateFile(dir);
-  const records = readRecords(dir);
-  const current = findRecord(records, record_path);
-  if (!current)
-    throw new Error(`実行レコードが見つかりません: ${record_path}`);
-  const updated = closeRecord(current, {
-    finished_at: now.toISOString(),
-    result: outcome.result,
-    verdict: outcome.verdict,
-    api_error_status: outcome.api_error_status,
-    session_id
-  });
-  saveRecord(dir, updated);
-  const result = finish({ phase: file2.phase, records, config, outcome });
-  writeStateFile(dir, file2, result, now);
-  return result;
-}
-// src/commands/label.ts
-function labelFor(phase, prefix) {
-  return `${prefix}${phase.replace(/_/g, "-")}`;
-}
-function labelRun(input) {
-  const file2 = readStateFile(input.dir);
-  const { prefix, trigger } = input.config.labels;
-  return {
-    label: labelFor(file2.phase, prefix),
-    issue: file2.meta.issue,
-    phase: file2.phase,
-    prefix,
-    trigger
-  };
-}
-// src/commands/request-changes.ts
-function requestChanges(input) {
-  return humanTransition({ ...input, event: "request_changes" });
-}
-function requestChangesRun(input) {
-  const { dir, association, body, config, now = new Date } = input;
-  const file2 = readStateFile(dir);
-  const decision = requestChanges({ phase: file2.phase, association, config });
-  if (!decision.ok)
-    return decision;
-  const kind = reviewKindFor(file2.phase, config) ?? "plan";
-  const review_path = saveReview({
-    dir,
-    kind,
-    verdict: "request_changes",
-    reviewer: `human:${association}`,
-    body
-  });
-  writeStateFile(dir, file2, { phase: decision.phase, blocked_reason: null }, now);
-  return { ...decision, review_path };
-}
-// src/commands/retry.ts
-function retryRun(input) {
-  const { dir, association, config, now = new Date } = input;
-  if (!authorized(association, config)) {
-    return { ok: false, reason: `not_authorized: ${association}` };
-  }
-  const file2 = readStateFile(dir);
-  if (file2.phase !== "blocked")
-    return { ok: false, reason: `not_blocked: phase=${file2.phase}` };
-  if (file2.blocked_reason?.includes("_exceeded")) {
-    return { ok: false, reason: `limit_reached: ${file2.blocked_reason}` };
-  }
-  const last = latestRecord(readRecords(dir));
-  if (!last)
-    return { ok: false, reason: "no_records: 実行の記録が無いので戻る先が決まらない" };
-  if (last.finished_at === null) {
-    return { ok: false, reason: `run_in_progress: ${last.agent} run=${last.run_id}` };
-  }
-  writeStateFile(dir, file2, { phase: last.phase, blocked_reason: null }, now);
-  return { ok: true, phase: last.phase, agent: last.agent };
-}
-// src/commands/route.ts
-function routeRun(input) {
-  const file2 = readStateFile(input.dir);
-  const records = readRecords(input.dir);
-  const blocked2 = (reason) => ({
-    action: "block",
-    reason,
-    phase: file2.phase,
-    total_steps: records.length,
-    rounds: { plan_review: 0, dev_review: 0 }
-  });
-  if (input.config_error)
-    return blocked2(`config_invalid: ${input.config_error}`);
-  const mismatch = checkPipelineVersion(file2.meta, input.config);
-  if (mismatch)
-    return blocked2(mismatch);
-  return route({ phase: file2.phase, records, config: input.config });
-}
-// src/commands/start.ts
-function startRun(input) {
-  const { dir, agent, run_id, attempt, model, now = new Date } = input;
-  const file2 = readStateFile(dir);
-  const record = openRecord({
-    agent,
-    phase: file2.phase,
-    run_id,
-    attempt,
-    model,
-    started_at: now.toISOString()
-  });
-  return { record_path: saveRecord(dir, record) };
-}
+
 // src/commands/validate.ts
-import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
+import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
 import { join as join8 } from "node:path";
 
 // src/file/execution-log.ts
-import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
 function readResultEvent(path) {
-  if (!existsSync7(path))
+  if (!existsSync8(path))
     return null;
   const parsed = parseJson(readFileSync7(path, "utf8"), "execution_file");
   const events = Array.isArray(parsed) ? parsed : [parsed];
@@ -871,7 +1001,7 @@ function readApiErrorStatus(path) {
 // src/commands/validate.ts
 var nonEmpty = (rel) => ({ dir }) => {
   const path = join8(dir, rel);
-  return existsSync8(path) && readFileSync8(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+  return existsSync9(path) && readFileSync8(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
 };
 var contains = (rel, needle) => ({ dir }) => readFileSync8(join8(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
 var acceptanceSchema = ({ dir }) => {
@@ -944,173 +1074,731 @@ function readLatestVerdict(dir, kind) {
   const path = latestReviewPath(dir, kind);
   return path ? readVerdict(path) : null;
 }
-// src/defaults.ts
-var defaults = {
-  pipeline_version: 1,
-  models: {
-    default: "claude-opus-5",
-    reviewer: null
-  },
-  limits: {
-    plan_review_rounds: 5,
-    dev_review_rounds: 5,
-    total_steps: 24
-  },
-  tool_profiles: {
-    readonly: "Read,Glob,Grep,Write",
-    exec: "Read,Glob,Grep,Write,Edit,Bash"
-  },
-  agents: {
-    planner: { max_turns: 35, timeout_minutes: 20, tools: "readonly" },
-    "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
-    developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
-    "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
-    completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" }
-  },
-  approvers: ["OWNER", "COLLABORATOR"],
-  labels: {
-    prefix: "agent:",
-    trigger: "agent:go"
-  },
-  transitions: {
-    planning: { agent: "planner", on_ok: "plan_review" },
-    plan_review: {
-      agent: "plan-reviewer",
-      round_key: "plan_review",
-      on_approve: "awaiting_human",
-      on_request_changes: "planning"
-    },
-    developing: { agent: "developer", on_ok: "dev_review" },
-    dev_review: {
-      agent: "dev-reviewer",
-      round_key: "dev_review",
-      on_approve: "completing",
-      on_request_changes: "developing"
-    },
-    completing: { agent: "completion", on_pass: "done", on_fail: "blocked" },
-    awaiting_human: {
-      on_approval: "developing",
-      on_request_changes: "planning",
-      review_kind: "plan"
-    }
-  }
+
+// src/redux/from-outcome.ts
+var FROM_RESULT = {
+  api_error: (o, c) => agentFailed({
+    ...c,
+    reason: `api_error:${o.api_error_status ?? "unknown"}`,
+    api_error_status: o.api_error_status ?? null
+  }),
+  invalid: (o, c) => agentFailed({
+    ...c,
+    reason: o.detail ? `invalid_artifacts: ${o.detail}` : "invalid_artifacts"
+  }),
+  agent_failed: (_o, c) => agentFailed({ ...c, reason: "agent_failed" }),
+  ok: (o, c) => o.verdict ? review({ ...c, verdict: o.verdict }) : agentOk({ ...c, acceptance_passed: o.acceptance_passed ?? false })
 };
-// src/file/config-file.ts
-import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
-import { join as join9 } from "node:path";
+var fromOutcome = (o, c) => FROM_RESULT[o.result](o, c);
 
-// src/utils/merge-config.ts
-var OVERRIDABLE = [
-  "models",
-  "limits",
-  "tool_profiles",
-  "agents",
-  "approvers",
-  "labels"
-];
-var CONSISTENCY = [
-  (c) => {
-    const dangling = Object.entries(c.agents).filter(([, a]) => !(a.tools in c.tool_profiles)).map(([name, a]) => `agents.${name}.tools=${a.tools}`);
-    return dangling.length === 0 ? null : `tool_profiles に無いプロファイルを指しています: ${dangling.join(", ")}（使えるのは ${Object.keys(c.tool_profiles).join(" / ")}）`;
+// node_modules/redux/dist/redux.mjs
+var $$observable = /* @__PURE__ */ (() => typeof Symbol === "function" && Symbol.observable || "@@observable")();
+var symbol_observable_default = $$observable;
+var randomString = () => Math.random().toString(36).substring(7).split("").join(".");
+var ActionTypes = {
+  INIT: `@@redux/INIT${/* @__PURE__ */ randomString()}`,
+  REPLACE: `@@redux/REPLACE${/* @__PURE__ */ randomString()}`,
+  PROBE_UNKNOWN_ACTION: () => `@@redux/PROBE_UNKNOWN_ACTION${randomString()}`
+};
+var actionTypes_default = ActionTypes;
+function isPlainObject(obj) {
+  if (typeof obj !== "object" || obj === null)
+    return false;
+  let proto = obj;
+  while (Object.getPrototypeOf(proto) !== null) {
+    proto = Object.getPrototypeOf(proto);
   }
-];
-var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
-function mergeValue(path, base, over, errors) {
-  if (over === null)
-    return base;
-  if (base === null)
-    return over;
-  if (isRecord(base)) {
-    if (!isRecord(over)) {
-      errors.push(`${path}: オブジェクトを書いてください`);
-      return base;
+  return Object.getPrototypeOf(obj) === proto || Object.getPrototypeOf(obj) === null;
+}
+function miniKindOf(val) {
+  if (val === undefined)
+    return "undefined";
+  if (val === null)
+    return "null";
+  const type = typeof val;
+  switch (type) {
+    case "boolean":
+    case "string":
+    case "number":
+    case "symbol":
+    case "function": {
+      return type;
     }
-    const merged = { ...base };
-    for (const [key, value] of Object.entries(over)) {
-      if (!(key in base)) {
-        errors.push(`${path}.${key}: 既定にないキーです（使えるのは ${Object.keys(base).join(" / ")}）`);
-        continue;
+  }
+  if (Array.isArray(val))
+    return "array";
+  if (isDate(val))
+    return "date";
+  if (isError(val))
+    return "error";
+  const constructorName = ctorName(val);
+  switch (constructorName) {
+    case "Symbol":
+    case "Promise":
+    case "WeakMap":
+    case "WeakSet":
+    case "Map":
+    case "Set":
+      return constructorName;
+  }
+  return Object.prototype.toString.call(val).slice(8, -1).toLowerCase().replace(/\s/g, "");
+}
+function ctorName(val) {
+  return typeof val.constructor === "function" ? val.constructor.name : null;
+}
+function isError(val) {
+  return val instanceof Error || typeof val.message === "string" && val.constructor && typeof val.constructor.stackTraceLimit === "number";
+}
+function isDate(val) {
+  if (val instanceof Date)
+    return true;
+  return typeof val.toDateString === "function" && typeof val.getDate === "function" && typeof val.setDate === "function";
+}
+function kindOf(val) {
+  let typeOfVal = typeof val;
+  if (true) {
+    typeOfVal = miniKindOf(val);
+  }
+  return typeOfVal;
+}
+function createStore(reducer, preloadedState, enhancer) {
+  if (typeof reducer !== "function") {
+    throw new Error(`Expected the root reducer to be a function. Instead, received: '${kindOf(reducer)}'`);
+  }
+  if (typeof preloadedState === "function" && typeof enhancer === "function" || typeof enhancer === "function" && typeof arguments[3] === "function") {
+    throw new Error("It looks like you are passing several store enhancers to createStore(). This is not supported. Instead, compose them together to a single function. See https://redux.js.org/tutorials/fundamentals/part-4-store#creating-a-store-with-enhancers for an example.");
+  }
+  if (typeof preloadedState === "function" && typeof enhancer === "undefined") {
+    enhancer = preloadedState;
+    preloadedState = undefined;
+  }
+  if (typeof enhancer !== "undefined") {
+    if (typeof enhancer !== "function") {
+      throw new Error(`Expected the enhancer to be a function. Instead, received: '${kindOf(enhancer)}'`);
+    }
+    return enhancer(createStore)(reducer, preloadedState);
+  }
+  let currentReducer = reducer;
+  let currentState = preloadedState;
+  let currentListeners = /* @__PURE__ */ new Map;
+  let nextListeners = currentListeners;
+  let listenerIdCounter = 0;
+  let isDispatching = false;
+  function ensureCanMutateNextListeners() {
+    if (nextListeners === currentListeners) {
+      nextListeners = /* @__PURE__ */ new Map;
+      currentListeners.forEach((listener, key) => {
+        nextListeners.set(key, listener);
+      });
+    }
+  }
+  function getState() {
+    if (isDispatching) {
+      throw new Error("You may not call store.getState() while the reducer is executing. The reducer has already received the state as an argument. Pass it down from the top reducer instead of reading it from the store.");
+    }
+    return currentState;
+  }
+  function subscribe(listener) {
+    if (typeof listener !== "function") {
+      throw new Error(`Expected the listener to be a function. Instead, received: '${kindOf(listener)}'`);
+    }
+    if (isDispatching) {
+      throw new Error("You may not call store.subscribe() while the reducer is executing. If you would like to be notified after the store has been updated, subscribe from a component and invoke store.getState() in the callback to access the latest state. See https://redux.js.org/api/store#subscribelistener for more details.");
+    }
+    let isSubscribed = true;
+    ensureCanMutateNextListeners();
+    const listenerId = listenerIdCounter++;
+    nextListeners.set(listenerId, listener);
+    return function unsubscribe() {
+      if (!isSubscribed) {
+        return;
       }
-      merged[key] = mergeValue(`${path}.${key}`, base[key], value, errors);
-    }
-    return merged;
-  }
-  if (Array.isArray(base)) {
-    if (!Array.isArray(over)) {
-      errors.push(`${path}: 配列を書いてください`);
-      return base;
-    }
-    const wrong = over.filter((v) => typeof v !== typeof base[0]);
-    if (wrong.length > 0) {
-      errors.push(`${path}: 要素は ${typeof base[0]} で書いてください`);
-      return base;
-    }
-    return over;
-  }
-  if (typeof base !== typeof over) {
-    errors.push(`${path}: ${typeof base} で書いてください（いまは ${typeof over}）`);
-    return base;
-  }
-  if (typeof over === "number" && (!Number.isInteger(over) || over < 1)) {
-    errors.push(`${path}: 1 以上の整数で書いてください（いまは ${over}）`);
-    return base;
-  }
-  return over;
-}
-function mergeConfig(base, override) {
-  const errors = [];
-  if (!isRecord(override))
-    return { config: base, errors: ["最上位はオブジェクトで書いてください"] };
-  const merged = { ...base };
-  for (const [key, value] of Object.entries(override)) {
-    if (!OVERRIDABLE.includes(key)) {
-      errors.push(`${key}: 配布先では上書きできません（上書きできるのは ${OVERRIDABLE.join(" / ")}）`);
-      continue;
-    }
-    merged[key] = mergeValue(key, merged[key], value, errors);
-  }
-  const config = merged;
-  errors.push(...CONSISTENCY.map((check) => check(config)).filter((e) => e !== null));
-  return errors.length > 0 ? { config: base, errors } : { config, errors };
-}
-
-// src/file/config-file.ts
-var CONFIG_PATH = join9(".agent", "config.json");
-function readConfig(repo) {
-  const path = join9(repo, CONFIG_PATH);
-  if (!existsSync9(path))
-    return { config: defaults, source: null, error: null };
-  let raw;
-  try {
-    raw = JSON.parse(readFileSync9(path, "utf8"));
-  } catch (e) {
-    const detail = e instanceof Error ? e.message : String(e);
-    return {
-      config: defaults,
-      source: path,
-      error: `${CONFIG_PATH} が JSON として壊れています: ${detail}`
+      if (isDispatching) {
+        throw new Error("You may not unsubscribe from a store listener while the reducer is executing. See https://redux.js.org/api/store#subscribelistener for more details.");
+      }
+      isSubscribed = false;
+      ensureCanMutateNextListeners();
+      nextListeners.delete(listenerId);
+      currentListeners = null;
     };
   }
-  const { config, errors } = mergeConfig(defaults, raw);
-  if (errors.length > 0) {
-    return { config: defaults, source: path, error: `${CONFIG_PATH}: ${errors.join(" / ")}` };
+  function dispatch(action) {
+    if (!isPlainObject(action)) {
+      throw new Error(`Actions must be plain objects. Instead, the actual type was: '${kindOf(action)}'. You may need to add middleware to your store setup to handle dispatching other values, such as 'redux-thunk' to handle dispatching functions. See https://redux.js.org/tutorials/fundamentals/part-4-store#middleware and https://redux.js.org/tutorials/fundamentals/part-6-async-logic#using-the-redux-thunk-middleware for examples.`);
+    }
+    if (typeof action.type === "undefined") {
+      throw new Error('Actions may not have an undefined "type" property. You may have misspelled an action type string constant.');
+    }
+    if (typeof action.type !== "string") {
+      throw new Error(`Action "type" property must be a string. Instead, the actual type was: '${kindOf(action.type)}'. Value was: '${action.type}' (stringified)`);
+    }
+    if (isDispatching) {
+      throw new Error("Reducers may not dispatch actions.");
+    }
+    try {
+      isDispatching = true;
+      currentState = currentReducer(currentState, action);
+    } finally {
+      isDispatching = false;
+    }
+    const listeners = currentListeners = nextListeners;
+    listeners.forEach((listener) => {
+      listener();
+    });
+    return action;
   }
-  return { config, source: path, error: null };
+  function replaceReducer(nextReducer) {
+    if (typeof nextReducer !== "function") {
+      throw new Error(`Expected the nextReducer to be a function. Instead, received: '${kindOf(nextReducer)}`);
+    }
+    currentReducer = nextReducer;
+    dispatch({
+      type: actionTypes_default.REPLACE
+    });
+  }
+  function observable() {
+    const outerSubscribe = subscribe;
+    return {
+      subscribe(observer) {
+        if (typeof observer !== "object" || observer === null) {
+          throw new Error(`Expected the observer to be an object. Instead, received: '${kindOf(observer)}'`);
+        }
+        function observeState() {
+          const observerAsObserver = observer;
+          if (observerAsObserver.next) {
+            observerAsObserver.next(getState());
+          }
+        }
+        observeState();
+        const unsubscribe = outerSubscribe(observeState);
+        return {
+          unsubscribe
+        };
+      },
+      [symbol_observable_default]() {
+        return this;
+      }
+    };
+  }
+  dispatch({
+    type: actionTypes_default.INIT
+  });
+  const store = {
+    dispatch,
+    subscribe,
+    getState,
+    replaceReducer,
+    [symbol_observable_default]: observable
+  };
+  return store;
 }
+function legacy_createStore(reducer, preloadedState, enhancer) {
+  return createStore(reducer, preloadedState, enhancer);
+}
+function warning(message) {
+  if (typeof console !== "undefined" && typeof console.error === "function") {
+    console.error(message);
+  }
+  try {
+    throw new Error(message);
+  } catch (e) {}
+}
+function getUnexpectedStateShapeWarningMessage(inputState, reducers, action, unexpectedKeyCache) {
+  const reducerKeys = Object.keys(reducers);
+  const argumentName = action && action.type === actionTypes_default.INIT ? "preloadedState argument passed to createStore" : "previous state received by the reducer";
+  if (reducerKeys.length === 0) {
+    return "Store does not have a valid reducer. Make sure the argument passed to combineReducers is an object whose values are reducers.";
+  }
+  if (!isPlainObject(inputState)) {
+    return `The ${argumentName} has unexpected type of "${kindOf(inputState)}". Expected argument to be an object with the following keys: "${reducerKeys.join('", "')}"`;
+  }
+  const unexpectedKeys = Object.keys(inputState).filter((key) => !reducers.hasOwnProperty(key) && !unexpectedKeyCache[key]);
+  unexpectedKeys.forEach((key) => {
+    unexpectedKeyCache[key] = true;
+  });
+  if (action && action.type === actionTypes_default.REPLACE)
+    return;
+  if (unexpectedKeys.length > 0) {
+    return `Unexpected ${unexpectedKeys.length > 1 ? "keys" : "key"} "${unexpectedKeys.join('", "')}" found in ${argumentName}. Expected to find one of the known reducer keys instead: "${reducerKeys.join('", "')}". Unexpected keys will be ignored.`;
+  }
+}
+function assertReducerShape(reducers) {
+  Object.keys(reducers).forEach((key) => {
+    const reducer = reducers[key];
+    const initialState = reducer(undefined, {
+      type: actionTypes_default.INIT
+    });
+    if (typeof initialState === "undefined") {
+      throw new Error(`The slice reducer for key "${key}" returned undefined during initialization. If the state passed to the reducer is undefined, you must explicitly return the initial state. The initial state may not be undefined. If you don't want to set a value for this reducer, you can use null instead of undefined.`);
+    }
+    if (typeof reducer(undefined, {
+      type: actionTypes_default.PROBE_UNKNOWN_ACTION()
+    }) === "undefined") {
+      throw new Error(`The slice reducer for key "${key}" returned undefined when probed with a random type. Don't try to handle '${actionTypes_default.INIT}' or other actions in "redux/*" namespace. They are considered private. Instead, you must return the current state for any unknown actions, unless it is undefined, in which case you must return the initial state, regardless of the action type. The initial state may not be undefined, but can be null.`);
+    }
+  });
+}
+function combineReducers(reducers) {
+  const reducerKeys = Object.keys(reducers);
+  const finalReducers = {};
+  for (let i = 0;i < reducerKeys.length; i++) {
+    const key = reducerKeys[i];
+    if (true) {
+      if (typeof reducers[key] === "undefined") {
+        warning(`No reducer provided for key "${key}"`);
+      }
+    }
+    if (typeof reducers[key] === "function") {
+      finalReducers[key] = reducers[key];
+    }
+  }
+  const finalReducerKeys = Object.keys(finalReducers);
+  let unexpectedKeyCache;
+  if (true) {
+    unexpectedKeyCache = {};
+  }
+  let shapeAssertionError;
+  try {
+    assertReducerShape(finalReducers);
+  } catch (e) {
+    shapeAssertionError = e;
+  }
+  return function combination(state = {}, action) {
+    if (shapeAssertionError) {
+      throw shapeAssertionError;
+    }
+    if (true) {
+      const warningMessage = getUnexpectedStateShapeWarningMessage(state, finalReducers, action, unexpectedKeyCache);
+      if (warningMessage) {
+        warning(warningMessage);
+      }
+    }
+    let hasChanged = false;
+    const nextState = {};
+    for (let i = 0;i < finalReducerKeys.length; i++) {
+      const key = finalReducerKeys[i];
+      const reducer = finalReducers[key];
+      const previousStateForKey = state[key];
+      const nextStateForKey = reducer(previousStateForKey, action);
+      if (typeof nextStateForKey === "undefined") {
+        const actionType = action && action.type;
+        throw new Error(`When called with an action of type ${actionType ? `"${String(actionType)}"` : "(unknown type)"}, the slice reducer for key "${key}" returned undefined. To ignore an action, you must explicitly return the previous state. If you want this reducer to hold no value, you can return null instead of undefined.`);
+      }
+      nextState[key] = nextStateForKey;
+      hasChanged = hasChanged || nextStateForKey !== previousStateForKey;
+    }
+    hasChanged = hasChanged || finalReducerKeys.length !== Object.keys(state).length;
+    return hasChanged ? nextState : state;
+  };
+}
+function compose(...funcs) {
+  if (funcs.length === 0) {
+    return (arg) => arg;
+  }
+  if (funcs.length === 1) {
+    return funcs[0];
+  }
+  return funcs.reduce((a, b) => (...args) => a(b(...args)));
+}
+function applyMiddleware(...middlewares) {
+  return (createStore2) => (reducer, preloadedState) => {
+    const store = createStore2(reducer, preloadedState);
+    let dispatch = () => {
+      throw new Error("Dispatching while constructing your middleware is not allowed. Other middleware would not be applied to this dispatch.");
+    };
+    const middlewareAPI = {
+      getState: store.getState,
+      dispatch: (action, ...args) => dispatch(action, ...args)
+    };
+    const chain = middlewares.map((middleware) => middleware(middlewareAPI));
+    dispatch = compose(...chain)(store.dispatch);
+    return {
+      ...store,
+      dispatch
+    };
+  };
+}
+
+// src/redux/app/index.ts
+var app_default = createAppReducer;
+
+// src/redux/info/actions.ts
+var create3 = typescript_fsa_default("agent-pipeline/info");
+var configure = create3("CONFIGURE");
+var hydrated = create3("HYDRATED");
+
+// src/redux/info/reducer.ts
+var initialInfo = {
+  issue: null,
+  branch: null,
+  pipeline_version: null,
+  dir: "",
+  run_id: null,
+  attempt: 1,
+  hydrated: false
+};
+var infoReducer = reducerWithInitialState(initialInfo).case(configure, (s, p) => ({ ...s, ...p })).case(hydrated, (s) => ({ ...s, hydrated: true })).case(restore, (s, p) => ({ ...s, ...p.info })).build();
+
+// src/redux/info/index.ts
+var info_default = infoReducer;
+
+// src/redux/guards.ts
+var associationOf = (action) => (action.payload.by ?? "").replace(/^human:/, "");
+var authorized = (_root, action, config) => {
+  const association = associationOf(action);
+  return config.approvers.includes(association) ? null : `not_authorized: ${association}`;
+};
+var transitionExists = (event) => ({ app }, _action, config) => nextPhase(app.phase, event, config) ? null : `not_awaiting_approval: phase=${app.phase}`;
+var mustBeBlocked = ({ app }) => app.phase === "blocked" ? null : `not_blocked: phase=${app.phase}`;
+var notLimitReached = ({ app }) => app.blocked_reason?.includes("_exceeded") ? `limit_reached: ${app.blocked_reason}` : null;
+var knowsWhereToResume = ({ app }) => app.blocked_from ? null : "no_records: 実行の記録が無いので戻る先が決まらない";
+var notInFlight = ({ app }) => app.in_flight ? `run_in_progress: ${app.in_flight.agent} run=${app.in_flight.run_id}` : null;
+var GUARDS = {
+  [humanApproval.type]: [authorized, transitionExists("approval")],
+  [humanRequestChanges.type]: [authorized, transitionExists("request_changes")],
+  [retry.type]: [authorized, mustBeBlocked, notLimitReached, knowsWhereToResume, notInFlight]
+};
+function rejection(root, action, config) {
+  for (const guard of GUARDS[action.type] ?? []) {
+    const reason = guard(root, action, config);
+    if (reason)
+      return reason;
+  }
+  return null;
+}
+
+// src/redux/middleware/types.ts
+var isReplay = (action) => action?.meta?.hydrate === true;
+
+// src/redux/middleware/guard.ts
+var guard = ({ config }) => (store) => (next) => (action) => {
+  if (isReplay(action))
+    return next(action);
+  const a = action;
+  if (!String(a.type).startsWith("agent-pipeline/app/"))
+    return next(action);
+  const reason = rejection(store.getState(), a, config);
+  if (reason)
+    return { ok: false, reason };
+  return next(action);
+};
+
+// src/file/state-file.ts
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join9 } from "node:path";
+function parseStateFile(text) {
+  const raw = parseJson(text, "state.json");
+  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
+    throw new Error("state.json に issue か phase がありません");
+  }
+  return {
+    meta: {
+      pipeline_version: Number(raw.pipeline_version ?? 0),
+      issue: raw.issue,
+      branch: typeof raw.branch === "string" ? raw.branch : "",
+      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
+    },
+    phase: raw.phase,
+    blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
+  };
+}
+var STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at"
+];
+function renderStateFile(snapshot, now) {
+  const shape = {
+    ...snapshot,
+    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
+  };
+  const ordered = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
+}
+function stateFilePath(dir) {
+  return join9(dir, "state.json");
+}
+function readStateFile(dir) {
+  return parseStateFile(readFileSync9(stateFilePath(dir), "utf8"));
+}
+function writeStateFile(dir, snapshot, now) {
+  writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
+}
+
+// src/utils/derive-run-stats.ts
+function deriveRunStats(records) {
+  return {
+    total_steps: records.length,
+    rounds: {
+      plan_review: records.filter((r) => r.agent === "plan-reviewer").length,
+      dev_review: records.filter((r) => r.agent === "dev-reviewer").length
+    },
+    in_flight: records.find((r) => r.finished_at === null) ?? null
+  };
+}
+
+// src/redux/middleware/hydrate.ts
+var hydrate = () => (store) => (next) => (action) => {
+  if (!init.match(action))
+    return next(action);
+  const { dir } = store.getState().info;
+  const file2 = readStateFile(dir);
+  const records = readRecords(dir);
+  const stats = deriveRunStats(records);
+  const last = records.reduce((latest2, r) => !latest2 || r.started_at > latest2.started_at ? r : latest2, undefined);
+  store.dispatch(restore({
+    info: {
+      issue: file2.meta.issue,
+      branch: file2.meta.branch,
+      pipeline_version: file2.meta.pipeline_version
+    },
+    app: {
+      phase: file2.phase,
+      blocked_reason: file2.blocked_reason,
+      blocked_from: last?.phase ?? null,
+      counts: { total_steps: stats.total_steps, rounds: stats.rounds },
+      in_flight: stats.in_flight ? { agent: stats.in_flight.agent, run_id: stats.in_flight.run_id } : null
+    }
+  }));
+  store.dispatch(hydrated(undefined));
+  return;
+};
+
+// src/redux/middleware/review-file.ts
+var reviewFile = ({ config, outputs }) => (store) => (next) => (action) => {
+  if (isReplay(action))
+    return next(action);
+  const a = action;
+  if (!humanRequestChanges.match(action))
+    return next(action);
+  const { info, app } = store.getState();
+  outputs.review_path = saveReview({
+    dir: info.dir,
+    kind: reviewKindFor(app.phase, config) ?? "plan",
+    verdict: "request_changes",
+    reviewer: a.payload?.by ?? "human",
+    body: a.payload?.body ?? ""
+  });
+  return next(action);
+};
+
+// src/redux/middleware/run-record.ts
+var resultOf = (type, reason) => {
+  if (type !== agentFailed.type)
+    return "ok";
+  if (reason.startsWith("api_error:"))
+    return "api_error";
+  if (reason.startsWith("invalid_artifacts"))
+    return "invalid";
+  return "agent_failed";
+};
+var runRecord = ({ outputs }) => (store) => (next) => (action) => {
+  if (isReplay(action))
+    return next(action);
+  const { info, app } = store.getState();
+  const a = action;
+  if (a.type === agentStarted.type) {
+    const p2 = a.payload;
+    const record = openRecord({
+      agent: p2.agent,
+      phase: app.phase,
+      run_id: p2.run_id,
+      attempt: p2.attempt,
+      model: p2.model,
+      started_at: new Date().toISOString()
+    });
+    outputs.record_path = saveRecord(info.dir, record);
+    return next(action);
+  }
+  if (a.type !== agentOk.type && a.type !== review.type && a.type !== agentFailed.type) {
+    return next(action);
+  }
+  const agent = app.in_flight?.agent;
+  const p = a.payload ?? {};
+  const result = next(action);
+  if (!agent)
+    return result;
+  const path = recordPath(info.dir, { agent, run_id: p.run_id, attempt: p.attempt });
+  const current = readRecords(info.dir).find((r) => path.endsWith(`${r.agent}-${r.run_id}-${r.attempt}.json`));
+  if (!current)
+    return result;
+  saveRecord(info.dir, closeRecord(current, {
+    finished_at: new Date().toISOString(),
+    result: resultOf(a.type, p.reason ?? ""),
+    verdict: p.verdict ?? null,
+    api_error_status: p.api_error_status ?? null,
+    session_id: p.session_id ?? null
+  }));
+  return result;
+};
+
+// src/redux/middleware/snapshot.ts
+var snapshot = () => (store) => (next) => (action) => {
+  if (isReplay(action))
+    return next(action);
+  const before = store.getState();
+  const result = next(action);
+  const after = store.getState();
+  if (after.app !== before.app)
+    writeStateFile(after.info.dir, selectSnapshot(after), new Date);
+  return result;
+};
+
+// src/redux/middleware/index.ts
+var middlewares = [guard, snapshot, reviewFile, runRecord, hydrate];
+
+// src/redux/index.ts
+function createAgentStore(input) {
+  const outputs = {};
+  const wiring = { config: input.config, outputs };
+  const store = legacy_createStore(combineReducers({ info: info_default, app: app_default(input.config) }), applyMiddleware(...middlewares.map((m) => m(wiring))));
+  store.dispatch(configure({ dir: input.dir, run_id: input.run_id ?? null, attempt: input.attempt ?? 1 }));
+  store.dispatch(init(undefined));
+  return { store, outputs, state: () => store.getState() };
+}
+
+// src/redux/commands.ts
+class MissingArg extends Error {
+  arg;
+  constructor(arg) {
+    super(`--${arg} が必要です`);
+    this.arg = arg;
+  }
+}
+var need = (v, name) => {
+  if (v === undefined || v === "")
+    throw new MissingArg(name);
+  return v;
+};
+var at = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+var runOf = (a) => ({
+  run_id: need(a["run-id"], "run-id"),
+  attempt: Number(a.attempt ?? 1)
+});
+var harness = () => ({ at: at(), by: "harness" });
+var human = (a) => ({ at: at(), by: `human:${need(a.association, "association")}` });
+var outcomeOf = (a) => ({
+  result: need(a.result, "result"),
+  verdict: a.verdict ?? null,
+  oversize: a.oversize ?? false,
+  acceptance_passed: a["acceptance-passed"] ?? false,
+  api_error_status: a["api-error-status"] ? Number(a["api-error-status"]) : null,
+  detail: a.detail
+});
+var transitionOutput = (root) => ({
+  phase: root.app.phase,
+  blocked_reason: root.app.blocked_reason,
+  continue_chain: selectContinueChain(root),
+  reason: root.app.last_reason ?? ""
+});
+var COMMANDS = {
+  start: {
+    action: (a, config) => agentStarted({
+      ...harness(),
+      ...runOf(a),
+      agent: need(a.agent, "agent"),
+      model: a.model ?? config.models.default
+    }),
+    output: (_root, outputs) => ({ record_path: outputs.record_path })
+  },
+  finish: {
+    action: (a) => fromOutcome(outcomeOf(a), { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null }),
+    output: transitionOutput
+  },
+  approve: {
+    action: (a) => humanApproval(human(a)),
+    output: (root) => ({ ok: true, phase: root.app.phase })
+  },
+  "request-changes": {
+    action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
+    output: (root, outputs) => ({
+      ok: true,
+      phase: root.app.phase,
+      review_path: outputs.review_path
+    })
+  },
+  retry: {
+    action: (a) => retry(human(a)),
+    output: (root, _outputs, config) => ({
+      ok: true,
+      phase: root.app.phase,
+      agent: agentFor(root.app.phase, config)
+    })
+  },
+  block: {
+    action: (a) => block({ ...harness(), reason: need(a.reason, "reason") }),
+    output: transitionOutput
+  },
+  route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
+  label: { read: (root, _a, config) => selectLabel(root, config) },
+  explain: { read: (root, a) => explainRun(root, need(a.dir, "dir")) },
+  validate: {
+    plain: (a, config) => validateRun({
+      dir: need(a.dir, "dir"),
+      config,
+      agent: need(a.agent, "agent"),
+      agent_failed: a["agent-failed"] ?? false,
+      execution_file: a["execution-file"] ?? null,
+      changed_files: a["changed-files"] ? readFileSync10(a["changed-files"], "utf8").split(`
+`).filter(Boolean) : []
+    })
+  },
+  compose: {
+    plain: (a, config) => composeRun({
+      dir: need(a.dir, "dir"),
+      config,
+      agent: need(a.agent, "agent"),
+      repo: a.repo ?? ".",
+      central: need(a.central, "central"),
+      out: need(a.out, "out"),
+      run_id: need(a["run-id"], "run-id"),
+      attempt: Number(a.attempt ?? 1)
+    })
+  }
+};
+var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
+function runCommand(command, args, config, configError = null) {
+  const cmd = COMMANDS[command];
+  if (!cmd)
+    return;
+  if (cmd.plain)
+    return cmd.plain(args, config);
+  const dir = need(args.dir, "dir");
+  const { store, outputs, state } = createAgentStore({
+    dir,
+    config,
+    run_id: args["run-id"] ?? null,
+    attempt: Number(args.attempt ?? 1)
+  });
+  if (cmd.read)
+    return cmd.read(state(), args, config, configError);
+  const result = store.dispatch(cmd.action(args, config));
+  if (isRejection(result))
+    return result;
+  return cmd.output?.(state(), outputs, config);
+}
+
 // src/cli.ts
 var USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 
-commands:
+状態を変える（action を 1 つ dispatch する）:
   start    エージェント実行の開始を記録する   --agent --run-id --attempt [--model]
-  route    次に何をするかを決める
-  finish   実行の結末を書き次の phase を決める --record-path --result [--verdict] [--api-error-status]
-                                              [--oversize] [--acceptance-passed] [--session-id]
-  approve  /approve による遷移                --association
-  request-changes  /request-changes による差し戻し  --association --body
+  finish   実行の結末を書き次の phase を決める --run-id --result [--verdict] [--detail]
+                                              [--api-error-status] [--acceptance-passed] [--session-id]
+  approve  /agent approve による遷移           --association
+  request-changes  /agent request-changes による差し戻し  --association --body
   retry    blocked から直前のフェーズに戻す    --association
   block    phase を blocked にする            --reason
+
+読むだけ（何も書かない）:
+  route    次に何をするかを決める
   label    いま付いているべきラベルを返す
   explain  blocked の理由と次の一手を markdown で返す（PR に貼る）
+
+store を使わない:
   validate 成果物が契約を満たすか検証し Outcome を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
@@ -1129,7 +1817,6 @@ var { positionals, values } = parseArgs({
     "run-id": { type: "string" },
     attempt: { type: "string", default: "1" },
     model: { type: "string" },
-    "record-path": { type: "string" },
     result: { type: "string" },
     verdict: { type: "string" },
     "api-error-status": { type: "string" },
@@ -1148,95 +1835,23 @@ var { positionals, values } = parseArgs({
     out: { type: "string" }
   }
 });
-var need = (v, name) => {
-  if (v === undefined || v === "") {
-    console.error(`--${name} が必要です
+var command = positionals[0] ?? "";
+var fail = (message) => {
+  console.error(`${message}
 
 ${USAGE}`);
-    process.exit(2);
-  }
-  return v;
-};
-var command = positionals[0];
-var dir = need(values.dir, "dir");
-var loaded = readConfig(values.repo ?? ".");
-var config = loaded.config;
-if (loaded.error && command !== "route") {
-  console.error(loaded.error);
   process.exit(2);
-}
-var outcome = () => ({
-  result: need(values.result, "result"),
-  verdict: values.verdict ?? null,
-  oversize: values.oversize,
-  acceptance_passed: values["acceptance-passed"],
-  api_error_status: values["api-error-status"] ? Number(values["api-error-status"]) : null,
-  detail: values.detail
-});
-var run = () => {
-  switch (command) {
-    case "start":
-      return startRun({
-        dir,
-        config,
-        agent: need(values.agent, "agent"),
-        run_id: need(values["run-id"], "run-id"),
-        attempt: Number(values.attempt),
-        model: values.model ?? config.models.default
-      });
-    case "route":
-      return routeRun({ dir, config, config_error: loaded.error });
-    case "finish":
-      return finishRun({
-        dir,
-        config,
-        record_path: need(values["record-path"], "record-path"),
-        outcome: outcome(),
-        session_id: values["session-id"] ?? null
-      });
-    case "approve":
-      return approveRun({ dir, config, association: need(values.association, "association") });
-    case "request-changes":
-      return requestChangesRun({
-        dir,
-        config,
-        association: need(values.association, "association"),
-        body: need(values.body, "body")
-      });
-    case "retry":
-      return retryRun({ dir, config, association: need(values.association, "association") });
-    case "block":
-      return blockRun({ dir, config, reason: need(values.reason, "reason") });
-    case "explain":
-      return explainRun({ dir, config });
-    case "label":
-      return labelRun({ dir, config });
-    case "validate":
-      return validateRun({
-        dir,
-        config,
-        agent: need(values.agent, "agent"),
-        agent_failed: values["agent-failed"],
-        execution_file: values["execution-file"] ?? null,
-        changed_files: values["changed-files"] ? readFileSync10(values["changed-files"], "utf8").split(`
-`).filter(Boolean) : []
-      });
-    case "compose":
-      return composeRun({
-        dir,
-        config,
-        agent: need(values.agent, "agent"),
-        repo: values.repo ?? ".",
-        central: need(values.central, "central"),
-        out: need(values.out, "out"),
-        run_id: need(values["run-id"], "run-id"),
-        attempt: Number(values.attempt)
-      });
-    default:
-      console.error(`不明なコマンド: ${command ?? "(なし)"}
-
-${USAGE}`);
-      return process.exit(2);
-  }
 };
-console.log(JSON.stringify(run(), null, 2));
+var loaded = readConfig(values.repo ?? ".");
+if (loaded.error && command !== "route")
+  fail(loaded.error);
+try {
+  const result = runCommand(command, values, loaded.config, loaded.error);
+  if (result === undefined)
+    fail(`不明なコマンド: ${command || "(なし)"}`);
+  console.log(JSON.stringify(result, null, 2));
+} catch (e) {
+  if (e instanceof MissingArg)
+    fail(e.message);
+  throw e;
+}

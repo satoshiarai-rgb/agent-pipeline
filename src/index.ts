@@ -1,25 +1,23 @@
 /**
- * ハーネスの公開 IF。実装は commands/ 以下の各コマンドが持ち、
- * ここは「ワークフローから呼べるもの」の一覧としてまとめるだけ。
+ * ハーネスの公開 IF。実装は `redux/`（状態と判断）と `commands/`（成果物の検証と
+ * プロンプトの組み立て）にあり、ここは「外から呼べるもの」の一覧としてまとめるだけ。
  *
- * 各コマンドは dispatch.yml / approve.yml のステップと 1 対 1 に対応する。
+ * ワークフローが叩くのは CLI（`cli.ts` → `redux/commands.ts` の対応表）で、
+ * この一覧はテストと将来の埋め込み利用のためにある。
  */
-export { approveRun } from "./commands/approve.ts";
-export { blockRun } from "./commands/block.ts";
+
 export type { ComposeResult } from "./commands/compose.ts";
 export { composeRun } from "./commands/compose.ts";
 export { explainRun } from "./commands/explain.ts";
-export type { FinishResult, Outcome } from "./commands/finish.ts";
-export { finishRun } from "./commands/finish.ts";
-export { labelRun } from "./commands/label.ts";
-export { requestChangesRun } from "./commands/request-changes.ts";
-export type { RetryResult } from "./commands/retry.ts";
-export { retryRun } from "./commands/retry.ts";
-export { routeRun } from "./commands/route.ts";
-export { startRun } from "./commands/start.ts";
 export { validateRun } from "./commands/validate.ts";
 export type { Config } from "./defaults.ts";
 export { defaults } from "./defaults.ts";
 export type { LoadedConfig } from "./file/config-file.ts";
 export { CONFIG_PATH, readConfig } from "./file/config-file.ts";
-export type { RouteResult } from "./transitions.ts";
+export * from "./redux/app/actions.ts";
+export { COMMANDS, runCommand } from "./redux/commands.ts";
+export type { Outcome } from "./redux/from-outcome.ts";
+export { fromOutcome } from "./redux/from-outcome.ts";
+export { createAgentStore } from "./redux/index.ts";
+export * from "./redux/selectors.ts";
+export type { RootState } from "./redux/state.ts";

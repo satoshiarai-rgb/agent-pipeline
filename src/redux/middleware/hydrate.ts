@@ -1,0 +1,50 @@
+import { readRecords } from "../../file/run-record.ts";
+import { readStateFile } from "../../file/state-file.ts";
+import { deriveRunStats } from "../../utils/derive-run-stats.ts";
+import { init, restore } from "../actions.ts";
+import { hydrated } from "../info/actions.ts";
+import type { AgentMiddleware } from "./types.ts";
+
+/**
+ * 最初の処理。`init` action を捕まえてファイルを読み、状態を復元する。
+ * 読み取りも action で表すので、**読み取り専用のコマンド（route / label / explain）は
+ * 何も書かない**（書き込み系の middleware は状態を変える action にだけ反応する）。
+ *
+ * 段取り 2 では、ここが `events/*.json` を名前順に読んで**1 件ずつ再生する**形になる。
+ * いまはファイル形式を変えないため、`state.json` と `runs/*.json` から組み立てた
+ * `RESTORE` を 1 回 dispatch する（`RESTORE` はそこで消える）。
+ */
+export const hydrate: AgentMiddleware = () => (store) => (next) => (action) => {
+  if (!init.match(action as never)) return next(action);
+
+  const { dir } = store.getState().info;
+  const file = readStateFile(dir);
+  const records = readRecords(dir);
+  const stats = deriveRunStats(records);
+  // 戻り先は「直前に走ったエージェントのフェーズ」。段取り 2 では畳み込みから直接出る
+  const last = records.reduce<(typeof records)[number] | undefined>(
+    (latest, r) => (!latest || r.started_at > latest.started_at ? r : latest),
+    undefined,
+  );
+
+  store.dispatch(
+    restore({
+      info: {
+        issue: file.meta.issue,
+        branch: file.meta.branch,
+        pipeline_version: file.meta.pipeline_version,
+      },
+      app: {
+        phase: file.phase,
+        blocked_reason: file.blocked_reason,
+        blocked_from: last?.phase ?? null,
+        counts: { total_steps: stats.total_steps, rounds: stats.rounds },
+        in_flight: stats.in_flight
+          ? { agent: stats.in_flight.agent, run_id: stats.in_flight.run_id }
+          : null,
+      },
+    }),
+  );
+  store.dispatch(hydrated(undefined));
+  return undefined; // init は reducer に渡さない
+};

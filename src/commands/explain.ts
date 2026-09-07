@@ -1,6 +1,6 @@
 import { hasAcceptance, readAcceptance } from "../file/acceptance-file.ts";
-import { readStateFile } from "../file/state-file.ts";
-import type { CommandInput } from "./input.ts";
+import { selectBlocked } from "../redux/selectors.ts";
+import type { RootState } from "../redux/state.ts";
 
 /**
  * 止まった理由と次の一手を markdown で返す（`blocked` になったとき PR に貼る）。
@@ -151,12 +151,14 @@ const FALLBACK: Advice = {
  * `blocked` の理由に応じた案内を markdown で返す。
  * blocked でなければ null（呼び出し側はコメントしない）。
  */
-export function explainRun(input: CommandInput): { markdown: string; reason: string } | null {
-  const { dir } = input;
-  const file = readStateFile(dir);
-  if (file.phase !== "blocked") return null;
+export function explainRun(
+  root: RootState,
+  dir: string,
+): { markdown: string; reason: string } | null {
+  const blocked = selectBlocked(root);
+  if (!blocked.blocked) return null;
 
-  const reason = file.blocked_reason ?? "（理由が記録されていません）";
+  const reason = blocked.reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   const context: Context = { dir, reason };
 

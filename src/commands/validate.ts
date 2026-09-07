@@ -1,5 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
+import type { Config } from "../defaults.ts";
 import {
   acceptanceProblems,
   allPassed,
@@ -9,9 +10,8 @@ import {
 import { decisionRecordProblems } from "../file/decision-records.ts";
 import { completedCleanly, readApiErrorStatus } from "../file/execution-log.ts";
 import { latestReviewPath, readVerdict } from "../file/review-file.ts";
+import type { Outcome } from "../redux/from-outcome.ts";
 import type { AgentName } from "../types.ts";
-import type { Outcome } from "./finish.ts";
-import type { CommandInput } from "./input.ts";
 
 // ---------------------------------------------------------------- 検証の部品
 //
@@ -129,17 +129,17 @@ const CONTRACT: Record<AgentName, Contract> = {
  *       完成している。捨てずに契約で見る / K-20）
  *   3. 成果物が契約を満たすか
  */
-export function validateRun(
-  input: CommandInput & {
-    agent: AgentName;
-    /** エージェントの step が失敗したか */
-    agent_failed?: boolean;
-    /** base-action の実行ログ */
-    execution_file?: string | null;
-    /** developer の差分。git status から取ったファイル名の一覧 */
-    changed_files?: string[];
-  },
-): Outcome {
+export function validateRun(input: {
+  dir: string;
+  config: Config;
+  agent: AgentName;
+  /** エージェントの step が失敗したか */
+  agent_failed?: boolean;
+  /** base-action の実行ログ */
+  execution_file?: string | null;
+  /** developer の差分。git status から取ったファイル名の一覧 */
+  changed_files?: string[];
+}): Outcome {
   const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
 
   const apiError = readApiErrorStatus(execution_file);

@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import type { Config } from "../defaults.ts";
 import {
   decisionRecordPath,
   decisionRecordPaths,
@@ -19,7 +20,6 @@ import {
 } from "../file/review-file.ts";
 import { recordPaths } from "../file/run-record.ts";
 import type { AgentName } from "../types.ts";
-import type { CommandInput } from "./input.ts";
 
 // ---------------------------------------------------------------- 入力の部品
 //
@@ -139,20 +139,20 @@ export interface ComposeResult {
  * ここが持つのは「どのファイルをパスとして渡すか」だけで、
  * 何をどう考えるかは役割プロンプト（配布先で差し替え可）の側にある。
  */
-export function composeRun(
-  input: CommandInput & {
-    agent: AgentName;
-    /** 配布先のチェックアウト（既定はカレント） */
-    repo?: string;
-    /** 中央リポジトリのパス。action からは $GITHUB_ACTION_PATH */
-    central: string;
-    /** 組み立てたプロンプトの書き出し先 */
-    out: string;
-    /** この実行の識別。決定記録の名前の prefix になる（契約 §5） */
-    run_id: string;
-    attempt: number;
-  },
-): ComposeResult {
+export function composeRun(input: {
+  dir: string;
+  config: Config;
+  agent: AgentName;
+  /** 配布先のチェックアウト（既定はカレント） */
+  repo?: string;
+  /** 中央リポジトリのパス。action からは $GITHUB_ACTION_PATH */
+  central: string;
+  /** 組み立てたプロンプトの書き出し先 */
+  out: string;
+  /** この実行の識別。決定記録の名前の prefix になる（契約 §5） */
+  run_id: string;
+  attempt: number;
+}): ComposeResult {
   const { dir, agent, repo = ".", central, out, run_id, attempt } = input;
   const roots: PromptRoots = { repo, central };
   const contract = CONTRACT[agent];
