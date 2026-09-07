@@ -76,9 +76,9 @@
   Console 待ちが 11 件（§4）、展開が 2 件（§5）
 - 番号は CLAUDE.md や設計書から参照されているので消していない
 
-**次の一手**: §1 を上から。`stale.yml`（I-8 / A-14。**復旧手段が無い唯一の穴**）→ `install/` 一式（I-12）
-→ `.agent/config.json` のマージ（A-19）→ タグ `v1`（I-13）→ 2 つ目の配布先（R-2）。
-プロンプトの直し（A-48）は独立して先に入れてもよい。
+**次の一手**: `install/` 一式（I-12）→ `.agent/config.json` のマージ（A-19）→ タグ `v1`（I-13）
+→ 2 つ目の配布先（R-2）。プロンプトの直し（A-48）は独立して先に入れてもよい。
+`stale.yml`（I-8 / A-14）は発生条件が狭く手で直せるため後回しにした（§1 の末尾に判断を残した）。
 
 ---
 
@@ -119,7 +119,6 @@
 
 棚卸し（2026-09-07）後に本当に残っているもの。おおむね上から順に手を動かせる。
 
-- [ ] I-8 / A-14: **`stale.yml`（stale 検知）。** stale 検知の巡回を追加する。`run` job が job タイムアウトで落ちると `finalize` が走らず、`last_run.finished_at` が `null` のまま誰も push しないため run が無音で停止する。中央に `stale.yml`（`schedule` 起動、`started_at` が閾値超過かつ `finished_at` が null の run を `blocked` にしてコメント）を追加し、配布先 `agent.yml` から呼ぶ。**`/agent retry` は「レコードが閉じていない」run を断る（K-23）ので、この経路を埋めるまで無音で止まった run に復旧手段が無い** — 構成案 §4.2、設計書 §6.4 手順 4、K-23
 - [ ] I-12: **`install/` 一式（配布先の導入セット）。** `agent.yml`（薄いラッパー。いまの原本は `work/verify/check-dispatch.yml`）/ `config.json` / `conventions.md` / `setup.sh` と `templates/issue-template.yml`。下の A-46 と A-6 はこの作業に含まれる
   - [ ] A-46: **`install/` の前提に「生成物は `.gitignore` で無視されていること」を明記する。** `run` job は `.agent/setup.sh`（依存のインストール）を実行したあと、同じワークスペースで `git add -A` して成果物をコミットする。`git add -A` は `.gitignore` を尊重するので通常は問題にならないが、無視され忘れている生成物（`coverage/`、ビルド出力、`.venv` など）は PR に混ざり、`validate` に渡す `changed-files` も汚す。ハーネス側に機構は足さない（配布先の `.gitignore` の不備であって、パイプラインの欠陥ではない）— I-12
   - [ ] A-6: `.agent/conventions.md` 雛形の「触ってはいけない領域」に `.github/workflows/**` を明記する。developer プロンプトにも同じ制約を書く — K-4、設計書 §5.8
@@ -130,6 +129,11 @@
 - [ ] A-34: **`log.md` の追記も同じ問題を持つ。** 追記専用でも同じ行域（末尾）を触るため、並行時は rebase で競合する（自動マージされて順序が入れ替わる可能性もある）。A-33 の `runs/` レコードがそのまま実行ログになるので、`log.md` は**ハーネスが書く実体ではなく、completing フェーズで `runs/` を時刻順に連結して生成する読み物**に変える。人間が PR で 1 ファイルとして読める利点は維持できる — A-33、設計書 §5.6
 - [ ] A-32: **`finalize` の push 再試行を「rebase」から「状態の再計算」に変える。** 構成案 §5.5 は rejected 時に `git pull --rebase` して 1 回再試行するとしているが、`state.yml` は複数行の YAML なので、2 つの並行更新が別の行を触っていると **rebase が競合を出さずに自動マージし、どちらのランも書いていない状態が生まれる**（例: ラン A が `phase` を、ラン B が `rounds` を更新 → 両方が混ざった状態）。競合すれば `blocked` になって気付けるが、きれいにマージされると誰も気付かない。**唯一の silent corruption 経路**。正しい再試行は「リモートの `state.yml` を fetch して読み直し、遷移を再計算してから書く」。コード変更（developer の成果物）は rebase して構わないが、状態ファイルは再計算する。あわせて穴 2（`concurrency.group` がイベントごとに変わる、A-13 の周辺）を直せば発生確率自体が下がる。**A-33 で state.json の可変値が `phase` と `blocked_reason` だけになったので混ざる余地は小さくなったが、再試行そのものが未実装**（いまは push が rejected したらジョブが落ちるだけ。実機では concurrency で直列化されているため未発生） — 構成案 §5.5、設計書 §6.4 手順 8、A-33
 
+- [ ] I-8 / A-14: **`stale.yml`（stale 検知）。優先度は低い（2026-09-07 に後回しと判断）。** `run` job が **job の**タイムアウトやキャンセルで死ぬと、開始レコードが `finished_at: null` のまま残り、`state.json` はエージェントのフェーズのままで誰も push しないため run が無音で停止する（`route` は `in_flight` を見て何もしない）。
+  - **発生条件は狭い**: エージェント step には自前の `timeout-minutes` があるので時間切れは step 側で先に起き、そのときは `if: always()` で `validate` / `finish` が走って状態が書かれる。job の上限（step + 10 分）に到達するのは、compose・validate・push・ラベルが 10 分を使い切った場合だけ。ほかはランナーの異常と手動キャンセル
+  - **手では直せる**: `runs/*.json` の `finished_at` を埋め、`state.json` の `phase` を戻して push する（`templates/README.md` に手順を書いた）。影響は 1 issue で、PR が動かないので人間は気づく。`/agent retry` も `run_in_progress: <agent> run=<id>` と理由を返す
+  - **やるときは cron ではなく `/agent retry` に寄せる**: 「レコードの `started_at` がそのエージェントの上限 + 余裕より古ければ、retry がそのレコードを閉じて戻す」にすれば、新しいワークフローもブランチの巡回も要らない。諦めるのは自動通知だけ
+  - 以前の記述: 中央に `stale.yml`（`schedule` 起動、`started_at` が閾値超過かつ `finished_at` が null の run を `blocked` にしてコメント）を追加し、配布先 `agent.yml` から呼ぶ — 構成案 §4.2、設計書 §6.4 手順 4、K-23
 ---
 
 ## 2. 判断が必要

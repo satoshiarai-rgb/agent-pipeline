@@ -27,6 +27,17 @@
 - 直前のレコードが閉じていないもの（`finished_at` が `null`）。実行中か、途中で落ちて記録が
   閉じられていない状態。戻しても `route` が「実行中」と見て動かさないため、断る
 
+### レコードが閉じていない run（無音で止まった run）
+
+`/agent retry` が `run_in_progress: <agent> run=<id>` を返す場合、その実行のレコードが
+`finished_at: null` のまま残っている。`run` job が job のタイムアウトやキャンセルで死んだときに起きる。
+**まだ動いている可能性があるので、Actions でその run が終わっているかを確かめてから**次の 2 つを直す。
+
+1. `runs/<agent>-<run_id>-<attempt>.json` の `finished_at` に時刻を入れ、`result` を `agent_failed` にする
+2. `state.json` の `phase` をそのレコードの `phase` に戻し、`blocked_reason` を `null` にする
+
+この 2 つを 1 コミットで push すれば再開する。
+
 別のフェーズから始めたいときや、`pipeline_version_mismatch` で止まったとき（走る前のフェーズが
 state から失われている）は、`state.json` の `phase` を書き換えて push する。
 `agent-work/**` の変更で dispatch が起動するため、それ以外の操作は不要。
