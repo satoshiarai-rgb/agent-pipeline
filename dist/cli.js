@@ -126,9 +126,7 @@ function claudeArgs(a) {
 
 // src/transitions.ts
 var IDLE_PHASES = ["bootstrap", "awaiting_human", "done", "blocked"];
-var TERMINAL_PHASES = ["done", "blocked"];
 var isIdle = (phase) => IDLE_PHASES.includes(phase);
-var isTerminal = (phase) => TERMINAL_PHASES.includes(phase);
 function agentFor(phase, config) {
   return config.transitions[phase]?.agent ?? null;
 }
@@ -686,7 +684,7 @@ function advance(phase, event, config, reason) {
   const next = nextPhase(phase, event, config);
   if (!next)
     return blocked(`transition_incomplete: ${phase} (${event})`);
-  return { phase: next, blocked_reason: null, continue_chain: !isTerminal(next), reason };
+  return { phase: next, blocked_reason: null, continue_chain: !isIdle(next), reason };
 }
 function finish(input) {
   const { phase, records, config, outcome } = input;

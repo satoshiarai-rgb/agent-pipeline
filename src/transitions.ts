@@ -25,13 +25,10 @@ export interface RouteResult {
 /** 遷移表を引くためのイベント。エージェントの実行結果をこの語彙に落としてから渡す */
 type TransitionEvent = "ok" | "approve" | "request_changes" | "pass" | "fail" | "approval";
 
-/** エージェントを起動しない phase */
+/** エージェントを起動しない phase。連鎖（[skip ci] の要否）もこれで決める */
 const IDLE_PHASES: readonly Phase[] = ["bootstrap", "awaiting_human", "done", "blocked"];
-/** これ以上進まない phase */
-const TERMINAL_PHASES: readonly Phase[] = ["done", "blocked"];
 
-const isIdle = (phase: Phase): boolean => IDLE_PHASES.includes(phase);
-export const isTerminal = (phase: Phase): boolean => TERMINAL_PHASES.includes(phase);
+export const isIdle = (phase: Phase): boolean => IDLE_PHASES.includes(phase);
 
 /** その phase で動かすエージェント。遷移表に無ければ null */
 function agentFor(phase: Phase, config: Config): AgentName | null {

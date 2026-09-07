@@ -7,7 +7,7 @@ import {
   saveRecord,
 } from "../file/run-record.ts";
 import { readStateFile, writeStateFile } from "../file/state-file.ts";
-import { isTerminal, nextPhase, roundKeyFor } from "../transitions.ts";
+import { isIdle, nextPhase, roundKeyFor } from "../transitions.ts";
 import type { Phase, RunResult, Verdict } from "../types.ts";
 import { deriveRunStats } from "../utils/derive-run-stats.ts";
 import type { CommandInput } from "./input.ts";
@@ -34,7 +34,10 @@ export interface FinishResult {
   blocked_reason: string | null;
   /**
    * false なら finalize は HEAD コミットに [skip ci] を付けて連鎖を止める
-   * （[skip ci] の判定は push の HEAD コミットに対して行われる。V-5 実測 / A-36）
+   * （[skip ci] の判定は push の HEAD コミットに対して行われる。V-5 実測 / A-36）。
+   * 判定は「次にエージェントを起動するか」で行う。done / blocked に加えて
+   * awaiting_human も止める — 人間のコメントを待つ間に push で起動しても、
+   * route が none を返すだけの run が 1 本増える
    */
   continue_chain: boolean;
   reason: string;
@@ -54,7 +57,7 @@ function advance(
 ): FinishResult {
   const next = nextPhase(phase, event, config);
   if (!next) return blocked(`transition_incomplete: ${phase} (${event})`);
-  return { phase: next, blocked_reason: null, continue_chain: !isTerminal(next), reason };
+  return { phase: next, blocked_reason: null, continue_chain: !isIdle(next), reason };
 }
 
 /**
