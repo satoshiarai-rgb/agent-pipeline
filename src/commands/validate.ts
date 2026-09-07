@@ -11,7 +11,7 @@ import {
   decisionRecordsPath,
   hasDecisionRecords,
 } from "../file/decision-records.ts";
-import { readApiErrorStatus } from "../file/execution-log.ts";
+import { completedCleanly, readApiErrorStatus } from "../file/execution-log.ts";
 import { latestReviewPath, readVerdict } from "../file/review-file.ts";
 import type { AgentName } from "../types.ts";
 import type { Outcome } from "./finish.ts";
@@ -129,7 +129,9 @@ const CONTRACT: Record<AgentName, Contract> = {
  *
  * 見る順序:
  *   1. API エラー（設定ミスと区別できるようステータスを残す / A-31）
- *   2. 実行そのものの失敗
+ *   2. 実行そのものの失敗。ただし**実行ログが正常終了を示すなら成果物で判断する**
+ *      （base-action は max_turns 超過を step の失敗として返すが、そのとき成果物は
+ *       完成している。捨てずに契約で見る / K-20）
  *   3. 成果物が契約を満たすか
  */
 export function validateRun(
@@ -147,7 +149,7 @@ export function validateRun(
 
   const apiError = readApiErrorStatus(execution_file);
   if (apiError !== null) return { result: "api_error", api_error_status: apiError };
-  if (agent_failed) return { result: "agent_failed" };
+  if (agent_failed && !completedCleanly(execution_file)) return { result: "agent_failed" };
 
   const artifacts: Artifacts = { dir, changed: changed_files };
   const contract = CONTRACT[agent];

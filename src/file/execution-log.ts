@@ -8,6 +8,8 @@ import { parseJson } from "../utils/parse-json.ts";
  */
 export interface ResultEvent {
   type?: string;
+  /** success | error_max_turns など。正常終了の判定に使う */
+  subtype?: string;
   /** completed | api_error など */
   terminal_reason?: string;
   /** API エラーのときの HTTP ステータス */
@@ -23,6 +25,23 @@ export function readResultEvent(path: string): ResultEvent | null {
   const events = Array.isArray(parsed) ? parsed : [parsed];
   const results = events.filter((e) => (e as ResultEvent)?.type === "result");
   return (results.at(-1) as ResultEvent) ?? null;
+}
+
+/**
+ * エージェント自身が正常に終わったか。実行ログの最後の result イベントが
+ * `subtype: "success"` かつ `is_error` でないことを見る。
+ *
+ * base-action は step の exit code で「エージェントが死んだ」と
+ * 「正常終了したが num_turns が max_turns を超えた」を区別しない。後者は
+ * **成果物が完成している**ので、step の失敗だけを見て捨てると作業を失う
+ * （実測 2 件: developer 43/40 で $4.05、plan-reviewer 27/25 で $1.42。
+ * どちらも成果物は書き終わっていた）。判定はここに閉じ、成果物の可否は契約に委ねる。
+ */
+export function completedCleanly(path?: string | null): boolean {
+  if (!path) return false;
+  const result = readResultEvent(path);
+  if (!result) return false;
+  return result.subtype === "success" && result.is_error !== true;
 }
 
 /**

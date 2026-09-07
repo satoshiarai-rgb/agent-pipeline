@@ -675,6 +675,14 @@ function readResultEvent(path) {
   const results = events.filter((e) => e?.type === "result");
   return results.at(-1) ?? null;
 }
+function completedCleanly(path) {
+  if (!path)
+    return false;
+  const result = readResultEvent(path);
+  if (!result)
+    return false;
+  return result.subtype === "success" && result.is_error !== true;
+}
 function readApiErrorStatus(path) {
   if (!path)
     return null;
@@ -748,7 +756,7 @@ function validateRun(input) {
   const apiError = readApiErrorStatus(execution_file);
   if (apiError !== null)
     return { result: "api_error", api_error_status: apiError };
-  if (agent_failed)
+  if (agent_failed && !completedCleanly(execution_file))
     return { result: "agent_failed" };
   const artifacts = { dir, changed: changed_files };
   const contract = CONTRACT2[agent];

@@ -209,7 +209,9 @@ validate --dir <run dir> --agent <name> [--execution-file <path>]
 ```
 
 - `result`: `ok` | `invalid` | `agent_failed` | `api_error`
-- エージェントの step が失敗していれば `agent_failed`
+- エージェントの step が失敗していれば `agent_failed`。**ただし実行ログの最後の result が
+  `subtype: "success"` かつ `is_error` でないなら、step の失敗を無視して成果物で判断する**（K-20）。
+  base-action は `num_turns > max_turns` を step の失敗として返すが、そのとき成果物は完成している
 - `execution-file`（base-action の実行ログ）に `terminal_reason: api_error` があれば `api_error` + ステータス
 - 上の検証を満たさなければ `invalid`
 

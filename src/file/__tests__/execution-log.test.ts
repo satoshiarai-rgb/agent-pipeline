@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { readApiErrorStatus, readResultEvent } from "../execution-log.ts";
+import { completedCleanly, readApiErrorStatus, readResultEvent } from "../execution-log.ts";
 
 let dir = "";
 afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));
@@ -62,5 +62,31 @@ describe("readApiErrorStatus", () => {
   test("パスが未指定なら null（実行ログを渡さない場合）", () => {
     expect(readApiErrorStatus(null)).toBeNull();
     expect(readApiErrorStatus(undefined)).toBeNull();
+  });
+});
+
+describe("completedCleanly（K-20）", () => {
+  test("subtype: success かつ is_error でないなら正常終了", () => {
+    const path = write([{ type: "result", subtype: "success", is_error: false }]);
+    expect(completedCleanly(path)).toBe(true);
+  });
+
+  test("max_turns 超過でも result が success なら正常終了として扱う", () => {
+    // base-action は step を失敗にするが、成果物は書き終わっている（実測 2 件）
+    const path = write([{ type: "result", subtype: "success", is_error: false, num_turns: 43 }]);
+    expect(completedCleanly(path)).toBe(true);
+  });
+
+  test("is_error や success 以外の subtype は正常終了にしない", () => {
+    expect(completedCleanly(write([{ type: "result", subtype: "success", is_error: true }]))).toBe(
+      false,
+    );
+    expect(completedCleanly(write([{ type: "result", subtype: "error_max_turns" }]))).toBe(false);
+  });
+
+  test("ログが無い・パスが無いなら正常終了とは言えない", () => {
+    expect(completedCleanly(null)).toBe(false);
+    expect(completedCleanly("/does/not/exist.json")).toBe(false);
+    expect(completedCleanly(write([{ type: "assistant" }]))).toBe(false);
   });
 });

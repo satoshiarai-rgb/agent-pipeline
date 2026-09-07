@@ -256,7 +256,12 @@ jobs:
         run: |
           set -euo pipefail
           if [ "$DRY" = "true" ]; then O="$DUMMY_OUTCOME"; else O="$AGENT_OUTCOME"; fi
-          [ "$O" = "success" ] || echo "agent_failed=true" >> "$GITHUB_OUTPUT"
+          if [ "$O" != "success" ]; then
+            echo "agent_failed=true" >> "$GITHUB_OUTPUT"
+            # 実行ログが正常終了を示す場合は validate が成果物で判断して先に進む（K-20）。
+            # その場合も step が失敗したことは見えるようにしておく（max_turns の見直しに使う）
+            echo "::warning title=エージェントの step が失敗::validate が実行ログと成果物で分類する"
+          fi
 
           # developer の「差分がある」は agent-work/ を除いたコードの差分で見る
           # （acceptance.json の更新だけでは実装したことにならない）。

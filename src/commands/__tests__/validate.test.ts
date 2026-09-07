@@ -54,6 +54,31 @@ describe("実行そのものの失敗", () => {
     expect(r).toEqual({ result: "api_error", api_error_status: 429 });
   });
 
+  test("step が失敗していても、実行ログが正常終了なら成果物で判断する（K-20）", () => {
+    // base-action は max_turns 超過を step の失敗として返すが、成果物は完成している
+    const dir = makeRun();
+    write(dir, "plan.md", plan);
+    write(dir, "acceptance.json", acceptance());
+    const log = write(
+      dir,
+      "log.json",
+      JSON.stringify([{ type: "result", subtype: "success", is_error: false, num_turns: 43 }]),
+    );
+    const r = validateRun({
+      dir,
+      config: c,
+      agent: "planner",
+      agent_failed: true,
+      execution_file: log,
+    });
+    expect(r.result).toBe("ok");
+  });
+
+  test("実行ログが無ければ step の失敗をそのまま agent_failed にする", () => {
+    const r = validateRun({ dir: makeRun(), config: c, agent: "planner", agent_failed: true });
+    expect(r.result).toBe("agent_failed");
+  });
+
   test("正常終了した実行ログでは api_error にしない", () => {
     const dir = makeRun();
     write(dir, "plan.md", plan);
