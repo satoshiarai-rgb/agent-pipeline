@@ -34,22 +34,4 @@ describe("defaults", () => {
       expect(Object.keys(defaults.tool_profiles), name).toContain(a.tools);
     }
   });
-
-  test("遷移表に done の辺は無い（K-10: done は終端）", () => {
-    expect(Object.keys(defaults.transitions).sort()).toEqual([
-      "awaiting_human",
-      "completing",
-      "dev_review",
-      "developing",
-      "plan_review",
-      "planning",
-    ]);
-    expect(defaults.transitions.done).toBeUndefined();
-  });
-
-  test("人間が起こす辺にはエージェントが無い", () => {
-    expect(defaults.transitions.awaiting_human?.agent).toBeUndefined();
-    expect(defaults.transitions.awaiting_human?.on_approval).toBe("developing");
-    expect(defaults.transitions.awaiting_human?.review_kind).toBe("plan");
-  });
 });

@@ -2,16 +2,16 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { config } from "../../../__tests__/helpers.ts";
 import {
   approve,
-  block,
   cleanupRuns,
   makeRun,
   phaseOf,
   requestChanges,
+  retry,
   route,
   runOnce,
 } from "../../../__tests__/run-dir-fixture.ts";
 import { type RunRecord, readRecords } from "../../../file/run-record.ts";
-import { isIdle, nextPhase, reviewKindFor, roundKeyFor } from "../reducer.ts";
+import { agentFor, isIdle, reviewKindFor, roundKeyFor, TRANSITIONS } from "../reducer.ts";
 
 const c = config();
 afterEach(cleanupRuns);
@@ -133,17 +133,11 @@ describe("reducer: 停止条件", () => {
     }
   });
 
-  test("遷移表に行き先が無ければ blocked にする（設定の壊れを静かに通さない）", () => {
-    const broken = config();
-    broken.transitions.plan_review = { agent: "plan-reviewer", round_key: "plan_review" };
-    const f = runOnce(
-      makeRun("plan_review"),
-      "plan-reviewer",
-      { result: "ok", verdict: "approve" },
-      broken,
-    );
+  test("遷移表に行き先が無い組み合わせは blocked にする（黙って通さない）", () => {
+    // planning は verdict による辺を持たない（レビューのフェーズではない）
+    const f = runOnce(makeRun("planning"), "planner", { result: "ok", verdict: "approve" }, c);
     expect(f.phase).toBe("blocked");
-    expect(f.blocked_reason).toContain("transition_incomplete");
+    expect(f.blocked_reason).toContain("transition_incomplete: planning (approve)");
   });
 });
 
@@ -170,13 +164,30 @@ describe("reducer: 正常系の一巡", () => {
   });
 });
 
-describe("block action", () => {
-  test("blockRun は理由を残して blocked にする", () => {
+describe("blocked は導出される状態（K-26）", () => {
+  test("実行が失敗すれば止まる。phase は失敗で潰されない", () => {
     const dir = makeRun("developing");
-    block(dir, "stale: started_at から 60 分経過", c);
-    const s = phaseOf(dir);
-    expect(s.phase).toBe("blocked");
-    expect(s.blocked_reason).toContain("stale");
+    const f = runOnce(dir, "developer", { result: "agent_failed" }, c);
+    expect(f.phase).toBe("blocked");
+    expect(f.blocked_reason).toBe("agent_failed");
+    expect(f.continue_chain).toBe(false);
+    // スナップショットは導出した phase と理由を出す
+    expect(phaseOf(dir).phase).toBe("blocked");
+    expect(phaseOf(dir).blocked_reason).toBe("agent_failed");
+    // 記録済みの停止なので route は何もしない（書き直す必要がない）
+    expect(route(dir, c).action).toBe("none");
+  });
+
+  test("実行回数の総数が上限に達すると止まる（イベントは記録しない）", () => {
+    const dir = makeRun();
+    const limit = c.limits.total_steps;
+    for (let i = 0; i < limit; i += 2) {
+      runOnce(dir, "planner", { result: "ok" }, c);
+      runOnce(dir, "plan-reviewer", { result: "ok", verdict: "request_changes" }, c);
+    }
+    const r = route(dir, c);
+    expect(r.action).toBe("block");
+    expect(r.reason).toMatch(/_exceeded/);
   });
 });
 
@@ -197,48 +208,63 @@ describe("reducer: 人間の action による遷移", () => {
     expect(route(dir, c).run?.agent).toBe("planner");
   });
 
-  test("人間の差し戻しは total_steps を増やさない（A-41）", () => {
+  test("人間の差し戻しは total_steps を増やさない（A-41 がカウント表に出ている）", () => {
     const dir = makeRun("awaiting_human");
     requestChanges(dir, "OWNER", "やり直し", c);
     expect(route(dir, c).total_steps).toBe(0);
   });
+
+  test("retry は停止の理由を消して同じフェーズをやり直す（RETRY_TO / K-27）", () => {
+    const dir = makeRun("developing");
+    runOnce(dir, "developer", { result: "agent_failed" }, c);
+    expect(retry(dir, "OWNER", c)).toEqual({
+      ok: true,
+      phase: "developing",
+      agent: "developer",
+    });
+    expect(phaseOf(dir)).toMatchObject({ phase: "developing", blocked_reason: null });
+  });
 });
 
-describe("nextPhase", () => {
+describe("遷移表（TRANSITIONS。配布先の設定では上書きできない / K-26）", () => {
   test("成功で次に進む", () => {
-    expect(nextPhase("planning", "ok", c)).toBe("plan_review");
-    expect(nextPhase("developing", "ok", c)).toBe("dev_review");
+    expect(TRANSITIONS.planning?.ok).toBe("plan_review");
+    expect(TRANSITIONS.developing?.ok).toBe("dev_review");
   });
 
   test("レビューの verdict で分岐する", () => {
-    expect(nextPhase("plan_review", "approve", c)).toBe("awaiting_human");
-    expect(nextPhase("plan_review", "request_changes", c)).toBe("planning");
-    expect(nextPhase("dev_review", "approve", c)).toBe("completing");
-    expect(nextPhase("dev_review", "request_changes", c)).toBe("developing");
+    expect(TRANSITIONS.plan_review?.approve).toBe("awaiting_human");
+    expect(TRANSITIONS.plan_review?.request_changes).toBe("planning");
+    expect(TRANSITIONS.dev_review?.approve).toBe("completing");
+    expect(TRANSITIONS.dev_review?.request_changes).toBe("developing");
   });
 
-  test("completing は pass / fail", () => {
-    expect(nextPhase("completing", "pass", c)).toBe("done");
-    expect(nextPhase("completing", "fail", c)).toBe("blocked");
+  test("completing の成功は done（失敗は導出される blocked なので辺を持たない / K-26）", () => {
+    expect(TRANSITIONS.completing?.ok).toBe("done");
   });
 
-  test("定義されていない組み合わせは null", () => {
-    expect(nextPhase("planning", "approve", c)).toBeNull();
-    expect(nextPhase("plan_review", "ok", c)).toBeNull();
-    expect(nextPhase("awaiting_human", "ok", c)).toBeNull();
+  test("done は終端で辺を持たない（K-10）", () => {
+    expect(TRANSITIONS.done).toBeUndefined();
   });
-});
 
-describe("遷移表の引き方（roundKeyFor / reviewKindFor / isIdle）", () => {
+  test("エージェントは 5 つのフェーズに割り当たり、人間が起こす遷移には割り当たらない", () => {
+    expect(agentFor("planning")).toBe("planner");
+    expect(agentFor("plan_review")).toBe("plan-reviewer");
+    expect(agentFor("developing")).toBe("developer");
+    expect(agentFor("dev_review")).toBe("dev-reviewer");
+    expect(agentFor("completing")).toBe("completion");
+    expect(agentFor("awaiting_human")).toBeNull();
+  });
+
   test("ラウンドを数えるのはレビューのフェーズだけ", () => {
-    expect(roundKeyFor("plan_review", c)).toBe("plan_review");
-    expect(roundKeyFor("dev_review", c)).toBe("dev_review");
-    expect(roundKeyFor("planning", c)).toBeNull();
+    expect(roundKeyFor("plan_review")).toBe("plan_review");
+    expect(roundKeyFor("dev_review")).toBe("dev_review");
+    expect(roundKeyFor("planning")).toBeNull();
   });
 
   test("人間の差し戻しをどのレビューとして残すか", () => {
-    expect(reviewKindFor("awaiting_human", c)).toBe("plan");
-    expect(reviewKindFor("planning", c)).toBeNull();
+    expect(reviewKindFor("awaiting_human")).toBe("plan");
+    expect(reviewKindFor("planning")).toBeNull();
   });
 
   test("エージェントを起動しないフェーズ（continue_chain の判定に使う）", () => {

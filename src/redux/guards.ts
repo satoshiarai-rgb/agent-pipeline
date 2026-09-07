@@ -2,7 +2,8 @@ import type { Config } from "../defaults.ts";
 import type { Action, AnyAction } from "../utils/typescript-fsa.ts";
 import type { AppPayload, Origin } from "./app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "./app/actions.ts";
-import { nextPhase, type TransitionEvent } from "./app/reducer.ts";
+import { TRANSITIONS } from "./app/reducer.ts";
+import { selectBlocked } from "./selectors.ts";
 import type { RootState } from "./state.ts";
 
 /**
@@ -26,29 +27,36 @@ const authorized: Guard = (_root, action, config) => {
 };
 
 /** 対象外のフェーズでのコメントは何もしない（取り違えを黙って進めない） */
-const transitionExists =
-  (event: TransitionEvent): Guard =>
-  ({ app }, _action, config) =>
-    nextPhase(app.phase, event, config) ? null : `not_awaiting_approval: phase=${app.phase}`;
+const canApprove: Guard = ({ app }) =>
+  TRANSITIONS[app.phase]?.approval ? null : `not_awaiting_approval: phase=${app.phase}`;
 
-const mustBeBlocked: Guard = ({ app }) =>
-  app.phase === "blocked" ? null : `not_blocked: phase=${app.phase}`;
+const canRequestChanges: Guard = ({ app }) =>
+  TRANSITIONS[app.phase]?.request_changes ? null : `not_awaiting_approval: phase=${app.phase}`;
+
+/** 「止まっている」は導出された状態（`selectBlocked`）で判断する */
+const mustBeBlocked: Guard = (root, _action, config) =>
+  selectBlocked(root, config).blocked ? null : `not_blocked: phase=${root.app.phase}`;
 
 /** 上限で止まったものはやり直しても同じ理由で止まる。issue を分けて立て直す方が正しい */
-const notLimitReached: Guard = ({ app }) =>
-  app.blocked_reason?.includes("_exceeded") ? `limit_reached: ${app.blocked_reason}` : null;
+const notLimitReached: Guard = (root, _action, config) => {
+  const reason = selectBlocked(root, config).reason;
+  return reason?.includes("_exceeded") ? `limit_reached: ${reason}` : null;
+};
 
+/** 実行位置が失われている（スナップショットの phase が blocked のまま復元された場合） */
 const knowsWhereToResume: Guard = ({ app }) =>
-  app.blocked_from ? null : "no_records: 実行の記録が無いので戻る先が決まらない";
+  app.phase === "blocked" ? "no_records: 実行の記録が無いので戻る先が決まらない" : null;
 
 /** route は実行中のレコードを見て何もしないので、戻しても静かに止まったままになる */
 const notInFlight: Guard = ({ app }) =>
-  app.in_flight ? `run_in_progress: ${app.in_flight.agent} run=${app.in_flight.run_id}` : null;
+  app.in_flight_agent
+    ? `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}`
+    : null;
 
 /** action ごとのガード。**上から順に適用し、最初に返った理由を使う** */
 const GUARDS: Record<string, Guard[]> = {
-  [humanApproval.type]: [authorized, transitionExists("approval")],
-  [humanRequestChanges.type]: [authorized, transitionExists("request_changes")],
+  [humanApproval.type]: [authorized, canApprove],
+  [humanRequestChanges.type]: [authorized, canRequestChanges],
   [retry.type]: [authorized, mustBeBlocked, notLimitReached, knowsWhereToResume, notInFlight],
 };
 

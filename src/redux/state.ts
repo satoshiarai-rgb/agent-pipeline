@@ -10,5 +10,14 @@ export interface RootState {
 /** `RESTORE` の payload（既存のファイルから戻す値）。段取り 2 で消える */
 export interface RestorePayload {
   info: Pick<InfoState, "issue" | "branch" | "pipeline_version">;
-  app: Pick<AppState, "phase" | "blocked_reason" | "blocked_from" | "counts" | "in_flight">;
+  app: Pick<
+    AppState,
+    | "phase"
+    | "failure_reason"
+    | "total_steps"
+    | "plan_review_rounds"
+    | "dev_review_rounds"
+    | "in_flight_agent"
+    | "in_flight_run_id"
+  >;
 }

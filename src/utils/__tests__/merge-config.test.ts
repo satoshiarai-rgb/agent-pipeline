@@ -65,9 +65,12 @@ describe("mergeConfig（受け付けないもの）", () => {
     expect(error({ agents: { planer: { max_turns: 3 } } })).toContain("agents.planer");
   });
 
-  test("状態機械と版の握手は配布先では上書きできない", () => {
-    expect(error({ transitions: {} })).toContain("上書きできません");
+  test("版の握手は配布先では上書きできない", () => {
     expect(error({ pipeline_version: 2 })).toContain("上書きできません");
+  });
+
+  test("状態機械はそもそも設定に無い（遷移表は中央のコードが持つ / K-26）", () => {
+    expect(error({ transitions: {} })).toContain("上書きできません");
   });
 
   test("型が違えばエラー", () => {
@@ -98,7 +101,7 @@ describe("mergeConfig（受け付けないもの）", () => {
   });
 
   test("エラーがあるときは設定を一部だけ適用しない（既定のまま返す）", () => {
-    const r = mergeConfig(base, { limits: { dev_review_rounds: 3 }, transitions: {} });
+    const r = mergeConfig(base, { limits: { dev_review_rounds: 3 }, pipeline_version: 2 });
     expect(r.errors.length).toBe(1);
     expect(r.config).toEqual(base);
   });

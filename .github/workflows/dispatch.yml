@@ -101,13 +101,14 @@ jobs:
           # `git rev-parse --abbrev-ref origin/HEAD` で引けるようにしておく（main / master を問わない）
           git remote set-head origin -a
 
-      # ---- 上限超過・版の不一致: blocked にするだけ（連鎖させない）
+      # ---- 上限超過・版の不一致: 状態を書き直すだけ（連鎖させない）。
+      # 「止まっている」は失敗や上限から導出される状態なので、記録するのは
+      # スナップショットの書き直しだけでよい（K-26）
       - if: needs.route.outputs.action == 'block'
         uses: satoshiarai-rgb/agent-pipeline@main
         with:
-          command: block
+          command: snapshot
           dir: ${{ needs.route.outputs.dir }}
-          reason: ${{ needs.route.outputs.reason }}
 
       - name: blocked を push
         if: needs.route.outputs.action == 'block'

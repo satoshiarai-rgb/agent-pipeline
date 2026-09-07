@@ -34,28 +34,6 @@ var defaults = {
   labels: {
     prefix: "agent:",
     trigger: "agent:go"
-  },
-  transitions: {
-    planning: { agent: "planner", on_ok: "plan_review" },
-    plan_review: {
-      agent: "plan-reviewer",
-      round_key: "plan_review",
-      on_approve: "awaiting_human",
-      on_request_changes: "planning"
-    },
-    developing: { agent: "developer", on_ok: "dev_review" },
-    dev_review: {
-      agent: "dev-reviewer",
-      round_key: "dev_review",
-      on_approve: "completing",
-      on_request_changes: "developing"
-    },
-    completing: { agent: "completion", on_pass: "done", on_fail: "blocked" },
-    awaiting_human: {
-      on_approval: "developing",
-      on_request_changes: "planning",
-      review_kind: "plan"
-    }
   }
 };
 
@@ -643,47 +621,41 @@ var agentFailed = create2("AGENT_FAILED", undefined, true);
 var humanApproval = create2("HUMAN_APPROVAL");
 var humanRequestChanges = create2("HUMAN_REQUEST_CHANGES");
 var retry = create2("RETRY");
-var block = create2("BLOCK", undefined, true);
-var APP_ACTIONS = [
-  agentStarted,
-  agentOk,
-  review,
-  agentFailed,
-  humanApproval,
-  humanRequestChanges,
-  retry,
-  block
-];
-var isFailure = (a) => agentFailed.match(a) || block.match(a);
 
 // src/redux/app/reducer.ts
 var initialApp = {
   phase: "bootstrap",
-  blocked_reason: null,
-  blocked_from: null,
-  counts: { total_steps: 0, rounds: { plan_review: 0, dev_review: 0 } },
-  in_flight: null,
+  failure_reason: null,
+  total_steps: 0,
+  plan_review_rounds: 0,
+  dev_review_rounds: 0,
+  in_flight_agent: null,
+  in_flight_run_id: null,
   last_reason: null
 };
-function nextPhase(phase, event, config) {
-  const t = config.transitions[phase];
-  if (!t)
-    return null;
-  const edges = {
-    ok: t.on_ok,
-    approve: t.on_approve,
-    request_changes: t.on_request_changes,
-    pass: t.on_pass,
-    fail: t.on_fail,
-    approval: t.on_approval
-  };
-  return edges[event] ?? null;
-}
+var TRANSITIONS = {
+  planning: { agent: "planner", ok: "plan_review" },
+  plan_review: {
+    agent: "plan-reviewer",
+    round_key: "plan_review",
+    approve: "awaiting_human",
+    request_changes: "planning"
+  },
+  developing: { agent: "developer", ok: "dev_review" },
+  dev_review: {
+    agent: "dev-reviewer",
+    round_key: "dev_review",
+    approve: "completing",
+    request_changes: "developing"
+  },
+  completing: { agent: "completion", ok: "done" },
+  awaiting_human: { approval: "developing", request_changes: "planning", review_kind: "plan" }
+};
 var IDLE_PHASES = ["bootstrap", "awaiting_human", "done", "blocked"];
 var isIdle = (phase) => IDLE_PHASES.includes(phase);
-var agentFor = (phase, config) => config.transitions[phase]?.agent ?? null;
-var reviewKindFor = (phase, config) => config.transitions[phase]?.review_kind ?? null;
-var roundKeyFor = (phase, config) => config.transitions[phase]?.round_key ?? null;
+var agentFor = (phase) => TRANSITIONS[phase]?.agent ?? null;
+var reviewKindFor = (phase) => TRANSITIONS[phase]?.review_kind ?? null;
+var roundKeyFor = (phase) => TRANSITIONS[phase]?.round_key ?? null;
 var RETRY_TO = {
   bootstrap: "bootstrap",
   planning: "planning",
@@ -695,149 +667,126 @@ var RETRY_TO = {
   done: "done",
   blocked: "blocked"
 };
-var NONE = { total_steps: 0, rounds: 0 };
-var COUNTS = {
-  [agentStarted.type]: { total_steps: 1, rounds: 1 }
-};
-function nextCounts(s, a, c) {
-  const rule = COUNTS[a.type] ?? NONE;
-  const key = roundKeyFor(s.phase, c);
-  return {
-    total_steps: s.counts.total_steps + rule.total_steps,
-    rounds: key && rule.rounds ? { ...s.counts.rounds, [key]: s.counts.rounds[key] + rule.rounds } : s.counts.rounds
-  };
-}
-var blocked = (reason) => ({
-  phase: "blocked",
-  blocked_reason: reason,
-  reason
-});
-function advance(s, event, c, reason) {
-  const next = nextPhase(s.phase, event, c);
-  if (!next)
-    return blocked(`transition_incomplete: ${s.phase} (${event})`);
-  return { phase: next, blocked_reason: null, reason };
-}
-var EVENT_OF = {
-  [agentOk.type]: "ok",
-  [review.type]: (a) => review.match(a) ? a.payload.verdict : "ok",
-  [humanApproval.type]: "approval",
-  [humanRequestChanges.type]: "request_changes"
-};
-var RULES = [
-  (s, a) => agentStarted.match(a) ? { ...s, reason: "started" } : null,
-  (_s, a) => isFailure(a) ? blocked(a.payload.reason) : null,
-  (s, a) => retry.match(a) && s.blocked_from ? {
-    phase: RETRY_TO[s.blocked_from],
-    blocked_reason: null,
-    reason: `retry: ${s.blocked_from}`
-  } : null,
-  (s, a, c) => {
-    const key = roundKeyFor(s.phase, c);
-    if (!key)
-      return null;
-    if (review.match(a) && a.payload.verdict === "approve")
-      return advance(s, "approve", c, "approve");
-    if (!review.match(a))
-      return blocked("missing_verdict");
-    const used = s.counts.rounds[key];
-    const limit = c.limits[`${key}_rounds`];
-    if (used >= limit)
-      return blocked(`${key}_rounds_exceeded: ${used}/${limit}`);
-    return advance(s, "request_changes", c, `request_changes (${used}/${limit})`);
-  },
-  (s, a, c) => {
-    if (!agentOk.match(a) || nextPhase(s.phase, "pass", c) === null)
-      return null;
-    if (!a.payload.acceptance_passed)
-      return blocked("acceptance_not_passed");
-    return advance(s, "pass", c, "acceptance_passed");
-  },
-  (s, a, c) => {
-    const e = EVENT_OF[a.type];
-    if (!e)
-      return null;
-    const event = typeof e === "function" ? e(a) : e;
-    return advance(s, event, c, event);
-  }
-];
-function nextTransition(s, a, c) {
-  for (const rule of RULES) {
-    const t = rule(s, a, c);
-    if (t)
-      return t;
-  }
-  return { ...s, reason: "no_rule" };
-}
-function nextInFlight(s, a) {
-  if (agentStarted.match(a))
-    return { agent: a.payload.agent, run_id: a.payload.run_id };
-  const closes = agentOk.match(a) || review.match(a) || agentFailed.match(a);
-  return closes ? null : s.in_flight;
-}
-function nextBlockedFrom(s, t) {
-  if (t.phase !== "blocked")
-    return null;
-  return s.phase === "blocked" ? s.blocked_from : s.phase;
-}
-var step = (config) => (state, action) => {
-  const t = nextTransition(state, action, config);
-  return {
-    phase: t.phase,
-    blocked_reason: t.blocked_reason,
-    blocked_from: nextBlockedFrom(state, t),
-    counts: nextCounts(state, action, config),
-    in_flight: nextInFlight(state, action),
-    last_reason: t.reason
-  };
-};
-var createAppReducer = (config) => APP_ACTIONS.reduce((builder, creator) => builder.caseWithAction(creator, step(config)), reducerWithInitialState(initialApp).caseWithAction(restore, (s, a) => ({
+var createAppReducer = (config) => reducerWithInitialState(initialApp).case(restore, (s, p) => ({ ...s, ...p.app })).case(agentStarted, (s, p) => ({
   ...s,
-  ...a.payload.app
-}))).build();
+  total_steps: s.total_steps + 1,
+  plan_review_rounds: s.plan_review_rounds + (s.phase === "plan_review" ? 1 : 0),
+  dev_review_rounds: s.dev_review_rounds + (s.phase === "dev_review" ? 1 : 0),
+  in_flight_agent: p.agent,
+  in_flight_run_id: p.run_id,
+  last_reason: "started"
+})).case(agentFailed, (s, p) => ({
+  ...s,
+  failure_reason: p.reason,
+  in_flight_agent: null,
+  in_flight_run_id: null,
+  last_reason: p.reason
+})).case(agentOk, (s, p) => {
+  const next = TRANSITIONS[s.phase]?.ok;
+  const needsVerdict = roundKeyFor(s.phase) !== null;
+  const acceptance = s.phase === "completing" && !p.acceptance_passed;
+  return {
+    ...s,
+    phase: acceptance || needsVerdict ? s.phase : next ?? s.phase,
+    failure_reason: acceptance ? "acceptance_not_passed" : needsVerdict ? "missing_verdict" : next ? null : `transition_incomplete: ${s.phase} (ok)`,
+    in_flight_agent: null,
+    in_flight_run_id: null,
+    last_reason: s.phase === "completing" ? "acceptance_passed" : "ok"
+  };
+}).case(review, (s, p) => {
+  const key = roundKeyFor(s.phase);
+  const used = key === "dev_review" ? s.dev_review_rounds : s.plan_review_rounds;
+  const limit = key === "dev_review" ? config.limits.dev_review_rounds : config.limits.plan_review_rounds;
+  const exceeded = p.verdict === "request_changes" && used >= limit;
+  const next = TRANSITIONS[s.phase]?.[p.verdict];
+  return {
+    ...s,
+    phase: exceeded ? s.phase : next ?? s.phase,
+    failure_reason: exceeded ? `${key}_rounds_exceeded: ${used}/${limit}` : next ? null : `transition_incomplete: ${s.phase} (${p.verdict})`,
+    in_flight_agent: null,
+    in_flight_run_id: null,
+    last_reason: p.verdict === "approve" ? "approve" : `request_changes (${used}/${limit})`
+  };
+}).case(humanApproval, (s) => ({
+  ...s,
+  phase: TRANSITIONS[s.phase]?.approval ?? s.phase,
+  failure_reason: TRANSITIONS[s.phase]?.approval ? null : `transition_incomplete: ${s.phase} (approval)`,
+  last_reason: "approval"
+})).case(humanRequestChanges, (s) => ({
+  ...s,
+  phase: TRANSITIONS[s.phase]?.request_changes ?? s.phase,
+  failure_reason: TRANSITIONS[s.phase]?.request_changes ? null : `transition_incomplete: ${s.phase} (request_changes)`,
+  last_reason: "request_changes"
+})).case(retry, (s) => ({
+  ...s,
+  phase: RETRY_TO[s.phase],
+  failure_reason: null,
+  last_reason: `retry: ${s.phase}`
+})).build();
 
 // src/redux/selectors.ts
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
 function selectLabel(root, config) {
   const { prefix, trigger } = config.labels;
+  const phase = selectPhase(root, config);
   return {
-    label: labelFor(root.app.phase, prefix),
+    label: labelFor(phase, prefix),
     issue: root.info.issue ?? 0,
-    phase: root.app.phase,
+    phase,
     prefix,
     trigger
   };
 }
-var selectContinueChain = (root) => !isIdle(root.app.phase);
-var selectSnapshot = (root) => ({
+function selectEnvStop(root, config, config_error = null) {
+  const { total_steps } = root.app;
+  const version = root.info.pipeline_version;
+  if (config_error)
+    return `config_invalid: ${config_error}`;
+  if (version !== config.pipeline_version) {
+    return `pipeline_version_mismatch: run=${version} harness=${config.pipeline_version}`;
+  }
+  if (total_steps >= config.limits.total_steps) {
+    return `total_steps_exceeded: ${total_steps}/${config.limits.total_steps}`;
+  }
+  return null;
+}
+function selectBlocked(root, config, config_error = null) {
+  const { phase, failure_reason } = root.app;
+  const reason = failure_reason ?? selectEnvStop(root, config, config_error) ?? (phase === "blocked" ? "（理由が記録されていません）" : null);
+  return { blocked: reason !== null, reason };
+}
+var selectPhase = (root, config, config_error = null) => selectBlocked(root, config, config_error).blocked ? "blocked" : root.app.phase;
+var selectContinueChain = (root, config) => !isIdle(selectPhase(root, config));
+var selectSnapshot = (root, config, config_error = null) => ({
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
-  phase: root.app.phase,
-  blocked_reason: root.app.blocked_reason
+  phase: selectPhase(root, config, config_error),
+  blocked_reason: selectBlocked(root, config, config_error).reason
 });
-var selectBlocked = (root) => root.app.phase === "blocked" ? { blocked: true, reason: root.app.blocked_reason ?? "（理由が記録されていません）" } : { blocked: false, reason: null };
-var versionMismatch = (root, config) => root.info.pipeline_version === config.pipeline_version ? null : `pipeline_version_mismatch: run=${root.info.pipeline_version} harness=${config.pipeline_version}`;
 function selectNextAction(root, config, config_error = null) {
-  const { phase, counts, in_flight } = root.app;
-  const base = { phase, total_steps: counts.total_steps, rounds: counts.rounds };
-  const block2 = (reason) => ({ ...base, action: "block", reason });
-  const none = (reason) => ({ ...base, action: "none", reason });
-  if (config_error)
-    return block2(`config_invalid: ${config_error}`);
-  const mismatch = versionMismatch(root, config);
-  if (mismatch)
-    return block2(mismatch);
-  if (isIdle(phase))
-    return none(`phase_${phase}`);
-  if (in_flight)
-    return none(`run_in_progress: ${in_flight.agent} run=${in_flight.run_id}`);
-  if (counts.total_steps >= config.limits.total_steps) {
-    return block2(`total_steps_exceeded: ${counts.total_steps}/${config.limits.total_steps}`);
+  const { app } = root;
+  const phase = selectPhase(root, config, config_error);
+  const base = {
+    phase,
+    total_steps: app.total_steps,
+    rounds: { plan_review: app.plan_review_rounds, dev_review: app.dev_review_rounds }
+  };
+  const env = selectEnvStop(root, config, config_error);
+  if (env)
+    return { ...base, action: "block", reason: env };
+  if (app.failure_reason || isIdle(phase))
+    return { ...base, action: "none", reason: `phase_${phase}` };
+  if (app.in_flight_agent) {
+    return {
+      ...base,
+      action: "none",
+      reason: `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}`
+    };
   }
-  const agent = agentFor(phase, config);
+  const agent = agentFor(phase);
   if (!agent)
-    return block2(`no_transition_for_phase: ${phase}`);
+    return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
   return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
 }
 
@@ -934,10 +883,11 @@ var ADVICE = [
   {
     when: "pipeline_version_mismatch",
     title: "中央リポジトリの版が合いません",
-    body: ({ dir }) => `進行中の run を壊さないための停止です。
+    body: () => `進行中の run を壊さないための停止です。**この停止は状態から毎回導かれる**ので、
+版が揃った時点で解け、続きから動きます（\`/agent retry\` も要りません）。
 
 1. 配布先が参照している中央のタグと、run の \`pipeline_version\` を揃える
-2. \`${dir}/state.json\` の \`phase\` を戻して push する（この理由では走る前のフェーズが state から失われているため、\`/agent retry\` は使えません）`
+2. 作業ブランチに何か push する（または \`/agent retry\` とコメントする）`
   }
 ];
 var FALLBACK = {
@@ -947,11 +897,11 @@ var FALLBACK = {
 2. 原因を直す
 3. ${retryLine}`
 };
-function explainRun(root, dir) {
-  const blocked2 = selectBlocked(root);
-  if (!blocked2.blocked)
+function explainRun(root, dir, config, config_error = null) {
+  const blocked = selectBlocked(root, config, config_error);
+  if (!blocked.blocked || blocked.reason === null)
     return null;
-  const reason = blocked2.reason;
+  const reason = blocked.reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   const context = { dir, reason };
   return {
@@ -1073,6 +1023,51 @@ function validateRun(input) {
 function readLatestVerdict(dir, kind) {
   const path = latestReviewPath(dir, kind);
   return path ? readVerdict(path) : null;
+}
+
+// src/file/state-file.ts
+import { readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join9 } from "node:path";
+function parseStateFile(text) {
+  const raw = parseJson(text, "state.json");
+  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
+    throw new Error("state.json に issue か phase がありません");
+  }
+  return {
+    meta: {
+      pipeline_version: Number(raw.pipeline_version ?? 0),
+      issue: raw.issue,
+      branch: typeof raw.branch === "string" ? raw.branch : "",
+      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
+    },
+    phase: raw.phase,
+    blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
+  };
+}
+var STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at"
+];
+function renderStateFile(snapshot, now) {
+  const shape = {
+    ...snapshot,
+    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
+  };
+  const ordered = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
+}
+function stateFilePath(dir) {
+  return join9(dir, "state.json");
+}
+function readStateFile(dir) {
+  return parseStateFile(readFileSync9(stateFilePath(dir), "utf8"));
+}
+function writeStateFile(dir, snapshot, now) {
+  writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
 }
 
 // src/redux/from-outcome.ts
@@ -1448,14 +1443,18 @@ var authorized = (_root, action, config) => {
   const association = associationOf(action);
   return config.approvers.includes(association) ? null : `not_authorized: ${association}`;
 };
-var transitionExists = (event) => ({ app }, _action, config) => nextPhase(app.phase, event, config) ? null : `not_awaiting_approval: phase=${app.phase}`;
-var mustBeBlocked = ({ app }) => app.phase === "blocked" ? null : `not_blocked: phase=${app.phase}`;
-var notLimitReached = ({ app }) => app.blocked_reason?.includes("_exceeded") ? `limit_reached: ${app.blocked_reason}` : null;
-var knowsWhereToResume = ({ app }) => app.blocked_from ? null : "no_records: 実行の記録が無いので戻る先が決まらない";
-var notInFlight = ({ app }) => app.in_flight ? `run_in_progress: ${app.in_flight.agent} run=${app.in_flight.run_id}` : null;
+var canApprove = ({ app }) => TRANSITIONS[app.phase]?.approval ? null : `not_awaiting_approval: phase=${app.phase}`;
+var canRequestChanges = ({ app }) => TRANSITIONS[app.phase]?.request_changes ? null : `not_awaiting_approval: phase=${app.phase}`;
+var mustBeBlocked = (root, _action, config) => selectBlocked(root, config).blocked ? null : `not_blocked: phase=${root.app.phase}`;
+var notLimitReached = (root, _action, config) => {
+  const reason = selectBlocked(root, config).reason;
+  return reason?.includes("_exceeded") ? `limit_reached: ${reason}` : null;
+};
+var knowsWhereToResume = ({ app }) => app.phase === "blocked" ? "no_records: 実行の記録が無いので戻る先が決まらない" : null;
+var notInFlight = ({ app }) => app.in_flight_agent ? `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}` : null;
 var GUARDS = {
-  [humanApproval.type]: [authorized, transitionExists("approval")],
-  [humanRequestChanges.type]: [authorized, transitionExists("request_changes")],
+  [humanApproval.type]: [authorized, canApprove],
+  [humanRequestChanges.type]: [authorized, canRequestChanges],
   [retry.type]: [authorized, mustBeBlocked, notLimitReached, knowsWhereToResume, notInFlight]
 };
 function rejection(root, action, config) {
@@ -1482,51 +1481,6 @@ var guard = ({ config }) => (store) => (next) => (action) => {
     return { ok: false, reason };
   return next(action);
 };
-
-// src/file/state-file.ts
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join9 } from "node:path";
-function parseStateFile(text) {
-  const raw = parseJson(text, "state.json");
-  if (typeof raw.phase !== "string" || typeof raw.issue !== "number") {
-    throw new Error("state.json に issue か phase がありません");
-  }
-  return {
-    meta: {
-      pipeline_version: Number(raw.pipeline_version ?? 0),
-      issue: raw.issue,
-      branch: typeof raw.branch === "string" ? raw.branch : "",
-      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
-    },
-    phase: raw.phase,
-    blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
-  };
-}
-var STATE_KEYS = [
-  "pipeline_version",
-  "issue",
-  "branch",
-  "phase",
-  "blocked_reason",
-  "updated_at"
-];
-function renderStateFile(snapshot, now) {
-  const shape = {
-    ...snapshot,
-    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
-  };
-  const ordered = pick(shape, STATE_KEYS);
-  return stringifyJson(ordered);
-}
-function stateFilePath(dir) {
-  return join9(dir, "state.json");
-}
-function readStateFile(dir) {
-  return parseStateFile(readFileSync9(stateFilePath(dir), "utf8"));
-}
-function writeStateFile(dir, snapshot, now) {
-  writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
-}
 
 // src/utils/derive-run-stats.ts
 function deriveRunStats(records) {
@@ -1556,11 +1510,13 @@ var hydrate = () => (store) => (next) => (action) => {
       pipeline_version: file2.meta.pipeline_version
     },
     app: {
-      phase: file2.phase,
-      blocked_reason: file2.blocked_reason,
-      blocked_from: last?.phase ?? null,
-      counts: { total_steps: stats.total_steps, rounds: stats.rounds },
-      in_flight: stats.in_flight ? { agent: stats.in_flight.agent, run_id: stats.in_flight.run_id } : null
+      phase: file2.phase === "blocked" ? last?.phase ?? "blocked" : file2.phase,
+      failure_reason: file2.phase === "blocked" ? file2.blocked_reason : null,
+      total_steps: stats.total_steps,
+      plan_review_rounds: stats.rounds.plan_review,
+      dev_review_rounds: stats.rounds.dev_review,
+      in_flight_agent: stats.in_flight?.agent ?? null,
+      in_flight_run_id: stats.in_flight?.run_id ?? null
     }
   }));
   store.dispatch(hydrated(undefined));
@@ -1568,7 +1524,7 @@ var hydrate = () => (store) => (next) => (action) => {
 };
 
 // src/redux/middleware/review-file.ts
-var reviewFile = ({ config, outputs }) => (store) => (next) => (action) => {
+var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
   const a = action;
@@ -1577,7 +1533,7 @@ var reviewFile = ({ config, outputs }) => (store) => (next) => (action) => {
   const { info, app } = store.getState();
   outputs.review_path = saveReview({
     dir: info.dir,
-    kind: reviewKindFor(app.phase, config) ?? "plan",
+    kind: reviewKindFor(app.phase) ?? "plan",
     verdict: "request_changes",
     reviewer: a.payload?.by ?? "human",
     body: a.payload?.body ?? ""
@@ -1616,7 +1572,7 @@ var runRecord = ({ outputs }) => (store) => (next) => (action) => {
   if (a.type !== agentOk.type && a.type !== review.type && a.type !== agentFailed.type) {
     return next(action);
   }
-  const agent = app.in_flight?.agent;
+  const agent = app.in_flight_agent;
   const p = a.payload ?? {};
   const result = next(action);
   if (!agent)
@@ -1636,14 +1592,15 @@ var runRecord = ({ outputs }) => (store) => (next) => (action) => {
 };
 
 // src/redux/middleware/snapshot.ts
-var snapshot = () => (store) => (next) => (action) => {
+var snapshot = ({ config }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
   const before = store.getState();
   const result = next(action);
   const after = store.getState();
-  if (after.app !== before.app)
-    writeStateFile(after.info.dir, selectSnapshot(after), new Date);
+  if (after.app !== before.app) {
+    writeStateFile(after.info.dir, selectSnapshot(after, config), new Date);
+  }
   return result;
 };
 
@@ -1673,13 +1630,16 @@ var need = (v, name) => {
     throw new MissingArg(name);
   return v;
 };
-var at = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+var timestamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 var runOf = (a) => ({
   run_id: need(a["run-id"], "run-id"),
   attempt: Number(a.attempt ?? 1)
 });
-var harness = () => ({ at: at(), by: "harness" });
-var human = (a) => ({ at: at(), by: `human:${need(a.association, "association")}` });
+var harness = () => ({ timestamp: timestamp(), by: "harness" });
+var human = (a) => ({
+  timestamp: timestamp(),
+  by: `human:${need(a.association, "association")}`
+});
 var outcomeOf = (a) => ({
   result: need(a.result, "result"),
   verdict: a.verdict ?? null,
@@ -1688,10 +1648,10 @@ var outcomeOf = (a) => ({
   api_error_status: a["api-error-status"] ? Number(a["api-error-status"]) : null,
   detail: a.detail
 });
-var transitionOutput = (root) => ({
-  phase: root.app.phase,
-  blocked_reason: root.app.blocked_reason,
-  continue_chain: selectContinueChain(root),
+var transitionOutput = (root, _outputs, config) => ({
+  phase: selectPhase(root, config),
+  blocked_reason: selectBlocked(root, config).reason,
+  continue_chain: selectContinueChain(root, config),
   reason: root.app.last_reason ?? ""
 });
 var COMMANDS = {
@@ -1710,7 +1670,7 @@ var COMMANDS = {
   },
   approve: {
     action: (a) => humanApproval(human(a)),
-    output: (root) => ({ ok: true, phase: root.app.phase })
+    output: (root, _outputs, config) => ({ ok: true, phase: selectPhase(root, config) })
   },
   "request-changes": {
     action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
@@ -1724,17 +1684,21 @@ var COMMANDS = {
     action: (a) => retry(human(a)),
     output: (root, _outputs, config) => ({
       ok: true,
-      phase: root.app.phase,
-      agent: agentFor(root.app.phase, config)
+      phase: selectPhase(root, config),
+      agent: agentFor(selectPhase(root, config))
     })
   },
-  block: {
-    action: (a) => block({ ...harness(), reason: need(a.reason, "reason") }),
-    output: transitionOutput
+  snapshot: {
+    write: (root, config, configError) => {
+      writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date);
+      return transitionOutput(root, null, config);
+    }
   },
   route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
   label: { read: (root, _a, config) => selectLabel(root, config) },
-  explain: { read: (root, a) => explainRun(root, need(a.dir, "dir")) },
+  explain: {
+    read: (root, a, config, configError) => explainRun(root, need(a.dir, "dir"), config, configError)
+  },
   validate: {
     plain: (a, config) => validateRun({
       dir: need(a.dir, "dir"),
@@ -1775,6 +1739,8 @@ function runCommand(command, args, config, configError = null) {
   });
   if (cmd.read)
     return cmd.read(state(), args, config, configError);
+  if (cmd.write)
+    return cmd.write(state(), config, configError);
   const result = store.dispatch(cmd.action(args, config));
   if (isRejection(result))
     return result;
@@ -1791,7 +1757,7 @@ var USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
   approve  /agent approve による遷移           --association
   request-changes  /agent request-changes による差し戻し  --association --body
   retry    blocked から直前のフェーズに戻す    --association
-  block    phase を blocked にする            --reason
+  snapshot state.json を書き直す（止まったことを記録する。blocked は導出される状態）
 
 読むだけ（何も書かない）:
   route    次に何をするかを決める
@@ -1829,7 +1795,6 @@ var { positionals, values } = parseArgs({
     "execution-file": { type: "string" },
     "changed-files": { type: "string" },
     body: { type: "string" },
-    reason: { type: "string" },
     repo: { type: "string" },
     central: { type: "string" },
     out: { type: "string" }

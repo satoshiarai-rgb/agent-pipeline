@@ -8,11 +8,11 @@
 # 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
-description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / retry / block / label / explain / validate / compose）
+description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / retry / snapshot / label / explain / validate / compose）
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | retry | block | label | explain | validate | compose"
+    description: "start | route | finish | approve | request-changes | retry | snapshot | label | explain | validate | compose"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
@@ -41,8 +41,6 @@ inputs:
   # approve / request-changes / retry
   association: { description: "コメント投稿者の author_association", required: false }
   body: { description: "request-changes: コメント本文", required: false }
-  # block
-  reason: { description: "block: blocked_reason に残す理由", required: false }
 
 outputs:
   prompt_path:
@@ -150,7 +148,6 @@ runs:
         CLI_SESSION_ID: ${{ inputs.session-id }}
         CLI_ASSOCIATION: ${{ inputs.association }}
         CLI_BODY: ${{ inputs.body }}
-        CLI_REASON: ${{ inputs.reason }}
         CLI_AGENT_FAILED: ${{ inputs.agent-failed }}
         CLI_EXECUTION_FILE: ${{ inputs.execution-file }}
         CLI_CHANGED_FILES: ${{ inputs.changed-files }}

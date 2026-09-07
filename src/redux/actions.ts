@@ -1,7 +1,4 @@
-import type { Dispatch } from "redux";
-import actionCreatorFactory, { type Action } from "../utils/typescript-fsa.ts";
-import type { AppPayload } from "./app/actions.ts";
-import type { InfoPayload } from "./info/actions.ts";
+import actionCreatorFactory from "../utils/typescript-fsa.ts";
 import type { RestorePayload } from "./state.ts";
 
 /**
@@ -21,7 +18,3 @@ const create = actionCreatorFactory("agent-pipeline");
 
 export const init = create<undefined>("INIT", { hydrate: true });
 export const restore = create<RestorePayload>("RESTORE", { hydrate: true });
-
-/** store が受け取る action の全体。FSA の形を保つため dispatch の型をこれで固定する */
-export type PipelineAction = Action<AppPayload | InfoPayload | RestorePayload>;
-export type PipelineDispatch = Dispatch<PipelineAction>;

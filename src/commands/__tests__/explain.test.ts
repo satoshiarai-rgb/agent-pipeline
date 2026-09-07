@@ -2,7 +2,13 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../../__tests__/helpers.ts";
-import { block, cleanupRuns, cli, makeRun, runOnce } from "../../__tests__/run-dir-fixture.ts";
+import {
+  cleanupRuns,
+  cli,
+  makeBlocked,
+  makeRun,
+  runOnce,
+} from "../../__tests__/run-dir-fixture.ts";
 
 const c = config();
 afterEach(cleanupRuns);
@@ -12,11 +18,7 @@ const explain = (dir: string) =>
   cli("explain", { dir }, c) as { markdown: string; reason: string } | null;
 
 /** 理由を直接与えて案内だけを見る */
-const blocked = (reason: string) => {
-  const dir = makeRun();
-  block(dir, reason, c);
-  return dir;
-};
+const blocked = (reason: string) => makeBlocked(reason);
 
 const acceptance = (dir: string, criteria: unknown[]) => {
   mkdirSync(dir, { recursive: true });
@@ -83,10 +85,11 @@ describe("理由ごとの案内（上から順に最初に一致したもの）"
     expect(md).toContain("/agent retry");
   });
 
-  test("版の不一致は retry ではなく手で直す 1 ケース", () => {
+  test("版の不一致は「揃えれば解ける」と案内する（導出される停止 / K-26）", () => {
     const md = explain(blocked("pipeline_version_mismatch: run=1 harness=2"))?.markdown ?? "";
-    expect(md).toContain("state.json");
-    expect(md).toContain("使えません");
+    expect(md).toContain("pipeline_version");
+    expect(md).toContain("続きから動きます");
+    expect(md).not.toContain("state.json");
   });
 
   test("invalid_artifacts / missing_verdict / api_error はそれぞれの案内になる", () => {

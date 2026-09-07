@@ -16,7 +16,7 @@ const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
   approve  /agent approve による遷移           --association
   request-changes  /agent request-changes による差し戻し  --association --body
   retry    blocked から直前のフェーズに戻す    --association
-  block    phase を blocked にする            --reason
+  snapshot state.json を書き直す（止まったことを記録する。blocked は導出される状態）
 
 読むだけ（何も書かない）:
   route    次に何をするかを決める
@@ -55,7 +55,6 @@ const { positionals, values } = parseArgs({
     "execution-file": { type: "string" },
     "changed-files": { type: "string" },
     body: { type: "string" },
-    reason: { type: "string" },
     repo: { type: "string" },
     central: { type: "string" },
     out: { type: "string" },

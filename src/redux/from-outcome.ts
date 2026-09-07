@@ -21,7 +21,7 @@ export interface Outcome {
 
 /** action に必ず載る「いつ・誰が」と、どの実行か */
 interface Context {
-  at: string;
+  timestamp: string;
   by: string;
   run_id: string;
   attempt: number;

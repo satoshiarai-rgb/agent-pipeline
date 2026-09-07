@@ -26,6 +26,25 @@ export function makeRun(phase: Phase | string = "planning"): string {
   return dir;
 }
 
+/**
+ * スナップショットに「止まった」を書き込む。**`blocked` は action ではなく導出される状態**
+ * なので、任意の理由で止まった run を作るにはスナップショット側に書くのが素直
+ * （`hydrate` が `blocked_reason` を `failure_reason` に写す / K-26）。
+ */
+export function markBlocked(dir: string, reason: string): string {
+  const path = join(dir, "state.json");
+  const state = JSON.parse(readFileSync(path, "utf8"));
+  writeFileSync(
+    path,
+    JSON.stringify({ ...state, phase: "blocked", blocked_reason: reason }, null, 2),
+  );
+  return dir;
+}
+
+/** 止まった run を 1 つ作る */
+export const makeBlocked = (reason: string, phase: Phase | string = "planning"): string =>
+  markBlocked(makeRun(phase), reason);
+
 /** 作った run ディレクトリを片付ける（afterEach から呼ぶ） */
 export function cleanupRuns(): void {
   for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
@@ -98,8 +117,12 @@ export const requestChanges = (dir: string, association: string, body: string, c
 export const retry = (dir: string, association = "OWNER", config = defaults) =>
   cli("retry", { dir, association }, config) as Human & { agent?: AgentName | null };
 
-export const block = (dir: string, reason: string, config = defaults) =>
-  cli("block", { dir, reason }, config) as Transitioned;
+/**
+ * スナップショットを書き直す。**`blocked` は action ではなく導出される状態**なので、
+ * 止まったことを記録するコマンドはこれだけ（K-26）
+ */
+export const snapshot = (dir: string, config = defaults) =>
+  cli("snapshot", { dir }, config) as Transitioned;
 
 export const route = (dir: string, config = defaults) =>
   cli("route", { dir }, config) as NextAction;

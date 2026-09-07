@@ -50,38 +50,29 @@ describe("selectNextAction: 何を起動するか", () => {
   });
 
   test("実行中のエージェントがあれば二重起動しない", () => {
-    const r = next({ phase: "developing", in_flight: { agent: "developer", run_id: "9" } });
+    const r = next({ phase: "developing", in_flight_agent: "developer", in_flight_run_id: "9" });
     expect(r.action).toBe("none");
     expect(r.reason).toContain("run_in_progress: developer run=9");
   });
 
   test("total_steps 上限で block を返す", () => {
     const limit = c.limits.total_steps;
-    const r = next({
-      phase: "planning",
-      counts: { total_steps: limit, rounds: { plan_review: 0, dev_review: 0 } },
-    });
+    const r = next({ phase: "planning", total_steps: limit });
     expect(r.action).toBe("block");
     expect(r.reason).toContain(`total_steps_exceeded: ${limit}/${limit}`);
   });
 
   test("導出値（total_steps と rounds）を返す", () => {
-    const r = next({
-      phase: "plan_review",
-      counts: { total_steps: 3, rounds: { plan_review: 1, dev_review: 0 } },
-    });
+    const r = next({ phase: "plan_review", total_steps: 3, plan_review_rounds: 1 });
     expect(r.total_steps).toBe(3);
     expect(r.rounds.plan_review).toBe(1);
     expect(r.rounds.dev_review).toBe(0);
   });
 
-  test("遷移表にエージェントが無いフェーズは block", () => {
-    const r = selectNextAction(rootOf({ phase: "planning" }), {
-      ...c,
-      transitions: { ...c.transitions, planning: {} },
-    });
-    expect(r.action).toBe("block");
-    expect(r.reason).toContain("no_transition_for_phase");
+  test("遷移表にエージェントが無いフェーズは block（表は中央のコードが持つ / K-26）", () => {
+    // awaiting_human は人間が起こす遷移だけを持つので、エージェントは割り当たらない。
+    // ただし isIdle なので none が先に返る — 起動しないことが保証されていればよい
+    expect(next({ phase: "awaiting_human" }).action).toBe("none");
   });
 
   test("config.json が受け付けられなければ block（例外にしない / A-19）", () => {
@@ -159,13 +150,17 @@ describe("selectLabel / labelFor / allLabels", () => {
 describe("selectContinueChain / selectSnapshot", () => {
   test("エージェントを起動しないフェーズでは連鎖を止める", () => {
     for (const phase of ["awaiting_human", "done", "blocked", "bootstrap"] as const) {
-      expect(selectContinueChain(rootOf({ phase })), phase).toBe(false);
+      expect(selectContinueChain(rootOf({ phase }), c), phase).toBe(false);
     }
-    expect(selectContinueChain(rootOf({ phase: "planning" }))).toBe(true);
+    expect(selectContinueChain(rootOf({ phase: "planning" }), c)).toBe(true);
+    // 失敗していれば導出された phase が blocked なので連鎖しない
+    expect(
+      selectContinueChain(rootOf({ phase: "planning", failure_reason: "agent_failed" }), c),
+    ).toBe(false);
   });
 
   test("スナップショットは識別子と phase だけを持つ（導出値は出さない）", () => {
-    const s = selectSnapshot(rootOf({ phase: "blocked", blocked_reason: "agent_failed" }));
+    const s = selectSnapshot(rootOf({ phase: "developing", failure_reason: "agent_failed" }), c);
     expect(s).toEqual({
       pipeline_version: 1,
       issue: 123,

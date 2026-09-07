@@ -1,3 +1,4 @@
+import type { Config } from "../defaults.ts";
 import { hasAcceptance, readAcceptance } from "../file/acceptance-file.ts";
 import { selectBlocked } from "../redux/selectors.ts";
 import type { RootState } from "../redux/state.ts";
@@ -130,11 +131,12 @@ const ADVICE: Advice[] = [
   {
     when: "pipeline_version_mismatch",
     title: "中央リポジトリの版が合いません",
-    body: ({ dir }) =>
-      `進行中の run を壊さないための停止です。
+    body: () =>
+      `進行中の run を壊さないための停止です。**この停止は状態から毎回導かれる**ので、
+版が揃った時点で解け、続きから動きます（\`/agent retry\` も要りません）。
 
 1. 配布先が参照している中央のタグと、run の \`pipeline_version\` を揃える
-2. \`${dir}/state.json\` の \`phase\` を戻して push する（この理由では走る前のフェーズが state から失われているため、\`/agent retry\` は使えません）`,
+2. 作業ブランチに何か push する（または \`/agent retry\` とコメントする）`,
   },
 ];
 
@@ -154,9 +156,11 @@ const FALLBACK: Advice = {
 export function explainRun(
   root: RootState,
   dir: string,
+  config: Config,
+  config_error: string | null = null,
 ): { markdown: string; reason: string } | null {
-  const blocked = selectBlocked(root);
-  if (!blocked.blocked) return null;
+  const blocked = selectBlocked(root, config, config_error);
+  if (!blocked.blocked || blocked.reason === null) return null;
 
   const reason = blocked.reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;

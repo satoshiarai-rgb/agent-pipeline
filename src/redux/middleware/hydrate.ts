@@ -35,13 +35,15 @@ export const hydrate: AgentMiddleware = () => (store) => (next) => (action) => {
         pipeline_version: file.meta.pipeline_version,
       },
       app: {
-        phase: file.phase,
-        blocked_reason: file.blocked_reason,
-        blocked_from: last?.phase ?? null,
-        counts: { total_steps: stats.total_steps, rounds: stats.rounds },
-        in_flight: stats.in_flight
-          ? { agent: stats.in_flight.agent, run_id: stats.in_flight.run_id }
-          : null,
+        // スナップショットの phase が blocked なら、実行位置は直前に走ったレコードが持つ。
+        // **`phase` は blocked にならない**（止まっているかは `failure_reason` から導出する）
+        phase: file.phase === "blocked" ? (last?.phase ?? "blocked") : file.phase,
+        failure_reason: file.phase === "blocked" ? file.blocked_reason : null,
+        total_steps: stats.total_steps,
+        plan_review_rounds: stats.rounds.plan_review,
+        dev_review_rounds: stats.rounds.dev_review,
+        in_flight_agent: stats.in_flight?.agent ?? null,
+        in_flight_run_id: stats.in_flight?.run_id ?? null,
       },
     }),
   );

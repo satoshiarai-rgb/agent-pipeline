@@ -12,7 +12,7 @@ import { isReplay } from "./types.ts";
  * レビュー種別は**遷移前の phase** から引くので、`next` の前に書く。
  */
 export const reviewFile: AgentMiddleware =
-  ({ config, outputs }) =>
+  ({ outputs }) =>
   (store) =>
   (next) =>
   (action) => {
@@ -23,7 +23,7 @@ export const reviewFile: AgentMiddleware =
     const { info, app } = store.getState();
     outputs.review_path = saveReview({
       dir: info.dir,
-      kind: reviewKindFor(app.phase, config) ?? "plan",
+      kind: reviewKindFor(app.phase) ?? "plan",
       verdict: "request_changes",
       reviewer: a.payload?.by ?? "human",
       body: a.payload?.body ?? "",

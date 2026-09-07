@@ -1,10 +1,18 @@
-import { applyMiddleware, combineReducers, legacy_createStore as createStore } from "redux";
+import {
+  applyMiddleware,
+  combineReducers,
+  legacy_createStore as createStore,
+  type Dispatch,
+} from "redux";
 import type { Config } from "../defaults.ts";
+import type { Action } from "../utils/typescript-fsa.ts";
 import { init } from "./actions.ts";
+import type { AppPayload } from "./app/actions.ts";
 import createAppReducer from "./app/index.ts";
+import type { InfoPayload } from "./info/actions.ts";
 import infoReducer, { configure } from "./info/index.ts";
 import { middlewares } from "./middleware/index.ts";
-import type { RootState } from "./state.ts";
+import type { RestorePayload, RootState } from "./state.ts";
 
 /**
  * store の組み立て。ここが唯一の配線で、判断は reducer とガードの表にある。
@@ -19,6 +27,15 @@ import type { RootState } from "./state.ts";
  * `configureStore` 推奨）になっており、RTK は immer / reselect を連れてきて
  * バンドルの桁が変わるため（K-26）。
  */
+/**
+ * この store が受け取る action の全体（公開 IF）。FSA は「最上位のキーは
+ * type / payload / error / meta だけ」なので Redux 5 の `UnknownAction`
+ * （任意のキーを許す索引シグネチャ付き）には当てはまらない。dispatch の型を
+ * この union で固定して FSA の形を保つ。
+ */
+export type PipelineAction = Action<AppPayload | InfoPayload | RestorePayload>;
+export type PipelineDispatch = Dispatch<PipelineAction>;
+
 export interface Wiring {
   dir: string;
   config: Config;

@@ -1,20 +1,4 @@
-import type { AgentName, Phase, RoundKey } from "./types.ts";
-
-/** 遷移表の 1 エントリ。エージェントが起こす辺と人間が起こす辺の両方を持つ */
-interface TransitionEntry {
-  /** 無ければエージェントを起動しない（人間が起こす遷移） */
-  agent?: AgentName;
-  round_key?: RoundKey;
-  on_ok?: Phase;
-  on_approve?: Phase;
-  on_request_changes?: Phase;
-  on_pass?: Phase;
-  on_fail?: Phase;
-  /** 人間の承認で進む先 */
-  on_approval?: Phase;
-  /** 人間の差し戻しをどちらのレビューとして残すか */
-  review_kind?: "plan" | "dev";
-}
+import type { AgentName } from "./types.ts";
 
 export interface Config {
   pipeline_version: number;
@@ -24,7 +8,6 @@ export interface Config {
   agents: Record<AgentName, { max_turns: number; timeout_minutes: number; tools: string }>;
   approvers: string[];
   labels: { prefix: string; trigger: string };
-  transitions: Partial<Record<Phase, TransitionEntry>>;
 }
 
 /**
@@ -34,6 +17,8 @@ export interface Config {
  *   - YAML パーサが不要になり、バンドルが 248KB → 15KB になった
  * 配布先の `.agent/config.json` による上書きは `src/file/config-file.ts` が重ねる（A-19）。
  * 上書きできるキーと規則は `src/utils/merge-config.ts` の表が正。
+ * **遷移表はここに無い** — 状態機械は中央のもので配布先が変えられてはならないので、
+ * `src/redux/app/reducer.ts` の `TRANSITIONS` が持つ（K-26）。
  */
 export const defaults: Config = {
   /** 中央リポジトリのメジャー版。合わない run は blocked にする */
@@ -95,34 +80,5 @@ export const defaults: Config = {
   labels: {
     prefix: "agent:",
     trigger: "agent:go",
-  },
-
-  /**
-   * 遷移表。エージェントが起こす辺と人間が起こす辺をすべてここに集約する。
-   * agent を持たないエントリはエージェントを起動しない。
-   * done は終端で、辺を持たない（K-10: 作り直しが必要なら新しい issue を立てる）。
-   */
-  transitions: {
-    planning: { agent: "planner", on_ok: "plan_review" },
-    plan_review: {
-      agent: "plan-reviewer",
-      round_key: "plan_review",
-      on_approve: "awaiting_human",
-      on_request_changes: "planning",
-    },
-    developing: { agent: "developer", on_ok: "dev_review" },
-    dev_review: {
-      agent: "dev-reviewer",
-      round_key: "dev_review",
-      on_approve: "completing",
-      on_request_changes: "developing",
-    },
-    completing: { agent: "completion", on_pass: "done", on_fail: "blocked" },
-    /** 人間のコメントで進む/戻る（設計書 §6.5） */
-    awaiting_human: {
-      on_approval: "developing",
-      on_request_changes: "planning",
-      review_kind: "plan",
-    },
   },
 };

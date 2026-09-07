@@ -1,6 +1,6 @@
 import type { Middleware } from "redux";
 import type { Config } from "../../defaults.ts";
-import type { PipelineDispatch } from "../actions.ts";
+import type { PipelineDispatch } from "../index.ts";
 import type { RootState } from "../state.ts";
 
 /**

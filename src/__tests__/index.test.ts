@@ -18,7 +18,6 @@ describe("公開 IF（index.ts）", () => {
   test("CLI の語彙が 11 個そろっている（対応表の取りこぼしを防ぐ）", () => {
     expect(Object.keys(COMMANDS).sort()).toEqual([
       "approve",
-      "block",
       "compose",
       "explain",
       "finish",
@@ -26,6 +25,7 @@ describe("公開 IF（index.ts）", () => {
       "request-changes",
       "retry",
       "route",
+      "snapshot",
       "start",
       "validate",
     ]);

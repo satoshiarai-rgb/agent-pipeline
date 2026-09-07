@@ -55,7 +55,7 @@ export const runRecord: AgentMiddleware =
     if (a.type !== agentOk.type && a.type !== review.type && a.type !== agentFailed.type) {
       return next(action);
     }
-    const agent = app.in_flight?.agent;
+    const agent = app.in_flight_agent;
     const p = (a.payload ?? {}) as {
       run_id: string;
       attempt: number;

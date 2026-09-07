@@ -29,42 +29,88 @@ export const allLabels = (prefix: string, trigger: string): string[] => [
 /** いま issue に付いているべきラベル。どれを外すかはワークフローが prefix で決める */
 export function selectLabel(root: RootState, config: Config) {
   const { prefix, trigger } = config.labels;
+  const phase = selectPhase(root, config);
   return {
-    label: labelFor(root.app.phase, prefix),
+    label: labelFor(phase, prefix),
     issue: root.info.issue ?? 0,
-    phase: root.app.phase,
+    phase,
     prefix,
     trigger,
   };
 }
 
 /**
+ * **「止まっている」は導出された状態。** `blocked` という action は無く、
+ * 次の 4 つのどれかが立っていれば止まっている（K-26）。
+ *
+ *   1. 実行が失敗した / 契約を満たさなかった / 上限に達した（reducer が `failure_reason` に残す）
+ *   2. 配布先の `.agent/config.json` が受け付けられない（`config_error`）
+ *   3. 中央の版が進行中の run と合わない
+ *   4. 実行回数の総数が上限に達した
+ *
+ * 2〜4 は状態と設定から毎回計算できるので、イベントとして記録しない。
+ */
+/**
+ * 状態と設定から毎回計算できる停止の理由（イベントとして記録しない 3 つ）。
+ * `route` はこれを見たときだけスナップショットを書き直させる（まだ記録されていないため）。
+ */
+export function selectEnvStop(
+  root: RootState,
+  config: Config,
+  config_error: string | null = null,
+): string | null {
+  const { total_steps } = root.app;
+  const version = root.info.pipeline_version;
+  if (config_error) return `config_invalid: ${config_error}`;
+  if (version !== config.pipeline_version) {
+    return `pipeline_version_mismatch: run=${version} harness=${config.pipeline_version}`;
+  }
+  if (total_steps >= config.limits.total_steps) {
+    return `total_steps_exceeded: ${total_steps}/${config.limits.total_steps}`;
+  }
+  return null;
+}
+
+export function selectBlocked(
+  root: RootState,
+  config: Config,
+  config_error: string | null = null,
+): { blocked: boolean; reason: string | null } {
+  const { phase, failure_reason } = root.app;
+  const reason =
+    failure_reason ??
+    selectEnvStop(root, config, config_error) ??
+    (phase === "blocked" ? "（理由が記録されていません）" : null);
+  return { blocked: reason !== null, reason };
+}
+
+/** 導出された phase。止まっていれば blocked、そうでなければ実行位置そのもの */
+export const selectPhase = (
+  root: RootState,
+  config: Config,
+  config_error: string | null = null,
+): Phase => (selectBlocked(root, config, config_error).blocked ? "blocked" : root.app.phase);
+
+/**
  * false なら HEAD コミットに `[skip ci]` を付けて連鎖を止める（A-36 / V-5）。
  * 判定は「次にエージェントを起動するか」。`awaiting_human` も止める
  * （人間のコメントを待つ間の push は route が none を返すだけの run を作る）
  */
-export const selectContinueChain = (root: RootState): boolean => !isIdle(root.app.phase);
+export const selectContinueChain = (root: RootState, config: Config): boolean =>
+  !isIdle(selectPhase(root, config));
 
 /** `state.json` に書き出す内容。状態の射影であって、状態の正ではない（K-26） */
-export const selectSnapshot = (root: RootState): Snapshot => ({
+export const selectSnapshot = (
+  root: RootState,
+  config: Config,
+  config_error: string | null = null,
+): Snapshot => ({
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
-  phase: root.app.phase,
-  blocked_reason: root.app.blocked_reason,
+  phase: selectPhase(root, config, config_error),
+  blocked_reason: selectBlocked(root, config, config_error).reason,
 });
-
-/** blocked かどうかと理由（comment subscriber と explain コマンドが使う） */
-export const selectBlocked = (root: RootState) =>
-  root.app.phase === "blocked"
-    ? { blocked: true as const, reason: root.app.blocked_reason ?? "（理由が記録されていません）" }
-    : { blocked: false as const, reason: null };
-
-/** 中央の破壊的変更が進行中の run を壊さないための前提チェック（遷移の規則ではない） */
-const versionMismatch = (root: RootState, config: Config): string | null =>
-  root.info.pipeline_version === config.pipeline_version
-    ? null
-    : `pipeline_version_mismatch: run=${root.info.pipeline_version} harness=${config.pipeline_version}`;
 
 export interface NextAction {
   /** run=実行する / none=何もしない / block=phase を blocked に書く必要がある */
@@ -89,21 +135,29 @@ export function selectNextAction(
   config: Config,
   config_error: string | null = null,
 ): NextAction {
-  const { phase, counts, in_flight } = root.app;
-  const base = { phase, total_steps: counts.total_steps, rounds: counts.rounds };
-  const block = (reason: string): NextAction => ({ ...base, action: "block", reason });
-  const none = (reason: string): NextAction => ({ ...base, action: "none", reason });
+  const { app } = root;
+  const phase = selectPhase(root, config, config_error);
+  const base = {
+    phase,
+    total_steps: app.total_steps,
+    rounds: { plan_review: app.plan_review_rounds, dev_review: app.dev_review_rounds },
+  };
 
-  if (config_error) return block(`config_invalid: ${config_error}`);
-  const mismatch = versionMismatch(root, config);
-  if (mismatch) return block(mismatch);
-  if (isIdle(phase)) return none(`phase_${phase}`);
+  // 環境由来の停止だけは、まだスナップショットに記録されていないので書かせる
+  const env = selectEnvStop(root, config, config_error);
+  if (env) return { ...base, action: "block", reason: env };
+  // 記録済みの停止（失敗・上限・契約違反）と人間待ちは何もしない
+  if (app.failure_reason || isIdle(phase))
+    return { ...base, action: "none", reason: `phase_${phase}` };
   // 実行中の再入による二重起動を防ぐ。ここで止まったまま落ちた run は stale 検知が拾う（A-14）
-  if (in_flight) return none(`run_in_progress: ${in_flight.agent} run=${in_flight.run_id}`);
-  if (counts.total_steps >= config.limits.total_steps) {
-    return block(`total_steps_exceeded: ${counts.total_steps}/${config.limits.total_steps}`);
+  if (app.in_flight_agent) {
+    return {
+      ...base,
+      action: "none",
+      reason: `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}`,
+    };
   }
-  const agent = agentFor(phase, config);
-  if (!agent) return block(`no_transition_for_phase: ${phase}`);
+  const agent = agentFor(phase);
+  if (!agent) return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
   return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
 }

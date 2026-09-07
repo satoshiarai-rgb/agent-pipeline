@@ -41,7 +41,7 @@ describe("writeStateFile", () => {
     const dir = makeRun();
     writeStateFile(
       dir,
-      selectSnapshot(rootOf({ phase: "plan_review" })),
+      selectSnapshot(rootOf({ phase: "plan_review" }), config()),
       new Date("2026-09-04T10:22:00Z"),
     );
     const written = JSON.parse(readFileSync(stateFilePath(dir), "utf8"));
@@ -68,7 +68,10 @@ describe("writeStateFile", () => {
     const dir = makeRun();
     writeStateFile(
       dir,
-      selectSnapshot(rootOf({ phase: "blocked", blocked_reason: "total_steps_exceeded: 12/12" })),
+      selectSnapshot(
+        rootOf({ phase: "planning", failure_reason: "total_steps_exceeded: 12/12" }),
+        config(),
+      ),
       new Date(),
     );
     expect(readStateFile(dir).blocked_reason).toBe("total_steps_exceeded: 12/12");
@@ -76,7 +79,7 @@ describe("writeStateFile", () => {
 
   test("末尾に改行を付ける", () => {
     const dir = makeRun();
-    writeStateFile(dir, selectSnapshot(rootOf({ phase: "done" })), new Date());
+    writeStateFile(dir, selectSnapshot(rootOf({ phase: "done" }), config()), new Date());
     expect(readFileSync(stateFilePath(dir), "utf8").endsWith("}\n")).toBe(true);
   });
 });

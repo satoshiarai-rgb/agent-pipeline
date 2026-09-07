@@ -3,13 +3,21 @@ import { composeRun } from "../commands/compose.ts";
 import { explainRun } from "../commands/explain.ts";
 import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
+import { writeStateFile } from "../file/state-file.ts";
 import type { AgentName, RunResult, Verdict } from "../types.ts";
-import type { PipelineAction } from "./actions.ts";
-import { agentStarted, block, humanApproval, humanRequestChanges, retry } from "./app/actions.ts";
+import { agentStarted, humanApproval, humanRequestChanges, retry } from "./app/actions.ts";
 import { agentFor } from "./app/reducer.ts";
 import { fromOutcome, type Outcome } from "./from-outcome.ts";
+import type { PipelineAction } from "./index.ts";
 import { createAgentStore } from "./index.ts";
-import { selectContinueChain, selectLabel, selectNextAction } from "./selectors.ts";
+import {
+  selectBlocked,
+  selectContinueChain,
+  selectLabel,
+  selectNextAction,
+  selectPhase,
+  selectSnapshot,
+} from "./selectors.ts";
 import type { RootState } from "./state.ts";
 
 /**
@@ -42,7 +50,6 @@ export interface Args {
   "execution-file"?: string;
   "changed-files"?: string;
   body?: string;
-  reason?: string;
   repo?: string;
   central?: string;
   out?: string;
@@ -61,7 +68,7 @@ const need = <T>(v: T | undefined, name: string): T => {
 };
 
 /** ISO 基本形式。イベントのファイル名の先頭になる（段取り 2 で使う） */
-const at = () =>
+const timestamp = () =>
   new Date()
     .toISOString()
     .replace(/[-:]/g, "")
@@ -70,8 +77,11 @@ const runOf = (a: Args) => ({
   run_id: need(a["run-id"], "run-id"),
   attempt: Number(a.attempt ?? 1),
 });
-const harness = () => ({ at: at(), by: "harness" });
-const human = (a: Args) => ({ at: at(), by: `human:${need(a.association, "association")}` });
+const harness = () => ({ timestamp: timestamp(), by: "harness" });
+const human = (a: Args) => ({
+  timestamp: timestamp(),
+  by: `human:${need(a.association, "association")}`,
+});
 
 const outcomeOf = (a: Args): Outcome => ({
   result: need(a.result, "result") as RunResult,
@@ -83,10 +93,10 @@ const outcomeOf = (a: Args): Outcome => ({
 });
 
 /** 遷移の結果を返すコマンドの出力（ワークフローが読む形） */
-const transitionOutput = (root: RootState) => ({
-  phase: root.app.phase,
-  blocked_reason: root.app.blocked_reason,
-  continue_chain: selectContinueChain(root),
+const transitionOutput = (root: RootState, _outputs: unknown, config: Config) => ({
+  phase: selectPhase(root, config),
+  blocked_reason: selectBlocked(root, config).reason,
+  continue_chain: selectContinueChain(root, config),
   reason: root.app.last_reason ?? "",
 });
 
@@ -94,6 +104,8 @@ interface Command {
   action?: (a: Args, config: Config) => PipelineAction;
   output?: (root: RootState, outputs: Record<string, unknown>, config: Config) => unknown;
   read?: (root: RootState, a: Args, config: Config, configError: string | null) => unknown;
+  /** action を使わずにファイルを書き直すもの（スナップショットの再生成） */
+  write?: (root: RootState, config: Config, configError: string | null) => unknown;
   plain?: (a: Args, config: Config) => unknown;
 }
 
@@ -115,7 +127,7 @@ export const COMMANDS: Record<string, Command> = {
   },
   approve: {
     action: (a) => humanApproval(human(a)),
-    output: (root) => ({ ok: true, phase: root.app.phase }),
+    output: (root, _outputs, config) => ({ ok: true, phase: selectPhase(root, config) }),
   },
   "request-changes": {
     action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
@@ -129,17 +141,26 @@ export const COMMANDS: Record<string, Command> = {
     action: (a) => retry(human(a)),
     output: (root, _outputs, config) => ({
       ok: true,
-      phase: root.app.phase,
-      agent: agentFor(root.app.phase, config),
+      phase: selectPhase(root, config),
+      agent: agentFor(selectPhase(root, config)),
     }),
   },
-  block: {
-    action: (a) => block({ ...harness(), reason: need(a.reason, "reason") }),
-    output: transitionOutput,
+  /**
+   * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
+   * なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）。
+   */
+  snapshot: {
+    write: (root, config, configError) => {
+      writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date());
+      return transitionOutput(root, null, config);
+    },
   },
   route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
   label: { read: (root, _a, config) => selectLabel(root, config) },
-  explain: { read: (root, a) => explainRun(root, need(a.dir, "dir")) },
+  explain: {
+    read: (root, a, config, configError) =>
+      explainRun(root, need(a.dir, "dir"), config, configError),
+  },
   validate: {
     plain: (a, config) =>
       validateRun({
@@ -196,6 +217,7 @@ export function runCommand(
     attempt: Number(args.attempt ?? 1),
   });
   if (cmd.read) return cmd.read(state(), args, config, configError);
+  if (cmd.write) return cmd.write(state(), config, configError);
 
   const result = store.dispatch((cmd.action as NonNullable<Command["action"]>)(args, config));
   if (isRejection(result)) return result;

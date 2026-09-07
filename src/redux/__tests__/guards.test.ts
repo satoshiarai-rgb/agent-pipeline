@@ -4,9 +4,9 @@ import { join } from "node:path";
 import { config } from "../../__tests__/helpers.ts";
 import {
   approve,
-  block,
   cleanupRuns,
   makeRun,
+  markBlocked,
   phaseOf,
   requestChanges,
   retry as retryCmd,
@@ -103,7 +103,7 @@ describe("retry: 受け付けないもの", () => {
     const dir = makeRun("developing");
     // start だけして finish していない状態（job タイムアウトや stale の途中）
     start(dir, "developer", "1", c);
-    block(dir, "stale", c);
+    markBlocked(dir, "stale");
 
     const r = retry(dir);
     expect(r.ok).toBe(false);
