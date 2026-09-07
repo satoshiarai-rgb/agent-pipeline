@@ -147,6 +147,18 @@ export function saveRecord(dir: string, record: RunRecord): string {
   return path;
 }
 
+/**
+ * 直前に走ったレコード。無ければ undefined。
+ * ファイル名順はエージェント名の順なので、時刻（started_at）で選ぶ。
+ * `/agent retry` が「戻る先のフェーズ」をここから決める（K-23）。
+ */
+export function latestRecord(records: RunRecord[]): RunRecord | undefined {
+  return records.reduce<RunRecord | undefined>(
+    (latest, r) => (!latest || r.started_at > latest.started_at ? r : latest),
+    undefined,
+  );
+}
+
 /** パスからレコードを引く（ファイル名で照合する） */
 export function findRecord(records: RunRecord[], path: string): RunRecord | undefined {
   return records.find((r) => path.endsWith(recordFileName(r)));

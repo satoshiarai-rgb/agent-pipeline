@@ -4,7 +4,15 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## リポジトリの現状
 
-このリポジトリは**まだ実装が存在しない**。`CLAUDE.md` 以外の文書はすべて `work/` 配下にある。ビルド・lint・テストのコマンドはまだ無く、言語も未確定（設計書は `scripts/state.py` `scripts/labels.py` を Python として想定）。実装を始める際は設計書 §4.1 のディレクトリ構造に従ってファイルを作り、テストコマンドを決めた時点でこの節を書き換えること。
+ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使い、npm 依存はゼロ。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。
+
+```bash
+bun test              # 状態機械・契約・ワークフローの検査（git も GitHub API も触らない）
+bun run lint          # biome
+bun run build         # dist/cli.js を作る。src を変えたらコミットに含める
+```
+
+文書は 2 系統ある。**`docs/` は利用者向け**（パイプラインを自分のリポジトリで使う人が読む）、**`work/` は開発向け**（設計・残作業・検証手順）。利用者に見える振る舞いを変えたら `docs/` 側も直すこと。
 
 ### 文書の役割
 
@@ -16,6 +24,10 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 | `work/agent-contract.md` | **エージェントの入力と出力の契約。** プロンプトは配布先で差し替えられるが、この契約を満たさない出力は `blocked` になる |
 | `work/steps.md` | 段階的な実装手順。Actions の用語解説（§0）とフェーズ A〜E の 15 ステップ |
 | `work/verify/step-a1/check-wif.yml` | Step A-1 の検証ワークフロー原本。検証用リポジトリにコピーして使う |
+| `docs/overview.md` | 利用者向け: 何をするものか、フェーズと成果物、使い方 |
+| `docs/installation.md` | 利用者向け: 導入手順（GitHub App、Secrets、ワークフロー、お試し実行） |
+| `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
+| `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
 
 作業前に `work/worklist.md`（何を漏らさないか）と `work/steps.md`（どの順で手を動かすか）を読むこと。以下は全体像の要約であり、仕様の正は設計書側にある。
 
@@ -42,7 +54,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 
 - **状態の正は git 上の `agent-work/issue-<n>/state.yml` であり、書くのはハーネス（`run.yml` / `approve.yml` / `bootstrap.yml`）のみ。** エージェント（Claude Code 実行）は `state.yml` と `log.md` を書かない。エージェントに自己完了宣言をさせるとクラッシュ時に状態が不整合になる。
 - **issue ラベルは状態の射影**（`scripts/labels.py`）。ラベル操作の失敗が状態を壊してはいけない。
-- **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧も人間が `state.yml` を書き換えて push するだけで再開する。
+- **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧は PR への `/agent retry`（直前のフェーズに戻して再実行 / K-23）か、`state.json` を書き換えて push するだけで再開する。
 - **遷移判定は `reviews/*.md` の frontmatter `verdict`（`approve` | `request_changes`）のみを見る。** 本文は次のエージェントへの入力。frontmatter が欠落・不正なら `blocked`。
 - **レビュアーには成果物と元 issue のみを渡す。** 生成側のセッションログや思考過程は渡さない（追認を防ぐため）。
 - **停止条件は多層。** フェーズ別ラウンド上限（既定 5）と、その上に自走ループの最終防波堤として `total_steps`（既定 24、正常系 5〜8）。`total_steps` はラウンド上限から到達しうる最悪（21）より大きく取る — 先に総数で止まると「どのレビューが収束しなかったか」が残らないため。認可チェックは入口（bootstrap のラベル付与者、approve のコメント投稿者の `author_association`）のみで、dispatch には掛けない。

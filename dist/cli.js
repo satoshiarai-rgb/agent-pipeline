@@ -184,9 +184,12 @@ function route(input) {
 }
 
 // src/commands/human-transition.ts
+function authorized(association, config) {
+  return config.approvers.includes(association);
+}
 function humanTransition(input) {
   const { phase, association, config, event } = input;
-  if (!config.approvers.includes(association)) {
+  if (!authorized(association, config)) {
     return { ok: false, reason: `not_authorized: ${association}` };
   }
   const next = nextPhase(phase, event, config);
@@ -437,6 +440,9 @@ function saveRecord(dir, record) {
   writeFileSync4(path, renderRecord(record));
   return path;
 }
+function latestRecord(records) {
+  return records.reduce((latest, r) => !latest || r.started_at > latest.started_at ? r : latest, undefined);
+}
 function findRecord(records, path) {
   return records.find((r) => path.endsWith(recordFileName(r)));
 }
@@ -509,6 +515,167 @@ function composeRun(input) {
     role_prompt: role.path,
     inputs,
     review_path: review
+  };
+}
+// src/file/acceptance-file.ts
+import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
+import { join as join7 } from "node:path";
+function acceptancePath(dir) {
+  return join7(dir, "acceptance.json");
+}
+function readAcceptance(dir) {
+  const raw = parseJson(readFileSync6(acceptancePath(dir), "utf8"), "acceptance.json");
+  if (!Array.isArray(raw?.criteria))
+    throw new Error("acceptance.json に criteria がありません");
+  return raw;
+}
+function acceptanceProblems(file2) {
+  const problems = [];
+  if (file2.criteria.length === 0)
+    problems.push("criteria が空");
+  const seen = new Set;
+  for (const [i, c] of file2.criteria.entries()) {
+    const at = c?.id ? `criteria[${i}] (${c.id})` : `criteria[${i}]`;
+    if (!c?.id)
+      problems.push(`${at}: id が無い`);
+    else if (seen.has(c.id))
+      problems.push(`${at}: id が重複`);
+    else
+      seen.add(c.id);
+    if (!c?.description)
+      problems.push(`${at}: description が無い`);
+    if (c?.verification !== "automated" && c?.verification !== "manual") {
+      problems.push(`${at}: verification は automated か manual`);
+    }
+    if (c?.verification === "automated" && !c?.command) {
+      problems.push(`${at}: verification が automated なら command が必要`);
+    }
+    if (!["pending", "passed", "failed"].includes(c?.status)) {
+      problems.push(`${at}: status は pending / passed / failed`);
+    }
+    if (c?.status === "passed" && !c?.evidence) {
+      problems.push(`${at}: passed にするなら evidence が必要`);
+    }
+  }
+  return problems;
+}
+function allPassed(file2) {
+  return file2.criteria.length > 0 && file2.criteria.every((c) => c.status === "passed");
+}
+function hasAcceptance(dir) {
+  return existsSync6(acceptancePath(dir));
+}
+
+// src/commands/explain.ts
+function pendingCriteria(dir) {
+  if (!hasAcceptance(dir))
+    return "";
+  const rows = readAcceptance(dir).criteria.filter((c) => c.status !== "passed").map((c) => `| \`${c.id}\` | ${c.verification} | ${c.description} | ${c.evidence ?? "（なし）"} |`);
+  if (rows.length === 0)
+    return "";
+  return [
+    "",
+    "未達の受け入れ条件:",
+    "",
+    "| id | 検証 | 内容 | いまの evidence |",
+    "|---|---|---|---|",
+    ...rows,
+    ""
+  ].join(`
+`);
+}
+var retryLine = "PR に `/agent retry` とコメントする（直前のフェーズからやり直します）";
+var ADVICE = [
+  {
+    when: "acceptance_not_passed",
+    title: "受け入れ条件が全て `passed` になっていません",
+    body: ({ dir }) => `${pendingCriteria(dir)}
+**\`manual\` の項目は人間が確認します。** 手順は次のとおりです。
+
+1. 条件の内容を実際に確かめる（エージェントが代替検証をしている場合は \`evidence\` に何をどこまで確認したかが書かれています）
+2. \`${dir}/acceptance.json\` の該当項目を \`"status": "passed"\` にし、\`"evidence"\` に**何をどう確認したか**を書く（空のままだと契約違反で再び止まります）
+3. その変更を作業ブランチに push する
+4. ${retryLine}
+
+\`automated\` の項目が未達なら、まず \`command\` を手元で走らせて原因を見てください。
+実装を直す必要がある場合は \`/agent retry\` では completing に戻るだけなので、
+\`${dir}/state.json\` の \`phase\` を \`developing\` にして push してください。`
+  },
+  {
+    when: "invalid_artifacts",
+    title: "成果物が契約を満たしていません",
+    body: ({ dir }) => `理由は上の \`blocked_reason\` に出ています（\`work/agent-contract.md\` §4 の検証列に対応します）。
+
+1. 足りない成果物を確かめる（\`${dir}/\` の中身）
+2. プロンプトや設定に原因があれば直す
+3. ${retryLine}`
+  },
+  {
+    when: "missing_verdict",
+    title: "レビューに `verdict` がありません",
+    body: ({ dir }) => `ハーネスはレビューの frontmatter の \`verdict\`（\`approve\` か \`request_changes\`）だけを見て遷移を決めます。
+
+1. \`${dir}/reviews/\` の最新のファイルを見る
+2. 人間が判断を入れるなら frontmatter を直して push する
+3. レビュアーにやり直させるなら ${retryLine}`
+  },
+  {
+    when: "api_error",
+    title: "API のエラーで止まりました",
+    body: () => `ステータスが \`blocked_reason\` に出ています（429 なら使用量の上限、404 ならモデル名などの設定ミス）。
+
+1. 設定ミスなら直す。使用量なら時間を置く
+2. ${retryLine}`
+  },
+  {
+    when: "agent_failed",
+    title: "エージェントの実行そのものが失敗しました",
+    body: () => `Actions の run のログ（\`##[error]\` の行）に原因が出ています。
+
+1. ログを読む。タイムアウトやツールの許可漏れなら設定を直す
+2. ${retryLine}`
+  },
+  {
+    when: "_exceeded",
+    title: "上限に達しました",
+    body: () => `**\`/agent retry\` は受け付けません。** やり直しても同じ理由で止まるためです。
+
+- レビューが収束していないなら、**issue を分けて立て直す**のが正しい対処です（同一 issue の 2 周目は行いません）
+- 上限そのものを変えるなら、中央の \`src/defaults.ts\` の \`limits\` を直します`
+  },
+  {
+    when: "pipeline_version_mismatch",
+    title: "中央リポジトリの版が合いません",
+    body: ({ dir }) => `進行中の run を壊さないための停止です。
+
+1. 配布先が参照している中央のタグと、run の \`pipeline_version\` を揃える
+2. \`${dir}/state.json\` の \`phase\` を戻して push する（この理由では走る前のフェーズが state から失われているため、\`/agent retry\` は使えません）`
+  }
+];
+var FALLBACK = {
+  when: "",
+  title: "止まりました",
+  body: ({ dir }) => `1. \`${dir}/state.json\` の \`blocked_reason\` と Actions のログを読む
+2. 原因を直す
+3. ${retryLine}`
+};
+function explainRun(input) {
+  const { dir } = input;
+  const file2 = readStateFile(dir);
+  if (file2.phase !== "blocked")
+    return null;
+  const reason = file2.blocked_reason ?? "（理由が記録されていません）";
+  const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
+  const context = { dir, reason };
+  return {
+    reason,
+    markdown: `## 止まりました: ${advice.title}
+
+\`\`\`
+blocked_reason: ${reason}
+\`\`\`
+
+${advice.body(context)}`
   };
 }
 // src/commands/finish.ts
@@ -605,6 +772,27 @@ function requestChangesRun(input) {
   writeStateFile(dir, file2, { phase: decision.phase, blocked_reason: null }, now);
   return { ...decision, review_path };
 }
+// src/commands/retry.ts
+function retryRun(input) {
+  const { dir, association, config, now = new Date } = input;
+  if (!authorized(association, config)) {
+    return { ok: false, reason: `not_authorized: ${association}` };
+  }
+  const file2 = readStateFile(dir);
+  if (file2.phase !== "blocked")
+    return { ok: false, reason: `not_blocked: phase=${file2.phase}` };
+  if (file2.blocked_reason?.includes("_exceeded")) {
+    return { ok: false, reason: `limit_reached: ${file2.blocked_reason}` };
+  }
+  const last = latestRecord(readRecords(dir));
+  if (!last)
+    return { ok: false, reason: "no_records: 実行の記録が無いので戻る先が決まらない" };
+  if (last.finished_at === null) {
+    return { ok: false, reason: `run_in_progress: ${last.agent} run=${last.run_id}` };
+  }
+  writeStateFile(dir, file2, { phase: last.phase, blocked_reason: null }, now);
+  return { ok: true, phase: last.phase, agent: last.agent };
+}
 // src/commands/route.ts
 function routeRun(input) {
   const file2 = readStateFile(input.dir);
@@ -638,55 +826,6 @@ function startRun(input) {
 // src/commands/validate.ts
 import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
 import { join as join8 } from "node:path";
-
-// src/file/acceptance-file.ts
-import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
-import { join as join7 } from "node:path";
-function acceptancePath(dir) {
-  return join7(dir, "acceptance.json");
-}
-function readAcceptance(dir) {
-  const raw = parseJson(readFileSync6(acceptancePath(dir), "utf8"), "acceptance.json");
-  if (!Array.isArray(raw?.criteria))
-    throw new Error("acceptance.json に criteria がありません");
-  return raw;
-}
-function acceptanceProblems(file2) {
-  const problems = [];
-  if (file2.criteria.length === 0)
-    problems.push("criteria が空");
-  const seen = new Set;
-  for (const [i, c] of file2.criteria.entries()) {
-    const at = c?.id ? `criteria[${i}] (${c.id})` : `criteria[${i}]`;
-    if (!c?.id)
-      problems.push(`${at}: id が無い`);
-    else if (seen.has(c.id))
-      problems.push(`${at}: id が重複`);
-    else
-      seen.add(c.id);
-    if (!c?.description)
-      problems.push(`${at}: description が無い`);
-    if (c?.verification !== "automated" && c?.verification !== "manual") {
-      problems.push(`${at}: verification は automated か manual`);
-    }
-    if (c?.verification === "automated" && !c?.command) {
-      problems.push(`${at}: verification が automated なら command が必要`);
-    }
-    if (!["pending", "passed", "failed"].includes(c?.status)) {
-      problems.push(`${at}: status は pending / passed / failed`);
-    }
-    if (c?.status === "passed" && !c?.evidence) {
-      problems.push(`${at}: passed にするなら evidence が必要`);
-    }
-  }
-  return problems;
-}
-function allPassed(file2) {
-  return file2.criteria.length > 0 && file2.criteria.every((c) => c.status === "passed");
-}
-function hasAcceptance(dir) {
-  return existsSync6(acceptancePath(dir));
-}
 
 // src/file/execution-log.ts
 import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
@@ -853,8 +992,10 @@ commands:
                                               [--oversize] [--acceptance-passed] [--session-id]
   approve  /approve による遷移                --association
   request-changes  /request-changes による差し戻し  --association --body
+  retry    blocked から直前のフェーズに戻す    --association
   block    phase を blocked にする            --reason
   label    いま付いているべきラベルを返す
+  explain  blocked の理由と次の一手を markdown で返す（PR に貼る）
   validate 成果物が契約を満たすか検証し Outcome を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
@@ -938,8 +1079,12 @@ var run = () => {
         association: need(values.association, "association"),
         body: need(values.body, "body")
       });
+    case "retry":
+      return retryRun({ dir, config: defaults, association: need(values.association, "association") });
     case "block":
       return blockRun({ dir, config: defaults, reason: need(values.reason, "reason") });
+    case "explain":
+      return explainRun({ dir, config: defaults });
     case "label":
       return labelRun({ dir, config: defaults });
     case "validate":

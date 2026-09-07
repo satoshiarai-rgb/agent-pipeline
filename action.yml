@@ -8,11 +8,11 @@
 # 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
-description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / block / label / validate / compose）
+description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / retry / block / label / explain / validate / compose）
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | block | label | validate | compose"
+    description: "start | route | finish | approve | request-changes | retry | block | label | explain | validate | compose"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
@@ -39,7 +39,7 @@ inputs:
   repo: { description: "compose: 配布先のチェックアウト（既定はカレント）", required: false }
   central: { description: "compose: 中央リポジトリのパス（既定は action 自身の展開先）", required: false }
   out: { description: "compose: 組み立てたプロンプトの書き出し先（既定は $RUNNER_TEMP/agent-prompt.md）", required: false }
-  # approve / request-changes
+  # approve / request-changes / retry
   association: { description: "コメント投稿者の author_association", required: false }
   body: { description: "request-changes: コメント本文", required: false }
   # block
@@ -73,6 +73,9 @@ outputs:
   verdict:
     description: "validate: レビューの verdict"
     value: ${{ steps.run.outputs.verdict }}
+  markdown:
+    description: "explain: blocked の理由と次の一手（PR に貼る markdown）"
+    value: ${{ steps.run.outputs.markdown }}
   label:
     description: "label: いま issue に付いているべきラベル"
     value: ${{ steps.run.outputs.label }}
@@ -104,7 +107,7 @@ outputs:
     description: "start: 作成した実行レコードのパス"
     value: ${{ steps.run.outputs.record_path }}
   ok:
-    description: "approve / request-changes: 遷移したかどうか"
+    description: "approve / request-changes / retry: 遷移したかどうか"
     value: ${{ steps.run.outputs.ok }}
   agent:
     description: "route: 実行するエージェント"

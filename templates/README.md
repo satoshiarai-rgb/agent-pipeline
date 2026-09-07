@@ -1,28 +1,14 @@
-# run ディレクトリのファイル
+# 雛形
 
-`agent-work/issue-<n>/` に作られるファイルの説明。書くのはハーネスだけで、
-エージェントは `state.json` と `runs/` を書かない（設計書 §7.1）。
+`agent-work/issue-<n>/`（作業ディレクトリ）に置かれるファイルの雛形。
+`state.json` と `run-record.json` はテストが形を検査している（`src/file/__tests__/`）。
 
-| ファイル | 書く主体 | 内容 |
-|---|---|---|
-| `state.json` | ハーネス | run の状態。可変値は `phase` と `blocked_reason` だけ |
-| `runs/<agent>-<run_id>-<attempt>.json` | ハーネス | 1 実行 1 ファイルの追記専用レコード。`total_steps` と `rounds` はこの数から導出する（A-33） |
-| `plan.md` / `acceptance.json` | planner | 計画と受け入れ条件 |
-| `reviews/plan-NN.md` / `reviews/dev-NN.md` | レビュアー / 人間 | frontmatter の `verdict` だけがハーネスの遷移判断に使われる |
-| `decision-records/<run_id>-<attempt>-<slug>.md` | developer | 実装中の判断。判断 1 つにつき 1 ファイル（追加のみ）。frontmatter は `type` / `title` / `reversibility`。名前の prefix はハーネスが決める |
-| `completion.md` | completion | 完了報告 |
-| `log.md` | ハーネス | `runs/` を時刻順に連結した読み物（completing で生成 / A-34） |
+利用者向けの説明——各ファイルの中身、`blocked` の理由と復旧手順——は
+[`docs/troubleshooting.md`](../docs/troubleshooting.md) にある。ここには実装側の注記だけを置く。
 
-## blocked からの復旧
-
-`state.json` の `phase` を戻したい地点に書き換えて push すれば再開する。
-`agent-work/**` の変更で dispatch が起動するため、それ以外の操作は不要。
-
-`phase` に入る値: `bootstrap` / `planning` / `plan_review` / `awaiting_human` /
-`developing` / `dev_review` / `completing` / `done` / `blocked`
-
-`blocked_reason` の例: `plan_review_rounds_exceeded: 5/5`、`api_error:429`、
-`total_steps_exceeded: 24/24`、`invalid_artifacts: plan.md が無いか空`
-
-JSON にはコメントを書けないため、この説明をファイルの外に置いている。
-`blocked` になったときは issue コメントにも同じ復旧手順を投稿する。
+- 作業ディレクトリを書くのはハーネス（`bootstrap.yml` / `dispatch.yml` / `comment.yml` / `approve.yml`）だけで、
+  エージェントは `state.json` と `runs/` を書かない（設計書 §7.1）
+- `runs/<agent>-<run_id>-<attempt>.json` は追記専用。`total_steps` と `rounds` は
+  ファイル数から導出する（A-33）
+- `log.md`（`runs/` を時刻順に連結した読み物）は未実装（A-34）。
+  実装したら `docs/troubleshooting.md` のファイル一覧にも足すこと

@@ -6,6 +6,7 @@
 # コマンドは名前空間付き（K-13）:
 #   /agent approve
 #   /agent request-changes <理由>
+#   /agent retry                    blocked から直前のフェーズに戻して再実行する（K-23）
 #
 # コメント本文は人間が書いた任意の文字列なので、シェルには必ず env 経由で渡す
 # （run: の中に ${{ }} で展開するとコマンド注入になる）。
@@ -85,6 +86,10 @@ jobs:
           fi
 
           echo "command=$CMD" >> "$GITHUB_OUTPUT"
+          # 知っているコマンドだけ checkout する（未知のコマンドは案内を返すだけ）
+          case "$CMD" in
+            approve | request-changes | retry) echo "known=true" >> "$GITHUB_OUTPUT" ;;
+          esac
           echo "branch=$BR" >> "$GITHUB_OUTPUT"
           echo "dir=agent-work/${BR#claude/}" >> "$GITHUB_OUTPUT"
           {
@@ -94,13 +99,13 @@ jobs:
           } >> "$GITHUB_OUTPUT"
 
       - uses: actions/checkout@v7
-        if: steps.parse.outputs.command == 'approve' || steps.parse.outputs.command == 'request-changes'
+        if: steps.parse.outputs.known == 'true'
         with:
           token: ${{ steps.app.outputs.token }}
           ref: ${{ steps.parse.outputs.branch }}
 
       - name: git identity を App の bot にする
-        if: steps.parse.outputs.command == 'approve' || steps.parse.outputs.command == 'request-changes'
+        if: steps.parse.outputs.known == 'true'
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}
           SLUG: ${{ steps.app.outputs.app-slug }}
@@ -129,15 +134,24 @@ jobs:
           association: ${{ inputs.association }}
           body: ${{ steps.parse.outputs.reason }}
 
+      # ---- /agent retry（blocked からの復旧 / K-23）
+      - id: retry
+        if: steps.parse.outputs.command == 'retry'
+        uses: satoshiarai-rgb/agent-pipeline@main
+        with:
+          command: retry
+          dir: ${{ steps.parse.outputs.dir }}
+          association: ${{ inputs.association }}
+
       - name: 遷移を push して PR に結果を返す
-        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
+        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true' || steps.retry.outputs.ok == 'true'
         env:
           # push は checkout が仕込んだ App トークンで行う。
           # GH_TOKEN は gh（PR へのコメント）だけが使う
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ inputs.pr }}
           CMD: ${{ steps.parse.outputs.command }}
-          PHASE: ${{ steps.approve.outputs.phase || steps.request_changes.outputs.phase }}
+          PHASE: ${{ steps.approve.outputs.phase || steps.request_changes.outputs.phase || steps.retry.outputs.phase }}
         run: |
           set -euo pipefail
           git add -A
@@ -146,7 +160,7 @@ jobs:
           gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "\`/agent $CMD\` を受け付けました。次のフェーズは \`$PHASE\` です。"
 
       - name: 中央リポジトリを .pipeline に取得する
-        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
+        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true' || steps.retry.outputs.ok == 'true'
         uses: actions/checkout@v7
         with:
           repository: satoshiarai-rgb/agent-pipeline
@@ -154,7 +168,7 @@ jobs:
           path: .pipeline
 
       - name: ラベルを phase に合わせる
-        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
+        if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true' || steps.retry.outputs.ok == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_DIR: ${{ steps.parse.outputs.dir }}
@@ -170,17 +184,17 @@ jobs:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ inputs.pr }}
           CMD: ${{ steps.parse.outputs.command }}
-          REASON: ${{ steps.approve.outputs.reason || steps.request_changes.outputs.reason }}
+          REASON: ${{ steps.approve.outputs.reason || steps.request_changes.outputs.reason || steps.retry.outputs.reason }}
         run: |
           set -euo pipefail
           case "$CMD" in
             no-reason)
               gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "差し戻すときは理由を書いてください: \`/agent request-changes <理由>\`。理由はレビューとして残り、次の計画に反映されます。"
               ;;
-            approve | request-changes)
+            approve | request-changes | retry)
               gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "コマンドを受け付けませんでした: \`$REASON\`"
               ;;
             *)
-              gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "\`$CMD\` は知らないコマンドです。使えるのは \`/agent approve\` と \`/agent request-changes <理由>\` です。"
+              gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body "\`$CMD\` は知らないコマンドです。使えるのは \`/agent approve\` / \`/agent request-changes <理由>\` / \`/agent retry\` です。"
               ;;
           esac

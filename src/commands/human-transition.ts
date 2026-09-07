@@ -5,6 +5,14 @@ import type { Phase } from "../types.ts";
 export type HumanDecision = { ok: true; phase: Phase } | { ok: false; reason: string };
 
 /**
+ * コメントを投稿した人が操作してよいか（設計書 §7.3: 認可は入口でのみ見る）。
+ * approve / request-changes / retry で同じ規則を使う。
+ */
+export function authorized(association: string, config: Config): boolean {
+  return config.approvers.includes(association);
+}
+
+/**
  * 人間のコメントによる遷移の共通処理。
  * 遷移先は遷移表が持ち、認可はここで見る（入口でのみ認可する / 設計書 §7.3）。
  */
@@ -16,7 +24,7 @@ export function humanTransition(input: {
   event: "approval" | "request_changes";
 }): HumanDecision {
   const { phase, association, config, event } = input;
-  if (!config.approvers.includes(association)) {
+  if (!authorized(association, config)) {
     return { ok: false, reason: `not_authorized: ${association}` };
   }
   const next = nextPhase(phase, event, config);
