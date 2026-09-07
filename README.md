@@ -53,7 +53,7 @@ push され、それが次のフェーズを起動します。
 | 1 | `planning` | planner | issue 本文、既存コード | `plan.md`（方針と変更対象）、`acceptance.json`（受け入れ条件） | 成果物が契約を満たす |
 | 2 | `plan_review` | plan-reviewer | 計画と受け入れ条件、issue 本文 | `reviews/plan-NN.md`（`approve` / `request_changes`） | `approve` |
 | 3 | `awaiting_human` | **人間** | PR に集まった計画 | PR コメント（承認 or 差し戻しの理由） | `/agent approve` |
-| 4 | `developing` | developer | 計画、受け入れ条件、前回のレビュー | **コード**、`acceptance.json` の結果更新、`decisions.md`（計画に無い判断） | 差分があり、契約を満たす |
+| 4 | `developing` | developer | 計画、受け入れ条件、前回のレビュー | **コード**、`acceptance.json` の結果更新、`decision-records.jsonl`（計画に無い判断） | 差分があり、契約を満たす |
 | 5 | `dev_review` | dev-reviewer | 差分、計画、受け入れ条件、判断の記録 | `reviews/dev-NN.md`（`approve` / `request_changes`） | `approve` |
 | 6 | `completing` | completion | 受け入れ条件、判断の記録、全レビュー | `completion.md`（人間が最初に読む報告） | 受け入れ条件が全て `passed` |
 | 7 | `done` | — | — | draft を外した PR | — |
@@ -70,7 +70,7 @@ agent-work/issue-42/
 ├── issue.md            起点になった issue 本文（データとして保存したもの）
 ├── plan.md             計画: 要件の解釈・前提・変更対象・実装方針・規模判定
 ├── acceptance.json     受け入れ条件 AC-1..N（検証方法・コマンド・結果・根拠）
-├── decisions.md        実装中の判断と、その後戻りの容易さ
+├── decision-records.jsonl  実装中の判断（1 行 1 件。後戻りの容易さ付き）
 ├── reviews/            plan-01.md, plan-02.md, dev-01.md ...（各レビューの判定と指摘）
 ├── completion.md       完了報告（やったこと・条件の結果・人間に確認してほしいこと）
 ├── runs/               各実行の記録（時刻・モデル・結果・セッション ID）

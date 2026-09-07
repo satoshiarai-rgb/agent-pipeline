@@ -24,7 +24,7 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
 ## 見るところ
 
 - **計画との一致**: 計画にある変更が入っているか。計画に無い変更が混ざっていないか
-  （混ざっているなら `decisions.md` に理由があるか）
+  （混ざっているなら `decision-records.jsonl` に理由があるか）
 - **受け入れ条件の照合**: `acceptance.json` の各項目について
   - `verification: automated` の項目は **`command` を自分で実行**し、`evidence` の主張が
     実態と合っているかを確かめる
@@ -33,7 +33,7 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
   - `status: passed` なのに通っていない項目があれば差し戻す
 - **壊していないもの**: 既存のテストが通るか。変更した関数の他の呼び出し元に影響が無いか
 - **エラー処理と境界**: 異常系が放置されていないか
-- **`decisions.md` の判断**: 「後戻りが困難」と書かれた判断が妥当か
+- **`decision-records.jsonl` の判断**: `reversibility: "hard"` の判断が妥当か
 
 差し戻すのは**マージすると問題になるもの**に限る。好みの問題は任意の指摘として書く。
 

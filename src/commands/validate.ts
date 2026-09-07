@@ -6,6 +6,11 @@ import {
   hasAcceptance,
   readAcceptance,
 } from "../file/acceptance-file.ts";
+import {
+  decisionRecordProblems,
+  decisionRecordsPath,
+  hasDecisionRecords,
+} from "../file/decision-records.ts";
 import { readApiErrorStatus } from "../file/execution-log.ts";
 import { latestReviewPath, readVerdict } from "../file/review-file.ts";
 import type { AgentName } from "../types.ts";
@@ -61,6 +66,13 @@ const reviewWithVerdict =
 
 const hasDiff: Check = ({ changed }) => (changed.length > 0 ? null : "差分が無い");
 
+/** 決定記録は任意。書いたなら 1 行 1 レコードとして読める形であること */
+const decisionRecords: Check = ({ dir }) => {
+  if (!hasDecisionRecords(dir)) return null;
+  const problems = decisionRecordProblems(readFileSync(decisionRecordsPath(dir), "utf8"));
+  return problems.length > 0 ? `decision-records.jsonl: ${problems.join(" / ")}` : null;
+};
+
 /** K-4: エージェントは自身の起動条件を書き換えられない */
 const noWorkflowChanges: Check = ({ changed }) => {
   const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
@@ -95,7 +107,7 @@ const CONTRACT: Record<AgentName, Contract> = {
   },
 
   developer: {
-    checks: [hasDiff, noWorkflowChanges, acceptanceSchema],
+    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords],
   },
 
   "dev-reviewer": {

@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { readFileSync as readFileSync8 } from "node:fs";
+import { readFileSync as readFileSync9 } from "node:fs";
 import { parseArgs } from "node:util";
 
 // src/file/state-file.ts
@@ -403,7 +403,7 @@ var latest = (label, kind) => ({
 var ISSUE = file("issue 本文", "issue.md");
 var PLAN = file("計画", "plan.md");
 var ACCEPTANCE = file("受け入れ条件", "acceptance.json");
-var DECISIONS = file("実装中の判断", "decisions.md");
+var DECISIONS = file("実装中の判断", "decision-records.jsonl");
 var PLAN_REVIEW = latest("前回のレビュー", "plan");
 var DEV_REVIEW = latest("前回のレビュー", "dev");
 var ALL_REVIEWS = { label: "レビュー", find: (dir) => reviewPaths(dir) };
@@ -571,8 +571,8 @@ function startRun(input) {
   return { record_path: saveRecord(dir, record) };
 }
 // src/commands/validate.ts
-import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
-import { join as join7 } from "node:path";
+import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
+import { join as join8 } from "node:path";
 
 // src/file/acceptance-file.ts
 import { existsSync as existsSync5, readFileSync as readFileSync5 } from "node:fs";
@@ -623,12 +623,54 @@ function hasAcceptance(dir) {
   return existsSync5(acceptancePath(dir));
 }
 
-// src/file/execution-log.ts
+// src/file/decision-records.ts
 import { existsSync as existsSync6, readFileSync as readFileSync6 } from "node:fs";
+import { join as join7 } from "node:path";
+var REVERSIBILITY = ["easy", "hard"];
+function decisionRecordsPath(dir) {
+  return join7(dir, "decision-records.jsonl");
+}
+function hasDecisionRecords(dir) {
+  return existsSync6(decisionRecordsPath(dir));
+}
+function decisionRecordProblems(text) {
+  const problems = [];
+  const seen = new Set;
+  for (const { text: line, at } of lines(text)) {
+    let r;
+    try {
+      r = parseJson(line, at);
+    } catch (e) {
+      problems.push(`${at}: ${e instanceof Error ? e.message : String(e)}`);
+      continue;
+    }
+    if (!r.id)
+      problems.push(`${at}: id が無い`);
+    else if (seen.has(r.id))
+      problems.push(`${at}: id ${r.id} が重複`);
+    else
+      seen.add(r.id);
+    if (!r.title)
+      problems.push(`${at}: title が無い`);
+    if (!r.decision)
+      problems.push(`${at}: decision が無い`);
+    if (!REVERSIBILITY.includes(r.reversibility)) {
+      problems.push(`${at}: reversibility は easy か hard`);
+    }
+  }
+  return problems;
+}
+function lines(text) {
+  return text.split(`
+`).map((t, i) => ({ text: t.trim(), at: `${i + 1} 行目` })).filter((l) => l.text !== "");
+}
+
+// src/file/execution-log.ts
+import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
 function readResultEvent(path) {
-  if (!existsSync6(path))
+  if (!existsSync7(path))
     return null;
-  const parsed = parseJson(readFileSync6(path, "utf8"), "execution_file");
+  const parsed = parseJson(readFileSync7(path, "utf8"), "execution_file");
   const events = Array.isArray(parsed) ? parsed : [parsed];
   const results = events.filter((e) => e?.type === "result");
   return results.at(-1) ?? null;
@@ -645,10 +687,10 @@ function readApiErrorStatus(path) {
 
 // src/commands/validate.ts
 var nonEmpty = (rel) => ({ dir }) => {
-  const path = join7(dir, rel);
-  return existsSync7(path) && readFileSync7(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+  const path = join8(dir, rel);
+  return existsSync8(path) && readFileSync8(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
 };
-var contains = (rel, needle) => ({ dir }) => readFileSync7(join7(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var contains = (rel, needle) => ({ dir }) => readFileSync8(join8(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
 var acceptanceSchema = ({ dir }) => {
   if (!hasAcceptance(dir))
     return "acceptance.json が無い";
@@ -666,6 +708,12 @@ var reviewWithVerdict = (kind) => ({ dir }) => {
   return readVerdict(path) ? null : `${path} の frontmatter に verdict が無い`;
 };
 var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
+var decisionRecords = ({ dir }) => {
+  if (!hasDecisionRecords(dir))
+    return null;
+  const problems = decisionRecordProblems(readFileSync8(decisionRecordsPath(dir), "utf8"));
+  return problems.length > 0 ? `decision-records.jsonl: ${problems.join(" / ")}` : null;
+};
 var noWorkflowChanges = ({ changed }) => {
   const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
   return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
@@ -674,7 +722,7 @@ var CONTRACT2 = {
   planner: {
     checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
     postProcess: ({ dir }) => {
-      const text = readFileSync7(join7(dir, "plan.md"), "utf8");
+      const text = readFileSync8(join8(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));
       return scale.includes("上限超過") ? { oversize: true } : {};
     }
@@ -684,7 +732,7 @@ var CONTRACT2 = {
     postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
   },
   developer: {
-    checks: [hasDiff, noWorkflowChanges, acceptanceSchema]
+    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords]
   },
   "dev-reviewer": {
     checks: [reviewWithVerdict("dev")],
@@ -871,7 +919,7 @@ var run = () => {
         agent: need(values.agent, "agent"),
         agent_failed: values["agent-failed"],
         execution_file: values["execution-file"] ?? null,
-        changed_files: values["changed-files"] ? readFileSync8(values["changed-files"], "utf8").split(`
+        changed_files: values["changed-files"] ? readFileSync9(values["changed-files"], "utf8").split(`
 `).filter(Boolean) : []
       });
     case "compose":

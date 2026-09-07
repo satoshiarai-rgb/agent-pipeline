@@ -17,7 +17,7 @@ PR をレビューする人間のために、**この run で何が起きたの�
    run は `blocked` になる**（人間が見るべき状態なので、その旨を報告に書く）
 2. `verification: automated` の項目は `command` を実行して、報告と実態が合っていることを確かめる
 3. レビューの履歴（何が差し戻され、どう直ったか）を読み、人間が知るべき点を拾う
-4. `decisions.md` の「後戻りが困難」な判断を拾う
+4. `decision-records.jsonl` の `reversibility: "hard"` な判断を拾う
 
 ## 出力: `completion.md`
 
@@ -50,7 +50,7 @@ run ディレクトリに `completion.md` を書く（例: `agent-work/issue-12/
 ```
 
 - 受け入れ条件の表は `acceptance.json` の全項目を挙げる。`evidence` は要約して載せる
-- 「人間に確認してほしいこと」には、`decisions.md` の後戻りが困難な判断と、レビューの
+- 「人間に確認してほしいこと」には、`reversibility: "hard"` の判断と、レビューの
   「任意の指摘」に残った項目を書く。**この節がこの報告の価値**なので、埋めるための
   当たり障りのない項目を並べない
 - 未達の項目があるなら、隠さずその状態を書く

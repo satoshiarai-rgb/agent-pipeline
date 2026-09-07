@@ -229,6 +229,38 @@ describe("developer", () => {
       validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("evidence");
   });
+
+  test("決定記録は任意。無くても ok", () => {
+    const r = validateRun({
+      dir: setup(),
+      config: c,
+      agent: "developer",
+      changed_files: ["src/a.ts"],
+    });
+    expect(r.result).toBe("ok");
+  });
+
+  test("決定記録の形が壊れていれば invalid（機械が読む形式なので）", () => {
+    const dir = setup();
+    write(dir, "decision-records.jsonl", '{"id":"D-1","title":"x","decision":"y"}\n');
+    expect(
+      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
+    ).toContain("reversibility");
+  });
+
+  test("決定記録が妥当なら ok", () => {
+    const dir = setup();
+    const line = JSON.stringify({
+      id: "D-1",
+      title: "セッション有効期限を 24h にした",
+      decision: "既存の refresh token に揃えた",
+      reversibility: "hard",
+    });
+    write(dir, "decision-records.jsonl", `${line}\n`);
+    expect(
+      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).result,
+    ).toBe("ok");
+  });
 });
 
 describe("completion", () => {

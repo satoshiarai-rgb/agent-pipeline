@@ -43,7 +43,7 @@ const latest = (label: string, kind: "plan" | "dev"): Input => ({
 const ISSUE = file("issue 本文", "issue.md");
 const PLAN = file("計画", "plan.md");
 const ACCEPTANCE = file("受け入れ条件", "acceptance.json");
-const DECISIONS = file("実装中の判断", "decisions.md");
+const DECISIONS = file("実装中の判断", "decision-records.jsonl");
 const PLAN_REVIEW = latest("前回のレビュー", "plan");
 const DEV_REVIEW = latest("前回のレビュー", "dev");
 const ALL_REVIEWS: Input = { label: "レビュー", find: (dir) => reviewPaths(dir) };

@@ -52,6 +52,14 @@ const compose = (dir: string, agent: AgentName, over: { repo?: string } = {}) =>
   return { ...result, text: readFileSync(result.prompt_path, "utf8") };
 };
 
+/** 決定記録の 1 行（契約 §4） */
+const records = `${JSON.stringify({
+  id: "D-1",
+  title: "セッション有効期限を 24h にした",
+  decision: "既存の refresh token に揃えた",
+  reversibility: "easy",
+})}\n`;
+
 const review = (dir: string, kind: "plan" | "dev", n: number) =>
   put(
     dir,
@@ -127,7 +135,7 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     put(dir, "issue.md", "x");
     put(dir, "plan.md", "x");
     put(dir, "acceptance.json", "{}");
-    put(dir, "decisions.md", "x");
+    put(dir, "decision-records.jsonl", records);
     review(dir, "plan", 1);
 
     const { inputs } = compose(dir, "plan-reviewer");
@@ -143,7 +151,7 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     put(dir, "issue.md", "x");
     put(dir, "plan.md", "x");
     put(dir, "acceptance.json", "{}");
-    put(dir, "decisions.md", "x");
+    put(dir, "decision-records.jsonl", records);
     const dev = review(dir, "dev", 1);
 
     const { inputs } = compose(dir, "developer");
@@ -151,7 +159,7 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
       join(dir, "plan.md"),
       join(dir, "acceptance.json"),
       dev,
-      join(dir, "decisions.md"),
+      join(dir, "decision-records.jsonl"),
     ]);
   });
 
