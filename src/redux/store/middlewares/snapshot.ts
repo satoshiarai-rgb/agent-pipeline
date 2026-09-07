@@ -1,6 +1,6 @@
-import { writeStateFile } from "../../file/state-file.ts";
+import { writeStateFile } from "../../../file/state-file.ts";
+import type { RootState } from "../createStore.ts";
 import { selectSnapshot } from "../selectors.ts";
-import type { RootState } from "../state.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";
 

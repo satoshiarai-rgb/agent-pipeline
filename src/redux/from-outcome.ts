@@ -1,6 +1,6 @@
 import type { RunResult, Verdict } from "../types.ts";
 import type { Action } from "../utils/typescript-fsa.ts";
-import { type AppPayload, agentFailed, agentOk, review } from "./app/actions.ts";
+import { type AppPayload, agentFailed, agentOk, review } from "./store/app/actions.ts";
 
 /**
  * エージェント実行 1 回の結果（`validate` の出力）を action に写す。

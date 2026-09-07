@@ -607,12 +607,12 @@ function actionCreatorFactory(prefix, defaultIsError = (p) => p instanceof Error
 }
 var typescript_fsa_default = actionCreatorFactory;
 
-// src/redux/actions.ts
+// src/redux/store/global/actions.ts
 var create = typescript_fsa_default("agent-pipeline");
 var init = create("INIT", { hydrate: true });
 var restore = create("RESTORE", { hydrate: true });
 
-// src/redux/app/actions.ts
+// src/redux/store/app/actions.ts
 var create2 = typescript_fsa_default("agent-pipeline/app");
 var agentStarted = create2("AGENT_STARTED");
 var agentOk = create2("AGENT_OK");
@@ -622,7 +622,7 @@ var humanApproval = create2("HUMAN_APPROVAL");
 var humanRequestChanges = create2("HUMAN_REQUEST_CHANGES");
 var retry = create2("RETRY");
 
-// src/redux/app/reducer.ts
+// src/redux/store/app/reducer.ts
 var initialApp = {
   phase: "bootstrap",
   failure_reason: null,
@@ -724,7 +724,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
   last_reason: `retry: ${s.phase}`
 })).build();
 
-// src/redux/selectors.ts
+// src/redux/store/selectors.ts
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
 function selectLabel(root, config) {
   const { prefix, trigger } = config.labels;
@@ -1414,15 +1414,15 @@ function applyMiddleware(...middlewares) {
   };
 }
 
-// src/redux/app/index.ts
+// src/redux/store/app/index.ts
 var app_default = createAppReducer;
 
-// src/redux/info/actions.ts
+// src/redux/store/info/actions.ts
 var create3 = typescript_fsa_default("agent-pipeline/info");
 var configure = create3("CONFIGURE");
 var hydrated = create3("HYDRATED");
 
-// src/redux/info/reducer.ts
+// src/redux/store/info/reducer.ts
 var initialInfo = {
   issue: null,
   branch: null,
@@ -1434,10 +1434,10 @@ var initialInfo = {
 };
 var infoReducer = reducerWithInitialState(initialInfo).case(configure, (s, p) => ({ ...s, ...p })).case(hydrated, (s) => ({ ...s, hydrated: true })).case(restore, (s, p) => ({ ...s, ...p.info })).build();
 
-// src/redux/info/index.ts
+// src/redux/store/info/index.ts
 var info_default = infoReducer;
 
-// src/redux/guards.ts
+// src/redux/store/guards.ts
 var associationOf = (action) => (action.payload.by ?? "").replace(/^human:/, "");
 var authorized = (_root, action, config) => {
   const association = associationOf(action);
@@ -1466,10 +1466,10 @@ function rejection(root, action, config) {
   return null;
 }
 
-// src/redux/middleware/types.ts
+// src/redux/store/middlewares/types.ts
 var isReplay = (action) => action?.meta?.hydrate === true;
 
-// src/redux/middleware/guard.ts
+// src/redux/store/middlewares/guard.ts
 var guard = ({ config }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
@@ -1494,7 +1494,7 @@ function deriveRunStats(records) {
   };
 }
 
-// src/redux/middleware/hydrate.ts
+// src/redux/store/middlewares/hydrate.ts
 var hydrate = () => (store) => (next) => (action) => {
   if (!init.match(action))
     return next(action);
@@ -1523,7 +1523,7 @@ var hydrate = () => (store) => (next) => (action) => {
   return;
 };
 
-// src/redux/middleware/review-file.ts
+// src/redux/store/middlewares/review-file.ts
 var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
@@ -1541,7 +1541,7 @@ var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
   return next(action);
 };
 
-// src/redux/middleware/run-record.ts
+// src/redux/store/middlewares/run-record.ts
 var resultOf = (type, reason) => {
   if (type !== agentFailed.type)
     return "ok";
@@ -1591,7 +1591,7 @@ var runRecord = ({ outputs }) => (store) => (next) => (action) => {
   return result;
 };
 
-// src/redux/middleware/snapshot.ts
+// src/redux/store/middlewares/snapshot.ts
 var snapshot = ({ config }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
@@ -1604,11 +1604,11 @@ var snapshot = ({ config }) => (store) => (next) => (action) => {
   return result;
 };
 
-// src/redux/middleware/index.ts
+// src/redux/store/middlewares/index.ts
 var middlewares = [guard, snapshot, reviewFile, runRecord, hydrate];
 
-// src/redux/index.ts
-function createAgentStore(input) {
+// src/redux/store/createStore.ts
+function createStore2(input) {
   const outputs = {};
   const wiring = { config: input.config, outputs };
   const store = legacy_createStore(combineReducers({ info: info_default, app: app_default(input.config) }), applyMiddleware(...middlewares.map((m) => m(wiring))));
@@ -1731,7 +1731,7 @@ function runCommand(command, args, config, configError = null) {
   if (cmd.plain)
     return cmd.plain(args, config);
   const dir = need(args.dir, "dir");
-  const { store, outputs, state } = createAgentStore({
+  const { store, outputs, state } = createStore2({
     dir,
     config,
     run_id: args["run-id"] ?? null,

@@ -4,13 +4,7 @@ import { COMMANDS } from "../redux/commands.ts";
 describe("公開 IF（index.ts）", () => {
   test("ワークフローから呼ぶものを re-export している", async () => {
     const api = await import("../index.ts");
-    for (const name of [
-      "runCommand",
-      "createAgentStore",
-      "validateRun",
-      "composeRun",
-      "readConfig",
-    ]) {
+    for (const name of ["runCommand", "createStore", "validateRun", "composeRun", "readConfig"]) {
       expect(typeof api[name as keyof typeof api], name).toBe("function");
     }
   });

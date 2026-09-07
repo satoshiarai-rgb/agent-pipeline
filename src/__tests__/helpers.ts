@@ -1,10 +1,10 @@
 import { type Config, defaults } from "../defaults.ts";
 import type { RunRecord } from "../file/run-record.ts";
-import type { AppState } from "../redux/app/reducer.ts";
-import { initialApp } from "../redux/app/reducer.ts";
-import type { InfoState } from "../redux/info/reducer.ts";
-import { initialInfo } from "../redux/info/reducer.ts";
-import type { RootState } from "../redux/state.ts";
+import type { AppState } from "../redux/store/app/reducer.ts";
+import { initialApp } from "../redux/store/app/reducer.ts";
+import type { RootState } from "../redux/store/createStore.ts";
+import type { InfoState } from "../redux/store/info/reducer.ts";
+import { initialInfo } from "../redux/store/info/reducer.ts";
 import type { AgentName, Verdict } from "../types.ts";
 
 /**

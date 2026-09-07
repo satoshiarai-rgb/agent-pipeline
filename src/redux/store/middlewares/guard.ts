@@ -1,4 +1,4 @@
-import type { AnyAction } from "../../utils/typescript-fsa.ts";
+import type { AnyAction } from "../../../utils/typescript-fsa.ts";
 import { rejection } from "../guards.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";

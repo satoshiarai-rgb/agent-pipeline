@@ -5,11 +5,12 @@ import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/state-file.ts";
 import type { AgentName, RunResult, Verdict } from "../types.ts";
-import { agentStarted, humanApproval, humanRequestChanges, retry } from "./app/actions.ts";
-import { agentFor } from "./app/reducer.ts";
 import { fromOutcome, type Outcome } from "./from-outcome.ts";
-import type { PipelineAction } from "./index.ts";
-import { createAgentStore } from "./index.ts";
+import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
+import { agentFor } from "./store/app/reducer.ts";
+import type { RootState } from "./store/createStore.ts";
+import { createStore } from "./store/createStore.ts";
+import type { PipelineAction } from "./store/global/actions.ts";
 import {
   selectBlocked,
   selectContinueChain,
@@ -17,8 +18,7 @@ import {
   selectNextAction,
   selectPhase,
   selectSnapshot,
-} from "./selectors.ts";
-import type { RootState } from "./state.ts";
+} from "./store/selectors.ts";
 
 /**
  * CLI の語彙 → store 操作の対応表。**判断は 1 つも持たない。**
@@ -210,7 +210,7 @@ export function runCommand(
   if (cmd.plain) return cmd.plain(args, config);
 
   const dir = need(args.dir, "dir");
-  const { store, outputs, state } = createAgentStore({
+  const { store, outputs, state } = createStore({
     dir,
     config,
     run_id: args["run-id"] ?? null,

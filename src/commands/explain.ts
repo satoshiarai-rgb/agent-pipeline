@@ -1,7 +1,7 @@
 import type { Config } from "../defaults.ts";
 import { hasAcceptance, readAcceptance } from "../file/acceptance-file.ts";
-import { selectBlocked } from "../redux/selectors.ts";
-import type { RootState } from "../redux/state.ts";
+import type { RootState } from "../redux/store/createStore.ts";
+import { selectBlocked } from "../redux/store/selectors.ts";
 
 /**
  * 止まった理由と次の一手を markdown で返す（`blocked` になったとき PR に貼る）。

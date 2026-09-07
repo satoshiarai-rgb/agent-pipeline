@@ -1,7 +1,7 @@
-import type { Config } from "../../defaults.ts";
-import type { AgentName, Phase, RoundKey } from "../../types.ts";
-import { reducerWithInitialState } from "../../utils/typescript-fsa-reducers.ts";
-import { restore } from "../actions.ts";
+import type { Config } from "../../../defaults.ts";
+import type { AgentName, Phase, RoundKey } from "../../../types.ts";
+import { reducerWithInitialState } from "../../../utils/typescript-fsa-reducers.ts";
+import { restore } from "../global/actions.ts";
 import {
   agentFailed,
   agentOk,

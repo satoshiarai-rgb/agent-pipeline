@@ -1,10 +1,10 @@
-import type { Config } from "../defaults.ts";
-import type { Action, AnyAction } from "../utils/typescript-fsa.ts";
+import type { Config } from "../../defaults.ts";
+import type { Action, AnyAction } from "../../utils/typescript-fsa.ts";
 import type { AppPayload, Origin } from "./app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "./app/actions.ts";
 import { TRANSITIONS } from "./app/reducer.ts";
+import type { RootState } from "./createStore.ts";
 import { selectBlocked } from "./selectors.ts";
-import type { RootState } from "./state.ts";
 
 /**
  * dispatch を受け付けない条件。**理由を返せば reducer を呼ばない**（`guard` middleware が

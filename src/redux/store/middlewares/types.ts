@@ -1,7 +1,7 @@
 import type { Middleware } from "redux";
-import type { Config } from "../../defaults.ts";
-import type { PipelineDispatch } from "../index.ts";
-import type { RootState } from "../state.ts";
+import type { Config } from "../../../defaults.ts";
+import type { RootState } from "../createStore.ts";
+import type { PipelineDispatch } from "../global/actions.ts";
 
 /**
  * middleware が受け取るもの。`config` はクロージャで畳み込む（state に入れない / K-26）。

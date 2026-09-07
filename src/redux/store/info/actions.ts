@@ -1,4 +1,4 @@
-import actionCreatorFactory from "../../utils/typescript-fsa.ts";
+import actionCreatorFactory from "../../../utils/typescript-fsa.ts";
 
 /**
  * 設置（issue・ブランチ・版）と、この起動の環境を動かす action。

@@ -4,8 +4,8 @@ import {
   readRecords,
   recordPath,
   saveRecord,
-} from "../../file/run-record.ts";
-import type { RunResult } from "../../types.ts";
+} from "../../../file/run-record.ts";
+import type { RunResult } from "../../../types.ts";
 import { agentFailed, agentOk, agentStarted, review } from "../app/actions.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";

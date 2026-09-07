@@ -1,5 +1,5 @@
-import { reducerWithInitialState } from "../../utils/typescript-fsa-reducers.ts";
-import { restore } from "../actions.ts";
+import { reducerWithInitialState } from "../../../utils/typescript-fsa-reducers.ts";
+import { restore } from "../global/actions.ts";
 import { configure, hydrated } from "./actions.ts";
 
 /** 設置と環境。ここは他のスライスを読まないので `combineReducers` に素直に載る */

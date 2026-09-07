@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { config } from "../../../__tests__/helpers.ts";
+import { config } from "../../../../__tests__/helpers.ts";
 import {
   approve,
   cleanupRuns,
@@ -9,8 +9,8 @@ import {
   retry,
   route,
   runOnce,
-} from "../../../__tests__/run-dir-fixture.ts";
-import { type RunRecord, readRecords } from "../../../file/run-record.ts";
+} from "../../../../__tests__/run-dir-fixture.ts";
+import { type RunRecord, readRecords } from "../../../../file/run-record.ts";
 import { agentFor, isIdle, reviewKindFor, roundKeyFor, TRANSITIONS } from "../reducer.ts";
 
 const c = config();
