@@ -37,8 +37,14 @@ echo "$out"
 
 {
   echo "json=$(jq -c . <<<"$out")"
+  # 改行を含む値（explain の markdown）はヒアドキュメント形式で渡す。
+  # key=value 形式に混ぜると 2 行目以降が壊れる
+  if md=$(jq -er '.markdown' <<<"$out" 2>/dev/null); then
+    printf 'markdown<<MARKDOWN_EOF\n%s\nMARKDOWN_EOF\n' "$md"
+  fi
   # 最上位のスカラーと、route の run オブジェクトの中身を output に展開する
-  jq -r 'to_entries[] | select((.value | type) as $t | $t != "object" and $t != "array")
+  jq -r 'to_entries[] | select(.key != "markdown")
+         | select((.value | type) as $t | $t != "object" and $t != "array")
          | "\(.key)=\(.value)"' <<<"$out"
   jq -r '(.run // {}) | to_entries[] | "\(.key)=\(.value)"' <<<"$out"
 } >> "${GITHUB_OUTPUT:-/dev/stdout}"

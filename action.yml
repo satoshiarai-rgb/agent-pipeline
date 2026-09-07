@@ -8,11 +8,11 @@
 # 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
-description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / retry / block / label / validate / compose）
+description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / retry / block / label / explain / validate / compose）
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | retry | block | label | validate | compose"
+    description: "start | route | finish | approve | request-changes | retry | block | label | explain | validate | compose"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
@@ -73,6 +73,9 @@ outputs:
   verdict:
     description: "validate: レビューの verdict"
     value: ${{ steps.run.outputs.verdict }}
+  markdown:
+    description: "explain: blocked の理由と次の一手（PR に貼る markdown）"
+    value: ${{ steps.run.outputs.markdown }}
   label:
     description: "label: いま issue に付いているべきラベル"
     value: ${{ steps.run.outputs.label }}

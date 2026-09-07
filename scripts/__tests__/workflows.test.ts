@@ -372,6 +372,43 @@ describe("scripts/run-cli.sh（action の実体）", () => {
     expect(r.status).toBe(0);
   });
 
+  test("改行を含む値はヒアドキュメント形式で GITHUB_OUTPUT に渡す（explain の markdown）", () => {
+    // key=value 形式に混ぜると 2 行目以降が壊れる。実際に走らせて確かめる
+    const dir = mkdtempSync(join(tmpdir(), "run-cli-"));
+    const runDir = join(dir, "agent-work/issue-1");
+    spawnSync("mkdir", ["-p", runDir]);
+    writeFileSync(
+      join(runDir, "state.json"),
+      JSON.stringify({
+        pipeline_version: 1,
+        issue: 1,
+        branch: "claude/issue-1",
+        phase: "blocked",
+        blocked_reason: "acceptance_not_passed",
+        updated_at: null,
+      }),
+    );
+    const out = join(dir, "output.txt");
+    const r = spawnSync("bash", [join(ROOT, "scripts/run-cli.sh")], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_ACTION_PATH: ROOT,
+        GITHUB_OUTPUT: out,
+        CLI_COMMAND: "explain",
+        CLI_DIR: runDir,
+      },
+    });
+    expect(r.status).toBe(0);
+    const text = readFileSync(out, "utf8");
+    expect(text).toContain("markdown<<MARKDOWN_EOF");
+    expect(text).toContain("MARKDOWN_EOF\n");
+    // markdown 自体は key=value 側に出さない（改行で壊れるため）
+    expect(text).not.toContain("markdown=##");
+    expect(text).toContain("reason=acceptance_not_passed");
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("空の入力を引数に渡さない（CLI 側で未指定として扱わせる）", () => {
     const sh = readFileSync(join(ROOT, "scripts/run-cli.sh"), "utf8");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: シェルの ${2:-} を文字列として検査する

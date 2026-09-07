@@ -6,6 +6,7 @@ import {
   blockRun,
   composeRun,
   defaults as config,
+  explainRun,
   finishRun,
   labelRun,
   type Outcome,
@@ -33,6 +34,7 @@ commands:
   retry    blocked から直前のフェーズに戻す    --association
   block    phase を blocked にする            --reason
   label    いま付いているべきラベルを返す
+  explain  blocked の理由と次の一手を markdown で返す（PR に貼る）
   validate 成果物が契約を満たすか検証し Outcome を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --central --out [--repo]
@@ -122,6 +124,8 @@ const run = () => {
       return retryRun({ dir, config, association: need(values.association, "association") });
     case "block":
       return blockRun({ dir, config, reason: need(values.reason, "reason") });
+    case "explain":
+      return explainRun({ dir, config });
     case "label":
       return labelRun({ dir, config });
     case "validate":
