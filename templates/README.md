@@ -1,52 +1,14 @@
-# run ディレクトリのファイル
+# 雛形
 
-`agent-work/issue-<n>/` に作られるファイルの説明。書くのはハーネスだけで、
-エージェントは `state.json` と `runs/` を書かない（設計書 §7.1）。
+`agent-work/issue-<n>/`（作業ディレクトリ）に置かれるファイルの雛形。
+`state.json` と `run-record.json` はテストが形を検査している（`src/file/__tests__/`）。
 
-| ファイル | 書く主体 | 内容 |
-|---|---|---|
-| `state.json` | ハーネス | run の状態。可変値は `phase` と `blocked_reason` だけ |
-| `runs/<agent>-<run_id>-<attempt>.json` | ハーネス | 1 実行 1 ファイルの追記専用レコード。`total_steps` と `rounds` はこの数から導出する（A-33） |
-| `plan.md` / `acceptance.json` | planner | 計画と受け入れ条件 |
-| `reviews/plan-NN.md` / `reviews/dev-NN.md` | レビュアー / 人間 | frontmatter の `verdict` だけがハーネスの遷移判断に使われる |
-| `decision-records.jsonl` | developer | 実装中の判断。1 行 1 レコードの JSON（追記のみ） |
-| `completion.md` | completion | 完了報告 |
-| `log.md` | ハーネス | `runs/` を時刻順に連結した読み物（completing で生成 / A-34） |
+利用者向けの説明——各ファイルの中身、`blocked` の理由と復旧手順——は
+[`docs/troubleshooting.md`](../docs/troubleshooting.md) にある。ここには実装側の注記だけを置く。
 
-## blocked からの復旧
-
-**止まると理由と手順が PR にコメントされる**（文面は `src/commands/explain.ts` が理由から
-組み立てる）。それを読んで原因を直し、PR に `/agent retry` とコメントする。
-直前に走っていたフェーズ（`runs/` の最新レコードの `phase`）に戻して再実行する。
-
-受け付けないのは次の 3 つで、いずれも理由が PR に返る。
-
-- `blocked` 以外の phase（取り違えを黙って進めない）
-- 上限で止まったもの（`*_exceeded`）。やり直しても同じ理由で止まるので、issue を分けて立て直す
-- 実行の記録が無いもの（戻る先が決まらない）
-- 直前のレコードが閉じていないもの（`finished_at` が `null`）。実行中か、途中で落ちて記録が
-  閉じられていない状態。戻しても `route` が「実行中」と見て動かさないため、断る
-
-### レコードが閉じていない run（無音で止まった run）
-
-`/agent retry` が `run_in_progress: <agent> run=<id>` を返す場合、その実行のレコードが
-`finished_at: null` のまま残っている。`run` job が job のタイムアウトやキャンセルで死んだときに起きる。
-**まだ動いている可能性があるので、Actions でその run が終わっているかを確かめてから**次の 2 つを直す。
-
-1. `runs/<agent>-<run_id>-<attempt>.json` の `finished_at` に時刻を入れ、`result` を `agent_failed` にする
-2. `state.json` の `phase` をそのレコードの `phase` に戻し、`blocked_reason` を `null` にする
-
-この 2 つを 1 コミットで push すれば再開する。
-
-別のフェーズから始めたいときや、`pipeline_version_mismatch` で止まったとき（走る前のフェーズが
-state から失われている）は、`state.json` の `phase` を書き換えて push する。
-`agent-work/**` の変更で dispatch が起動するため、それ以外の操作は不要。
-
-`phase` に入る値: `bootstrap` / `planning` / `plan_review` / `awaiting_human` /
-`developing` / `dev_review` / `completing` / `done` / `blocked`
-
-`blocked_reason` の例: `plan_review_rounds_exceeded: 5/5`、`api_error:429`、
-`total_steps_exceeded: 24/24`、`invalid_artifacts: plan.md が無いか空`
-
-JSON にはコメントを書けないため、この説明をファイルの外に置いている。
-`blocked` になったときは issue コメントにも同じ復旧手順を投稿する。
+- 作業ディレクトリを書くのはハーネス（`bootstrap.yml` / `dispatch.yml` / `comment.yml` / `approve.yml`）だけで、
+  エージェントは `state.json` と `runs/` を書かない（設計書 §7.1）
+- `runs/<agent>-<run_id>-<attempt>.json` は追記専用。`total_steps` と `rounds` は
+  ファイル数から導出する（A-33）
+- `log.md`（`runs/` を時刻順に連結した読み物）は未実装（A-34）。
+  実装したら `docs/troubleshooting.md` のファイル一覧にも足すこと
