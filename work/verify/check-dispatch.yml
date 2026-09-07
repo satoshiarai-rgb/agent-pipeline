@@ -46,8 +46,9 @@ on:
 
 # reusable workflow は呼び出し側より広い権限を要求できないため、
 # 中央のワークフローが宣言する分をここで与える（設計書 §6.1）。
-# 実際の操作は App トークンで行うので GITHUB_TOKEN はほとんど使わないが、
-# 宣言は静的に検証される
+# 連鎖させたい push は App トークンで行うが、ラベルの射影と PR へのコメントは
+# 中央が GITHUB_TOKEN で行う（K-22。空の run を作らないため）ので、
+# issues / pull-requests の write はここで実際に使われる
 permissions:
   contents: write
   pull-requests: write

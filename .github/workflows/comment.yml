@@ -28,9 +28,14 @@ on:
         required: true
         type: string
 
+# ラベルとコメントは GITHUB_TOKEN で操作する（K-22）。
+# GITHUB_TOKEN が起こしたイベントは新しい workflow run を作らないため、
+# 状態の射影が「全ジョブ skipped の空の run」を生まない。
+# 連鎖させたい push だけを App トークンで行う
 permissions:
   contents: write
   pull-requests: write
+  issues: write
 
 jobs:
   comment:
@@ -127,7 +132,9 @@ jobs:
       - name: 遷移を push して PR に結果を返す
         if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          # push は checkout が仕込んだ App トークンで行う。
+          # GH_TOKEN は gh（PR へのコメント）だけが使う
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ inputs.pr }}
           CMD: ${{ steps.parse.outputs.command }}
           PHASE: ${{ steps.approve.outputs.phase || steps.request_changes.outputs.phase }}
@@ -149,7 +156,7 @@ jobs:
       - name: ラベルを phase に合わせる
         if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_DIR: ${{ steps.parse.outputs.dir }}
           CLI: ${{ github.workspace }}/.pipeline/dist/cli.js
         run: bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"
@@ -160,7 +167,7 @@ jobs:
           steps.approve.outputs.ok != 'true' &&
           steps.request_changes.outputs.ok != 'true'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ inputs.pr }}
           CMD: ${{ steps.parse.outputs.command }}
           REASON: ${{ steps.approve.outputs.reason || steps.request_changes.outputs.reason }}

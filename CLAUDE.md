@@ -56,6 +56,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 
 - Anthropic API: Console 組織 + サービスアカウント + Workload Identity Federation。GitHub Actions の OIDC を短命トークンに交換するため、**長期 API キーを Secrets に置かない**（`anthropic_api_key` は渡さない）。
 - GitHub: 自前の GitHub App トークン。`GITHUB_TOKEN` によるコミットは後続ワークフローを起動しないため、エージェント間の連鎖に App トークンが必須。App ID / 秘密鍵は Organization secrets に置き、配布先ごとには設定しない。
+- **逆に、連鎖させたくない操作（ラベルの射影、PR へのコメント、`gh pr ready`）は `GITHUB_TOKEN` で行う（K-22）。** App トークンで行うと `issues` / `issue_comment` が発火し、配布先のラッパーが「全ジョブ skipped の空の run」を毎フェーズ作ってしまう。トークンの選択は権限ではなく**イベントを起こしたいかどうか**で決める。
 - claude.ai 側のサブスクリプション認証は使わない（個人シート紐付けのため CI 不適）。
 
 ## 未決事項と、確認して閉じた事項

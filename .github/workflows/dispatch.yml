@@ -16,8 +16,14 @@ on:
         default: false
         type: boolean
 
+# ラベルとコメントは GITHUB_TOKEN で操作する（K-22）。
+# GITHUB_TOKEN が起こしたイベントは新しい workflow run を作らないため、
+# 状態の射影が「全ジョブ skipped の空の run」を生まない。
+# 連鎖させたい push だけを App トークンで行う
 permissions:
   contents: write
+  issues: write
+  pull-requests: write
 
 jobs:
   # ------------------------------------------------- 次に何をするか決める
@@ -335,7 +341,7 @@ jobs:
       - name: ラベルを phase に合わせる
         if: always() && needs.route.outputs.action != 'none'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_DIR: ${{ needs.route.outputs.dir }}
           CLI: ${{ github.workspace }}/.pipeline/dist/cli.js
         run: |
@@ -350,7 +356,7 @@ jobs:
       - name: 規模超過を PR に警告する
         if: always() && steps.validate.outputs.oversize == 'true'
         env:
-          GH_TOKEN: ${{ steps.app.outputs.token }}
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_DIR: ${{ needs.route.outputs.dir }}
         run: |
           set -uo pipefail

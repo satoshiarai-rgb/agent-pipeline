@@ -1,8 +1,13 @@
 #!/usr/bin/env bash
 # state.json の phase を issue のラベルに射影する（設計書 §2.3）。
 #
+# 射影であって連鎖ではないので、GitHub の操作は GITHUB_TOKEN で行う（K-22）。
+# App トークンで付け替えると issues.labeled が発火し、配布先のラッパーが
+# 「全ジョブ skipped の空の workflow run」を毎フェーズ 1 本ずつ作ってしまう。
+# GITHUB_TOKEN が起こしたイベントは新しい run を作らない。
+#
 # 必要な環境変数:
-#   GH_TOKEN          App トークン
+#   GH_TOKEN          GITHUB_TOKEN（App トークンではない）
 #   GITHUB_REPOSITORY owner/repo
 #   RUN_DIR           agent-work/issue-<n>
 #   CLI               dist/cli.js のパス
