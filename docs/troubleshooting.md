@@ -60,8 +60,9 @@ git commit -am "agent: retry planning"
 git push
 ```
 
-`phase` に入る値: `planning` / `plan_review` / `awaiting_human` / `developing` /
-`dev_review` / `completing` / `done` / `blocked`
+`phase` に入る値: `bootstrap` / `planning` / `plan_review` / `awaiting_human` /
+`developing` / `dev_review` / `completing` / `done` / `blocked`
+（戻す先に使うのは `planning` から `completing` までのいずれかです）
 
 `blocked_reason` は書き換えなくてかまいません（次の実行で上書きされます）。
 
