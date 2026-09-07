@@ -25,6 +25,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 - **プロンプトは配布先で差し替えられる（`.agent/prompts/<agent>.md`）。中央は既定を提供する。** 契約（入力と出力）は `work/agent-contract.md` にあり、`validate` が強制する
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
+- **`.claude/**` も同じ扱い。** Claude Code が「センシティブファイル」として書き込みを拒否し、**許可ルール（`Edit(.claude/**)` を含む）では開けられない**。開ける手段は `--permission-mode bypassPermissions`（全権限チェックの無効化）だけなので採らない。必要な変更は run ディレクトリに成果物を置いて人間が設置する（K-19）
 - **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない
 - モデルは生成・レビュー共に `claude-opus-5`
 - `verification: manual` の受け入れ条件は developer が `evidence` 付きで `passed` にし、dev-reviewer が照合する

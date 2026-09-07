@@ -780,11 +780,11 @@ var defaults = {
     exec: "Read,Glob,Grep,Write,Edit,Bash"
   },
   agents: {
-    planner: { max_turns: 25, timeout_minutes: 20, tools: "readonly" },
-    "plan-reviewer": { max_turns: 15, timeout_minutes: 15, tools: "readonly" },
-    developer: { max_turns: 40, timeout_minutes: 45, tools: "exec" },
-    "dev-reviewer": { max_turns: 20, timeout_minutes: 20, tools: "exec" },
-    completion: { max_turns: 15, timeout_minutes: 15, tools: "exec" }
+    planner: { max_turns: 35, timeout_minutes: 20, tools: "readonly" },
+    "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
+    developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
+    "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
+    completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" }
   },
   approvers: ["OWNER", "COLLABORATOR"],
   labels: {

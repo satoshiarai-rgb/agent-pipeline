@@ -67,12 +67,18 @@ export const defaults: Config = {
     exec: "Read,Glob,Grep,Write,Edit,Bash",
   },
 
+  /**
+   * max_turns は実測に合わせている（2026-09-07、compass-wiki issue #7）。
+   * base-action は実行後に num_turns > max_turns を検査して**失敗**にするため、
+   * 上限が足りないと完成した成果物ごと agent_failed になる。実測は
+   * planner 18〜22 / plan-reviewer 13〜15 / developer 43。
+   */
   agents: {
-    planner: { max_turns: 25, timeout_minutes: 20, tools: "readonly" },
-    "plan-reviewer": { max_turns: 15, timeout_minutes: 15, tools: "readonly" },
-    developer: { max_turns: 40, timeout_minutes: 45, tools: "exec" },
-    "dev-reviewer": { max_turns: 20, timeout_minutes: 20, tools: "exec" },
-    completion: { max_turns: 15, timeout_minutes: 15, tools: "exec" },
+    planner: { max_turns: 35, timeout_minutes: 20, tools: "readonly" },
+    "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
+    developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
+    "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
+    completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" },
   },
 
   /**

@@ -71,6 +71,11 @@
 
 - **`.github/workflows/**` を変更しない。** 差分に含まれていると `blocked` になる（エージェントが
   自身の起動条件を書き換えられないようにするため）
+- **`.claude/**` には書けない。** Claude Code が「センシティブファイル」として拒否する
+  （エージェント自身の権限設定と hook の置き場所なので塞いである）。計画がそこを指していたら、
+  完成品を run ディレクトリの `staged/` 配下に同じ木構造で置き（`.claude` を含むパスは作れないので
+  `staged/dot-claude/` のような名前にする）、**設置手順を `staged/README.md` に書いて**
+  判断を `decision-records.jsonl` に残す。該当する受け入れ条件は `failed` にして `evidence` に理由を書く
 - `plan.md` の要件部分を書き換えない。計画と違う実装をするなら `decision-records.jsonl` に書く
 - `state.json` と `runs/` を書かない（状態を書くのはハーネス）
 - **git を操作しない。** コミット・push・ブランチ操作・`git reset` はハーネスが行う。

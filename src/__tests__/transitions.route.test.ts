@@ -10,7 +10,7 @@ describe("route", () => {
     expect(r.action).toBe("run");
     expect(r.run?.agent).toBe("planner");
     expect(r.run?.tools).toBe("Read,Glob,Grep,Write");
-    expect(r.run?.max_turns).toBe(25);
+    expect(r.run?.max_turns).toBe(c.agents.planner.max_turns);
   });
 
   test("各フェーズが正しいエージェントに割り当たる", () => {
