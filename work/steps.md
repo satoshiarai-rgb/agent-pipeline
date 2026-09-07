@@ -302,7 +302,7 @@ gh issue edit <n> --repo satoshiarai-rgb/compass-wiki --add-label agent:go
 - `reviews/plan-01.md` の frontmatter に `verdict` がある。本文が次の planner に渡せる粒度か
 - planner が `agent-work/` の外を書き換えていない（読み取り専用プロファイルの確認）
 
-**段 3: 承認して developer 以降（3 実行）**
+**段 3: 承認して developer 以降（3 実行）** — 2026-09-07 に issue #11 で完了（`done` まで到達）
 
 draft PR に `/agent approve` とコメントする。見るところ:
 
@@ -310,6 +310,12 @@ draft PR に `/agent approve` とコメントする。見るところ:
 - developer の差分が `agent-work/` の外にある。`acceptance.json` の `passed` に `evidence` がある
 - dev-reviewer が差分を読めている（`git diff origin/HEAD...HEAD` が空でない）
 - completion が `completion.md` を書き、`done` になる
+
+段 3 の結果（issue #11）: 上記すべて確認。`setup.sh` の無い配布先で notice を出して通過、
+差分は `agent-work/` の外の 5 ファイル、dev-reviewer は `git diff` で差分を読み**合成
+トランスクリプトを流してバグを実測で示した**。`manual` の受け入れ条件 1 件は構造的に
+エージェントが実行できず（`.claude/**` / K-19）、人間が検証して `passed` にし、`phase` を
+`completing` に戻して push したところ completion が走り直して `done` になった。
 
 サブスクの 5 時間枠はローカルの Claude Code と共有される（V-13）。段 2 と段 3 は分けて回す。
 

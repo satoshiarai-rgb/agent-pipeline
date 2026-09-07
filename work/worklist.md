@@ -6,13 +6,11 @@
 
 ---
 
-## 現在地（2026-09-05）
+## 現在地（2026-09-07）
 
-フェーズ A〜C は実機で完走済み（issue のラベル → draft PR → planner → plan-reviewer →
-`awaiting_human` → PR コメント `/agent approve` → developer → dev-reviewer → completion →
-`done`、ラベル射影と `gh pr ready` まで）。ただしエージェントはダミー（`dry_run: true`）。
+**フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
 
-- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 228 件 / 24 ファイル、`bunx tsc --noEmit`、
+- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 250 件 / 25 ファイル、`bunx tsc --noEmit`、
   `bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り**コミットする**
   （配布先はルートの `action.yml` から `uses:` で呼ぶ）
 - 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
@@ -20,36 +18,53 @@
 - 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `approve.yml` / `comment.yml`
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
 - 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `validate` が担う
-- 本番経路: `dispatch.yml` の `run` job が `compose` → `base-action` → `validate` → `finish` を通す。
-  `dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）。
-  `blocked` になった run は push とラベル更新の後に失敗させるので、Actions の一覧で赤く見える
+- 本番経路: `dispatch.yml` の `run` job が `compose` → `base-action@v1.0.215` → `validate` → `finish`
+  を通す。`dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）。
+  `blocked` になった run は push とラベル更新の後に失敗させるので Actions の一覧で赤く見える
+- 配布先（検証用）は `satoshiarai-rgb/compass-wiki`。`dry_run` はリポジトリ変数 `AGENT_DRY_RUN`
+  で切り替える（未設定ならダミー）
 
-**dry run の一巡は実機で確認済み（2026-09-05、issue #5）**。planner → plan-reviewer →
-`awaiting_human` → PR コメント `/agent approve` → developer → dev-reviewer → completion → `done`。
-5 つの実行レコードすべてが `result: ok`、`compose` は中央の既定プロンプトを解決し、
-`validate` は 5 フェーズすべてで `ok`、`issue.md` も作られた。`dispatch-live` は skip され二重起動なし。
+### 実機で通したもの
 
-**段 2（本物のエージェント）は `awaiting_human` まで到達（issue #7、2026-09-05）**。
+| | issue | 結果 |
+|---|---|---|
+| 段 1: dry run 一巡 | #5 | `done`。5 実行すべて `result: ok`、`validate` も 5 フェーズすべて `ok` |
+| 段 2: 本物で計画まで | #7 | `awaiting_human` まで到達。計画は実行不能（`.claude/**` / K-19）と分かり `staged/` に完成品が残った。**issue は開いたまま**（人が `cp` して閉じる価値がある） |
+| 作り直し 1 回目 | #9 | 計画が往復ごとに膨らみ（14 → 26 → 39KB）3 回目のレビューで上限超過。**閉じた**（A-47 で対処） |
+| 段 3: 本物で `done` まで | #11 | **`done`。PR #12 が ready for review。**10 実行 / $10.37 / 約 50 分 |
 
-- 1 回目の planner は `invalid` で `blocked`。原因はハーネス側で、`--tools` はツールを使える
-  状態にするだけで書き込みの許可にならず `permission_denials_count: 3` になっていた
-  （A-24 を実機で確定。`--allowed-tools` を足して修正）。`state.json` を手で戻して push する
-  復旧経路もそのまま機能した
-- 復旧後: planner `ok` → plan-reviewer **`request_changes`** → planner → plan-reviewer
-  **`approve`** → `awaiting_human` → PR に人間の `/agent request-changes` → planner →
-  plan-reviewer `approve` → `awaiting_human`（現在ここ）。ラベル射影も追随した
-- plan-reviewer は実際に穴を見つけた（planner が書いた検証コマンドが `refs/heads/main` の
-  無いワークツリーで fatal になり、出力が空なので `test -z` が通ってしまう＝検証していない
-  ものが緑になる）。レビュアーに成果物だけを渡す設計が効いている
-- 実測コスト: planner 1 実行 $1.0〜1.2（18〜22 ターン、5 分前後）、plan-reviewer $0.75〜0.88。
-  ここまでで約 $5。**ターン数がそのままコストになる**（Q-6 の見立てどおり）
-- `session_id` / `execution_file` の出力名は実在し、`runs/*.json` と `validate` に届く
-- plan-reviewer を 3 本使ったので上限を 5 に上げた（K-17）。残り 2 ラウンド
+**#11 の内訳**（人間の関与は「計画の承認」「設置して 1 セッション回す」「AC-13 を閉じる」の 3 回）:
 
-**次の一手**: 段 3。PR #8 に `/agent approve` を投稿すると developer / dev-reviewer /
-completion の 3 実行に進む。見るところは `work/steps.md` の Step D-0 の段 3
-（`setup.sh` の無い配布先で落ちないか、差分が `agent-work/` の外にあるか、
-dev-reviewer が `git diff origin/HEAD...HEAD` を読めているか）。そのあとフェーズ D。
+- planner 15/13 ターン $0.97/$0.73、plan-reviewer 13/15 ターン $0.66/$0.65、
+  developer 26/30 ターン $1.89/$1.69、dev-reviewer 21/19 ターン $1.40/$1.12、completion 13 ターン $0.63 ×2
+- 計画は 110 行 / 8KB に収まり、往復しても膨らまなかった（A-47 の効果。#9 は 39KB）
+- **レビュアーが実際に穴を見つけた**: plan-reviewer は「前提の根拠が無い」「設置元を run ディレクトリに
+  置くと issue が閉じたあと辿れない」を指摘（→ A-48）。dev-reviewer は合成トランスクリプトを流して
+  `SubagentStop` の重複計上を実測で示した（developer の 12 件の `passed` はこれを通していた）
+- `decision-records.jsonl`（K-18）は 7 レコードが新形式で書かれ `validate` を通った
+- 最後の 1 件（`manual` の AC-13）は構造的にエージェントが実行できず、人間が検証して閉じた。
+  completion が「この run は blocked です」と自己申告する報告を書いたのは期待どおりの挙動
+
+### 今日（2026-09-07）入れた修正
+
+実機で踏んだものだけ。すべて push 済み。
+
+- K-19: `.claude/**` はエージェントが書けない（許可ルールでは開けられない）ことを確定し、
+  planner / developer のプロンプトに明示
+- K-20: **正常終了したのに `max_turns` を超えた実行を `agent_failed` にしない**（完成した成果物を
+  2 回捨てていた: $4.05 と $1.42）。`completedCleanly` で分類する
+- K-21: **規模超過は停止条件にしない。** PR に警告を出して作業は続ける
+- K-18: `decisions.md` → `decision-records.jsonl`（1 行 1 レコード、`reversibility` で絞れる）
+- A-47: planner に「差し戻しには直して応える。足さない」と計画の粒度（200 行の目安）
+- `max_turns` を実測に合わせて 35 / 25 / 60 / 30 / 20 に、ラウンド上限を各 5 / `total_steps` を 24 に
+- K-22: **ラベルとコメントを `GITHUB_TOKEN` で行い、空の run を作らない。** ハーネス自身の
+  ラベル射影が `issues: labeled` を発火し、issue #7 では 15 run のうち 7 本が skipped だった。
+  `GITHUB_TOKEN` のイベントは後続ワークフローを起動しないので、この経路が消える。入口イベントの
+  run には固定のタイトル（`agent: trigger check`）を付けて一覧で見分けられるようにした
+
+**次の一手**: フェーズ E。`stale.yml`（A-14 / I-8）→ `install/` 一式（I-12）→ 2 つ目の配布先（R-2）→
+タグ `v1`（I-13）。実機で残った未処理は A-48（`.claude/**` の説明の書き方と設置元の置き場所）、
+A-49（設計書 §1 の規模上限を K-21 に合わせる）、Q-7（`invalid` のとき直す機会を与えるか）。
 
 ---
 
