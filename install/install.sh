@@ -66,7 +66,8 @@ cat <<'NEXT'
 
 次にやること（詳しくは docs/installation.md）:
 
-  1. GitHub App を作り、このリポジトリと agent-pipeline 本体の両方にインストールする。
+  1. GitHub App をこのリポジトリにインストールする。App はアカウント（組織）に 1 つ作れば
+     使い回せるので、作るのは初回だけ。本体へのインストールは不要（本体は public）。
      権限は Contents / Issues / Pull requests の Read & Write。Workflows 権限は与えない
   2. Secrets を 3 つ登録する
        gh secret set AGENT_APP_CLIENT_ID

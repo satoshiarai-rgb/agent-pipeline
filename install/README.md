@@ -25,7 +25,9 @@
   実行したあと、同じワークスペースで成果物をコミットします。無視され忘れている生成物
   （`coverage/`、ビルド出力、`.venv`、`node_modules/` など）は PR に混ざり、レビュー対象の
   差分も汚します。パイプライン側では判別できないので、導入前に確かめてください
-- GitHub App が**このリポジトリと本体リポジトリの両方**にインストールされていること
+- GitHub App が**このリポジトリ**にインストールされていること。App はアカウント（または組織）に
+  1 つ作れば使い回せます。本体リポジトリへのインストールは要りません（本体は public で、
+  実行時の読み取りは `GITHUB_TOKEN` で足りるため）
 - Secrets に `AGENT_APP_CLIENT_ID` / `AGENT_APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`
 
 ラベル（`agent:go`、`agent:planning`、…）は事前に作らなくてよく、パイプラインが必要に
