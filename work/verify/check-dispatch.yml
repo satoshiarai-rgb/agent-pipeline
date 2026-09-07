@@ -20,6 +20,13 @@
 
 name: check-dispatch
 
+# 一覧に出る run のタイトル。push（実作業）はコミットメッセージのままにし、
+# それ以外は固定文言にする。起動条件に合わないイベント（agent:go 以外のラベル、
+# /agent 以外のコメント）の run は空になるが、既定では issue のタイトルが付くため
+# 実作業の run と見分けが付かない（K-22 で消せなかった分の見え方の対処）
+run-name: >-
+  ${{ github.event_name == 'push' && github.event.head_commit.message || 'エージェントの入口を確認' }}
+
 on:
   workflow_dispatch:
     inputs:
