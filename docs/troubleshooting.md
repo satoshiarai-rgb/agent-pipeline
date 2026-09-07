@@ -36,6 +36,7 @@ cat agent-work/issue-<n>/state.json
 
 | 返ってくる理由 | 意味 |
 |---|---|
+| `not_authorized: <association>` | コメントした人にこの操作の権限がありません（承認と同じ権限が必要です） |
 | `not_blocked: phase=...` | 止まっていません。取り違えを黙って進めないための拒否です |
 | `limit_reached: ...` | 上限で止まったものです。やり直しても同じ理由で止まります |
 | `no_records: ...` | 実行の記録が無く、戻る先が決まりません |

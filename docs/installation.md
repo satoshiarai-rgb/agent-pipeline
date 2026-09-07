@@ -69,7 +69,9 @@ permissions:
   issues: write
   id-token: write # 将来の認証方式（Workload Identity Federation）で必要になります
 
-# 同じ issue の実行を直列化します。実行中のものは止めず、順番待ちにします
+# 作業ブランチへの push を直列化します（実行中のものは止めず、順番待ちにします）。
+# キーはイベントごとに変わるため、ラベルや PR コメントの入口はこれとは別のグループに
+# なります（同じ issue の作業でも、それらとの間では直列化されません）
 concurrency:
   group: agent-${{ github.event.issue.number || github.ref_name }}
   cancel-in-progress: false

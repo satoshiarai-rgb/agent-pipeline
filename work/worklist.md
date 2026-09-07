@@ -124,6 +124,7 @@
 
 - [ ] I-12: **`install/` 一式（配布先の導入セット）。** `agent.yml`（薄いラッパー。いまの原本は `work/verify/check-dispatch.yml`）/ `config.json` / `conventions.md` / `setup.sh` と `templates/issue-template.yml`。下の A-46 と A-6 はこの作業に含まれる
   - [ ] A-46: **`install/` の前提に「生成物は `.gitignore` で無視されていること」を明記する。** `run` job は `.agent/setup.sh`（依存のインストール）を実行したあと、同じワークスペースで `git add -A` して成果物をコミットする。`git add -A` は `.gitignore` を尊重するので通常は問題にならないが、無視され忘れている生成物（`coverage/`、ビルド出力、`.venv` など）は PR に混ざり、`validate` に渡す `changed-files` も汚す。ハーネス側に機構は足さない（配布先の `.gitignore` の不備であって、パイプラインの欠陥ではない）— I-12
+  - [ ] A-51: **配布先ワークフローの正を 1 つにする（2026-09-07 に判断）。** 同じ caller の YAML が `work/verify/check-dispatch.yml`（テストが検査している原本）と `docs/installation.md` のコードブロックに二重に存在する。いまは差分がコメントと `workflow_dispatch` の有無だけで等価だが、原本を直したときドキュメントが取り残される。**`install/agent.yml` を正とし、両方からそれを参照する**（ドキュメントは inline の YAML をやめて参照に変え、検証用は `install/agent.yml` + 手動起動の追加分にする）。`workflows.test.ts` は `install/agent.yml` を検査する — I-12
   - [ ] A-6: `.agent/conventions.md` 雛形の「触ってはいけない領域」に `.github/workflows/**` を明記する。developer プロンプトにも同じ制約を書く — K-4、設計書 §5.8
 - [ ] A-19: **`src/defaults.ts` と配布先 `.agent/config.json` のマージを実装する**（深いマージ、`null` は「継承」、未知キーはエラー / K-11）。担当は `route`（状態を読むところ）。配布先ごとに上限・モデル・ツールを変えられるようにする。**2 つ目の配布先（R-2）を入れる時点で必要になる** — 構成案 §5.2、設計書 §5.7
 - [ ] I-13: タグ `v1` / `v1.0.0` を打つ
