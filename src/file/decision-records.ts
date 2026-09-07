@@ -1,81 +1,130 @@
-import { existsSync, readFileSync } from "node:fs";
-import { join } from "node:path";
-import { parseJson } from "../utils/parse-json.ts";
+import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { basename, join } from "node:path";
+import { type Frontmatter, parseFrontmatter } from "../utils/frontmatter.ts";
 
 /**
- * decision-records.jsonl の 1 行（契約 §4）。
- * developer が「計画に無い判断」をしたときだけ追記する。1 行 1 レコードの追記専用なので、
- * 並行更新でも行が混ざらず、`reversibility` で機械的に絞り込める
- * （後戻りが困難な判断だけを人間が重点確認する運用 / 設計書 §5.4）。
+ * `decision-records/<run_id>-<attempt>-<slug>.md` の 1 ファイル（契約 §4）。
+ * developer が「計画に無い判断」をしたときだけ、判断 1 つにつき 1 ファイルで書く。
+ *
+ * トピックごとにファイルを分けるので、追記が競合せず diff に新規ファイルとして現れる。
+ * 名前の prefix（`<run_id>-<attempt>`）はハーネスが決めるため、実行をまたいだ名前の衝突
+ * — 過去のラウンドの記録の上書き — が構造的に起きない。エージェントの裁量は `<slug>` だけ。
+ *
+ * frontmatter は機械が読む 3 つ（`type` / `title` / `reversibility`）だけで、内容は本文にある
+ * （`reviews/*.md` と同じ「機械は frontmatter、人は本文」の形 / 設計書 §5.4）。
  */
 export interface DecisionRecord {
-  /** D-<n>。レコードの識別子 */
-  id: string;
+  path: string;
+  /** 記録の種類。次に誰が受け取る記録かで切る */
+  type: DecisionType;
   /** 一行の見出し */
   title: string;
-  /** 何をどう決めたか */
-  decision: string;
   /** 後戻りの容易さ。困難なものだけを人間が重点確認する */
   reversibility: "easy" | "hard";
-  /** そう判断した前提 */
-  premise?: string;
-  /** 影響が及ぶファイルや領域 */
-  impact?: string[];
-  /** 検討して採らなかった案 */
-  alternatives?: string;
-  note?: string;
+  /** 決めたこと・前提・影響・採らなかった案。機械は読まない */
+  body: string;
 }
+
+/** 実行を一意にする組。`runs/<agent>-<run_id>-<attempt>.json` と同じもの */
+export interface Execution {
+  run_id: string;
+  attempt: number;
+}
+
+const DIR = "decision-records";
+const SHAPE = "<run_id>-<attempt>-<slug>.md";
+
+/** `<slug>` は英小文字・数字をハイフンで繋いだもの。日本語のタイトルは frontmatter に置く */
+const NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 
 const REVERSIBILITY = ["easy", "hard"];
 
-export function decisionRecordsPath(dir: string): string {
-  return join(dir, "decision-records.jsonl");
+/**
+ * 記録の種類（契約 §4）。「次に誰が受け取る記録か」だけで切る。
+ * 何についての判断か（性能・構造など）は `title` と本文が持つので値にしない。
+ *
+ *   requirements 計画・受け入れ条件の不足や誤り     → planner / issue の作者
+ *   design       実装方針の選択                     → dev-reviewer
+ *   harness      パイプライン側の問題               → 中央リポジトリの保守者
+ *   friction     判断ではない観察（詰まった点）     → 配布先 / 中央の改善ネタ
+ */
+const TYPES = ["requirements", "design", "harness", "friction"] as const;
+
+export type DecisionType = (typeof TYPES)[number];
+
+export function decisionRecordsDir(dir: string): string {
+  return join(dir, DIR);
 }
 
-export function hasDecisionRecords(dir: string): boolean {
-  return existsSync(decisionRecordsPath(dir));
+/** エージェントに伝える書き込み先。prefix はハーネスが決め、`<slug>` だけを任せる */
+export function decisionRecordPath(dir: string, run: Execution, slug: string): string {
+  return join(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
 }
 
-/** 空行を飛ばして 1 行ずつ読む。行が壊れていれば例外 */
+/** 実行順（古い順）に返す。名前の prefix がそのまま実行の順序を持つ */
+export function decisionRecordPaths(dir: string): string[] {
+  const base = decisionRecordsDir(dir);
+  if (!existsSync(base)) return [];
+  return readdirSync(base)
+    .sort(byExecution)
+    .map((name) => join(base, name));
+}
+
+/** 1 ファイル 1 レコード。形は `decisionRecordProblems` が先に見る */
+export function readDecisionRecord(path: string): DecisionRecord {
+  const frontmatter = parseFrontmatter(readFileSync(path, "utf8"));
+  if (!frontmatter) throw new Error(`${basename(path)} に frontmatter がありません`);
+  const { fields, body } = frontmatter;
+  return {
+    path,
+    type: fields.type as DecisionType,
+    title: fields.title ?? "",
+    reversibility: fields.reversibility as DecisionRecord["reversibility"],
+    body,
+  };
+}
+
 export function readDecisionRecords(dir: string): DecisionRecord[] {
-  return lines(readFileSync(decisionRecordsPath(dir), "utf8")).map(({ text, at }) =>
-    parseJson<DecisionRecord>(text, `decision-records.jsonl ${at}`),
-  );
+  return decisionRecordPaths(dir).map(readDecisionRecord);
 }
 
 /**
- * 契約 §4 の違反を列挙する。空なら妥当。
- * エージェント（プロンプト差し替え可）が書くファイルなので、形だけをここで見る。
+ * 契約 §4 の違反を列挙する。空なら妥当（1 つも書かないことは違反ではない）。
+ * エージェント（プロンプト差し替え可）が書くファイルなので、名前と形だけをここで見る。
  */
-export function decisionRecordProblems(text: string): string[] {
-  const problems: string[] = [];
-  const seen = new Set<string>();
-
-  for (const { text: line, at } of lines(text)) {
-    let r: Partial<DecisionRecord>;
-    try {
-      r = parseJson<DecisionRecord>(line, at);
-    } catch (e) {
-      problems.push(`${at}: ${e instanceof Error ? e.message : String(e)}`);
-      continue;
-    }
-    if (!r.id) problems.push(`${at}: id が無い`);
-    else if (seen.has(r.id)) problems.push(`${at}: id ${r.id} が重複`);
-    else seen.add(r.id);
-
-    if (!r.title) problems.push(`${at}: title が無い`);
-    if (!r.decision) problems.push(`${at}: decision が無い`);
-    if (!REVERSIBILITY.includes(r.reversibility as string)) {
-      problems.push(`${at}: reversibility は easy か hard`);
-    }
-  }
-  return problems;
+export function decisionRecordProblems(dir: string): string[] {
+  return decisionRecordPaths(dir).flatMap((path) =>
+    fileProblems(basename(path), readFileSync(path, "utf8")),
+  );
 }
 
-/** 中身のある行だけを、位置（人間が追える形）付きで返す */
-function lines(text: string): { text: string; at: string }[] {
-  return text
-    .split("\n")
-    .map((t, i) => ({ text: t.trim(), at: `${i + 1} 行目` }))
-    .filter((l) => l.text !== "");
+/** frontmatter と本文の契約。満たしていれば null */
+const CONTENT: ((f: Frontmatter) => string | null)[] = [
+  ({ fields }) =>
+    TYPES.includes(fields.type as DecisionType) ? null : `type は ${TYPES.join(" | ")}`,
+  ({ fields }) => (fields.title ? null : "title が無い"),
+  ({ fields }) =>
+    REVERSIBILITY.includes(fields.reversibility ?? "") ? null : "reversibility は easy か hard",
+  ({ body }) => (body ? null : "本文が無い（何をどう決めたかを書く）"),
+];
+
+/** 名前の形 → frontmatter の有無 → 中身 の順に見る */
+function fileProblems(name: string, text: string): string[] {
+  const frontmatter = parseFrontmatter(text);
+  return [
+    NAME.test(name) ? null : `名前が ${SHAPE} ではない`,
+    frontmatter ? null : "frontmatter が無い",
+    ...(frontmatter ? CONTENT.map((check) => check(frontmatter)) : []),
+  ]
+    .filter((reason): reason is string => reason !== null)
+    .map((reason) => `${name}: ${reason}`);
 }
+
+/** run_id と attempt は数値として比べる（桁数が変わっても順序が壊れない） */
+function byExecution(a: string, b: string): number {
+  const [aRun = 0, aAttempt = 0] = execution(a);
+  const [bRun = 0, bAttempt = 0] = execution(b);
+  return aRun - bRun || aAttempt - bAttempt || a.localeCompare(b);
+}
+
+const execution = (name: string): number[] => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);

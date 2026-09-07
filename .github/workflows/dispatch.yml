@@ -157,6 +157,9 @@ jobs:
           command: compose
           dir: ${{ needs.route.outputs.dir }}
           agent: ${{ needs.route.outputs.agent }}
+          # 決定記録の名前の prefix（<run_id>-<attempt>）になる。契約 §5
+          run-id: ${{ github.run_id }}
+          attempt: ${{ github.run_attempt }}
 
       # ---- ダミー実行（dry run）。トークンを使わずに配線だけを確認する（設計書 §9-9）
       # 成果物は契約（work/agent-contract.md §4）を満たす形で書く。dry run でも validate を通す

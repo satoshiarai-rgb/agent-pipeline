@@ -1,5 +1,6 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
+import { parseFrontmatter } from "../utils/frontmatter.ts";
 
 /**
  * reviews/<kind>-NN.md の形式。
@@ -81,11 +82,6 @@ export function latestReviewPath(dir: string, kind: "plan" | "dev"): string | nu
  * 本文の書式は自由なので、frontmatter の 1 行だけを見る。
  */
 export function readVerdict(path: string): "approve" | "request_changes" | null {
-  const text = readFileSync(path, "utf8");
-  const frontmatter = text.match(/^---\r?\n([\s\S]*?)\r?\n---/);
-  if (!frontmatter) return null;
-  const line = (frontmatter[1] as string).split(/\r?\n/).find((l) => /^verdict:/.test(l.trim()));
-  if (!line) return null;
-  const value = line.split(":")[1]?.trim();
+  const value = parseFrontmatter(readFileSync(path, "utf8"))?.fields.verdict;
   return value === "approve" || value === "request_changes" ? value : null;
 }

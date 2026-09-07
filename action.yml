@@ -19,8 +19,8 @@ inputs:
     required: true
   # start
   agent: { description: "start: 実行するエージェント", required: false }
-  run-id: { description: "start: GitHub Actions のラン ID", required: false }
-  attempt: { description: "start: 再実行の回数", required: false }
+  run-id: { description: "start / compose: GitHub Actions のラン ID", required: false }
+  attempt: { description: "start / compose: 再実行の回数", required: false }
   model: { description: "start: モデル（既定は src/defaults.ts の models.default）", required: false }
   # finish
   record-path: { description: "finish: start が返したレコードのパス", required: false }

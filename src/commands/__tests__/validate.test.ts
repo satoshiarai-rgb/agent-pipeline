@@ -265,23 +265,38 @@ describe("developer", () => {
     expect(r.result).toBe("ok");
   });
 
+  const record = (over: Record<string, string> = {}) => {
+    const fields = {
+      type: "design",
+      title: "セッション有効期限を 24h にした",
+      reversibility: "hard",
+      ...over,
+    };
+    const frontmatter = Object.entries(fields)
+      .map(([k, v]) => `${k}: ${v}`)
+      .join("\n");
+    return `---\n${frontmatter}\n---\n\n## 決めたこと\n既存の refresh token に揃えた。\n`;
+  };
+
   test("決定記録の形が壊れていれば invalid（機械が読む形式なので）", () => {
     const dir = setup();
-    write(dir, "decision-records.jsonl", '{"id":"D-1","title":"x","decision":"y"}\n');
+    write(dir, "decision-records/17293840112-1-session-ttl.md", record({ reversibility: "容易" }));
     expect(
       validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("reversibility");
   });
 
+  test("名前がハーネスの決めた形でなければ invalid（過去の記録を上書きさせない）", () => {
+    const dir = setup();
+    write(dir, "decision-records/D-1.md", record());
+    expect(
+      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
+    ).toContain("名前が");
+  });
+
   test("決定記録が妥当なら ok", () => {
     const dir = setup();
-    const line = JSON.stringify({
-      id: "D-1",
-      title: "セッション有効期限を 24h にした",
-      decision: "既存の refresh token に揃えた",
-      reversibility: "hard",
-    });
-    write(dir, "decision-records.jsonl", `${line}\n`);
+    write(dir, "decision-records/17293840112-1-session-ttl.md", record());
     expect(
       validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).result,
     ).toBe("ok");

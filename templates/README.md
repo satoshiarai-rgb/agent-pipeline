@@ -9,7 +9,7 @@
 | `runs/<agent>-<run_id>-<attempt>.json` | ハーネス | 1 実行 1 ファイルの追記専用レコード。`total_steps` と `rounds` はこの数から導出する（A-33） |
 | `plan.md` / `acceptance.json` | planner | 計画と受け入れ条件 |
 | `reviews/plan-NN.md` / `reviews/dev-NN.md` | レビュアー / 人間 | frontmatter の `verdict` だけがハーネスの遷移判断に使われる |
-| `decision-records.jsonl` | developer | 実装中の判断。1 行 1 レコードの JSON（追記のみ） |
+| `decision-records/<run_id>-<attempt>-<slug>.md` | developer | 実装中の判断。判断 1 つにつき 1 ファイル（追加のみ）。frontmatter は `type` / `title` / `reversibility`。名前の prefix はハーネスが決める |
 | `completion.md` | completion | 完了報告 |
 | `log.md` | ハーネス | `runs/` を時刻順に連結した読み物（completing で生成 / A-34） |
 

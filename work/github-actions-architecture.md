@@ -372,7 +372,7 @@ outputs:
 |---|---|---|
 | planner | `plan.md` 存在、規模判定セクション存在、`acceptance.yml` スキーマ | 規模超過なら `oversize` |
 | plan-reviewer / dev-reviewer | `reviews/<kind>-NN.md` 存在、frontmatter に `verdict` ∈ {approve, request_changes} | frontmatter の値 |
-| developer | `acceptance.yml` の `status` が全件 pending でない、`decision-records.jsonl`（あれば全行が形式を満たす）、差分がある | – |
+| developer | `acceptance.yml` の `status` が全件 pending でない、`decision-records/*.md`（あれば全ファイルが名前と frontmatter の形を満たす）、差分がある | – |
 | completion | `completion.md` 存在、`acceptance.yml` 全件 `passed` | `pass` / `fail` |
 
 - `agent_outcome != success` の場合は検証をスキップし `result=agent_failed`

@@ -332,7 +332,7 @@ draft PR に `/agent approve` とコメントする。見るところ:
 
 - **学ぶ概念**: 配布先の `setup.sh` の実行、コード変更を含む commit
 - **やること**: `.agent/setup.sh` を実行してから developer を動かす。`.github/workflows/**` への変更は禁止（プロンプトで指示し、`validate-artifacts` でも差分を検出して `blocked` にする）
-- **確認**: コードと `acceptance.yml` の `status` 更新、`decision-records.jsonl` が出る。`status: passed` の項目に `evidence` があること
+- **確認**: コードと `acceptance.yml` の `status` 更新、`decision-records/*.md` が出る。`status: passed` の項目に `evidence` があること
 - 対応: worklist I-11、A-3、A-6、A-7
 
 ### Step D-4: dev-reviewer / Step D-5: completing

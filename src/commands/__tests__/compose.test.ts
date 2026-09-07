@@ -38,6 +38,8 @@ const repo = () => {
   return d;
 };
 
+const RUN = { run_id: "17293840112", attempt: 1 };
+
 const compose = (dir: string, agent: AgentName, over: { repo?: string } = {}) => {
   const out = join(mkdtempSync(join(tmpdir(), "out-")), "agent-prompt.md");
   extra.push(dirname(out));
@@ -48,17 +50,18 @@ const compose = (dir: string, agent: AgentName, over: { repo?: string } = {}) =>
     repo: over.repo ?? repo(),
     central: central(),
     out,
+    ...RUN,
   });
   return { ...result, text: readFileSync(result.prompt_path, "utf8") };
 };
 
-/** 決定記録の 1 行（契約 §4） */
-const records = `${JSON.stringify({
-  id: "D-1",
-  title: "セッション有効期限を 24h にした",
-  decision: "既存の refresh token に揃えた",
-  reversibility: "easy",
-})}\n`;
+/** 決定記録 1 ファイル（契約 §4）。名前の prefix はハーネスが決める */
+const record = (dir: string, slug: string) =>
+  put(
+    dir,
+    `decision-records/${RUN.run_id}-${RUN.attempt}-${slug}.md`,
+    "---\ntype: design\ntitle: セッション有効期限を 24h にした\nreversibility: easy\n---\n\n本文",
+  );
 
 const review = (dir: string, kind: "plan" | "dev", n: number) =>
   put(
@@ -135,7 +138,7 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     put(dir, "issue.md", "x");
     put(dir, "plan.md", "x");
     put(dir, "acceptance.json", "{}");
-    put(dir, "decision-records.jsonl", records);
+    record(dir, "session-ttl");
     review(dir, "plan", 1);
 
     const { inputs } = compose(dir, "plan-reviewer");
@@ -151,7 +154,8 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     put(dir, "issue.md", "x");
     put(dir, "plan.md", "x");
     put(dir, "acceptance.json", "{}");
-    put(dir, "decision-records.jsonl", records);
+    const first = record(dir, "session-ttl");
+    const second = record(dir, "token-rotation");
     const dev = review(dir, "dev", 1);
 
     const { inputs } = compose(dir, "developer");
@@ -159,7 +163,8 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
       join(dir, "plan.md"),
       join(dir, "acceptance.json"),
       dev,
-      join(dir, "decision-records.jsonl"),
+      first,
+      second,
     ]);
   });
 
@@ -191,10 +196,27 @@ describe("レビューの書き込み先（契約 §5）", () => {
     expect(compose(dir, "dev-reviewer").review_path).toBe(join(dir, "reviews", "dev-01.md"));
   });
 
-  test("レビュアー以外には出力の節を作らない", () => {
-    const { text, review_path } = compose(makeRun(), "developer");
+  test("planner には出力の節を作らない（ハーネスが名前を決めるものが無い）", () => {
+    const { text, review_path } = compose(makeRun(), "planner");
     expect(review_path).toBeNull();
     expect(text).not.toContain("## 出力");
+  });
+});
+
+describe("決定記録の書き込み先（契約 §5）", () => {
+  test("developer には prefix 付きのパスと slug の規則を伝える", () => {
+    const dir = makeRun();
+    const { text, review_path } = compose(dir, "developer");
+    expect(review_path).toBeNull();
+    expect(text).toContain(
+      `- 実装中の判断: ${join(dir, "decision-records", "17293840112-1-<slug>.md")}`,
+    );
+    // 役割プロンプトが差し替えられても残るよう、名前の規則はハーネス側に書く
+    expect(text).toContain("判断 1 つにつき 1 ファイル");
+  });
+
+  test("developer 以外には書き込み先を伝えない（書くのは developer だけ）", () => {
+    expect(compose(makeRun(), "dev-reviewer").text).not.toContain("実装中の判断:");
   });
 });
 
@@ -215,7 +237,15 @@ describe("使ったプロンプトを返す", () => {
     for (const agent of AGENTS) {
       const out = join(mkdtempSync(join(tmpdir(), "out-")), "agent-prompt.md");
       extra.push(dirname(out));
-      const r = composeRun({ dir: makeRun(), config: c, agent, repo: repo(), central, out });
+      const r = composeRun({
+        dir: makeRun(),
+        config: c,
+        agent,
+        repo: repo(),
+        central,
+        out,
+        ...RUN,
+      });
       expect(r.role_prompt).toBe(join(central, "prompts", `${agent}.md`));
     }
   });

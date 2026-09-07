@@ -33,7 +33,8 @@ commands:
   label    いま付いているべきラベルを返す
   validate 成果物が契約を満たすか検証し Outcome を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
-  compose  エージェントに渡すプロンプトを組み立てる --agent --central --out [--repo]
+  compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
+                                              [--repo]
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -140,6 +141,9 @@ const run = () => {
         repo: values.repo ?? ".",
         central: need(values.central, "central"),
         out: need(values.out, "out"),
+        // 決定記録の名前の prefix になる（契約 §5）
+        run_id: need(values["run-id"], "run-id"),
+        attempt: Number(values.attempt),
       });
     default:
       console.error(`不明なコマンド: ${command ?? "(なし)"}\n\n${USAGE}`);
