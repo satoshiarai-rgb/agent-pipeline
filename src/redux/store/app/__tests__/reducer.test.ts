@@ -11,7 +11,7 @@ import {
   runOnce,
 } from "../../../../__tests__/run-dir-fixture.ts";
 import { type RunRecord, readRecords } from "../../../../file/run-record.ts";
-import { agentFor, isIdle, reviewKindFor, roundKeyFor, TRANSITIONS } from "../reducer.ts";
+import { agentFor, isIdle } from "../reducer.ts";
 
 const c = config();
 afterEach(cleanupRuns);
@@ -226,27 +226,7 @@ describe("reducer: 人間の action による遷移", () => {
   });
 });
 
-describe("遷移表（TRANSITIONS。配布先の設定では上書きできない / K-26）", () => {
-  test("成功で次に進む", () => {
-    expect(TRANSITIONS.planning?.ok).toBe("plan_review");
-    expect(TRANSITIONS.developing?.ok).toBe("dev_review");
-  });
-
-  test("レビューの verdict で分岐する", () => {
-    expect(TRANSITIONS.plan_review?.approve).toBe("awaiting_human");
-    expect(TRANSITIONS.plan_review?.request_changes).toBe("planning");
-    expect(TRANSITIONS.dev_review?.approve).toBe("completing");
-    expect(TRANSITIONS.dev_review?.request_changes).toBe("developing");
-  });
-
-  test("completing の成功は done（失敗は導出される blocked なので辺を持たない / K-26）", () => {
-    expect(TRANSITIONS.completing?.ok).toBe("done");
-  });
-
-  test("done は終端で辺を持たない（K-10）", () => {
-    expect(TRANSITIONS.done).toBeUndefined();
-  });
-
+describe("フェーズの性質（agentFor / isIdle）", () => {
   test("エージェントは 5 つのフェーズに割り当たり、人間が起こす遷移には割り当たらない", () => {
     expect(agentFor("planning")).toBe("planner");
     expect(agentFor("plan_review")).toBe("plan-reviewer");
@@ -254,17 +234,7 @@ describe("遷移表（TRANSITIONS。配布先の設定では上書きできな�
     expect(agentFor("dev_review")).toBe("dev-reviewer");
     expect(agentFor("completing")).toBe("completion");
     expect(agentFor("awaiting_human")).toBeNull();
-  });
-
-  test("ラウンドを数えるのはレビューのフェーズだけ", () => {
-    expect(roundKeyFor("plan_review")).toBe("plan_review");
-    expect(roundKeyFor("dev_review")).toBe("dev_review");
-    expect(roundKeyFor("planning")).toBeNull();
-  });
-
-  test("人間の差し戻しをどのレビューとして残すか", () => {
-    expect(reviewKindFor("awaiting_human")).toBe("plan");
-    expect(reviewKindFor("planning")).toBeNull();
+    expect(agentFor("done")).toBeNull();
   });
 
   test("エージェントを起動しないフェーズ（continue_chain の判定に使う）", () => {
@@ -274,5 +244,19 @@ describe("遷移表（TRANSITIONS。配布先の設定では上書きできな�
     expect(isIdle("awaiting_human")).toBe(true);
     expect(isIdle("bootstrap")).toBe(true);
     expect(isIdle("planning")).toBe(false);
+  });
+});
+
+describe("遷移は reducer の中に書いてある（dispatch で確かめる / K-26）", () => {
+  test("done は終端なので、そこから動く action は無い（K-10）", () => {
+    const dir = makeRun("done");
+    expect(approve(dir, "OWNER", c).ok).toBe(false);
+    expect(requestChanges(dir, "OWNER", "直して", c).ok).toBe(false);
+    expect(phaseOf(dir).phase).toBe("done");
+  });
+
+  test("レビューのフェーズ以外で verdict が来たら黙って通さない", () => {
+    const f = runOnce(makeRun("planning"), "planner", { result: "ok", verdict: "approve" }, c);
+    expect(f.blocked_reason).toBe("transition_incomplete: planning (approve)");
   });
 });

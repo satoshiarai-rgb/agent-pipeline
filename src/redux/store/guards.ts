@@ -2,7 +2,6 @@ import type { Config } from "../../defaults.ts";
 import type { Action, AnyAction } from "../../utils/typescript-fsa.ts";
 import type { AppPayload, Origin } from "./app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "./app/actions.ts";
-import { TRANSITIONS } from "./app/reducer.ts";
 import type { RootState } from "./createStore.ts";
 import { selectBlocked } from "./selectors.ts";
 
@@ -26,12 +25,12 @@ const authorized: Guard = (_root, action, config) => {
   return config.approvers.includes(association) ? null : `not_authorized: ${association}`;
 };
 
-/** 対象外のフェーズでのコメントは何もしない（取り違えを黙って進めない） */
-const canApprove: Guard = ({ app }) =>
-  TRANSITIONS[app.phase]?.approval ? null : `not_awaiting_approval: phase=${app.phase}`;
-
-const canRequestChanges: Guard = ({ app }) =>
-  TRANSITIONS[app.phase]?.request_changes ? null : `not_awaiting_approval: phase=${app.phase}`;
+/**
+ * 対象外のフェーズでのコメントは何もしない（取り違えを黙って進めない）。
+ * 人間が判断を入れられるのは計画の承認待ちだけ（設計書 §3.1 / K-10）。
+ */
+const awaitingHuman: Guard = ({ app }) =>
+  app.phase === "awaiting_human" ? null : `not_awaiting_approval: phase=${app.phase}`;
 
 /** 「止まっている」は導出された状態（`selectBlocked`）で判断する */
 const mustBeBlocked: Guard = (root, _action, config) =>
@@ -55,8 +54,8 @@ const notInFlight: Guard = ({ app }) =>
 
 /** action ごとのガード。**上から順に適用し、最初に返った理由を使う** */
 const GUARDS: Record<string, Guard[]> = {
-  [humanApproval.type]: [authorized, canApprove],
-  [humanRequestChanges.type]: [authorized, canRequestChanges],
+  [humanApproval.type]: [authorized, awaitingHuman],
+  [humanRequestChanges.type]: [authorized, awaitingHuman],
   [retry.type]: [authorized, mustBeBlocked, notLimitReached, knowsWhereToResume, notInFlight],
 };
 

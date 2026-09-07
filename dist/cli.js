@@ -633,95 +633,159 @@ var initialApp = {
   in_flight_run_id: null,
   last_reason: null
 };
-var TRANSITIONS = {
-  planning: { agent: "planner", ok: "plan_review" },
-  plan_review: {
-    agent: "plan-reviewer",
-    round_key: "plan_review",
-    approve: "awaiting_human",
-    request_changes: "planning"
-  },
-  developing: { agent: "developer", ok: "dev_review" },
-  dev_review: {
-    agent: "dev-reviewer",
-    round_key: "dev_review",
-    approve: "completing",
-    request_changes: "developing"
-  },
-  completing: { agent: "completion", ok: "done" },
-  awaiting_human: { approval: "developing", request_changes: "planning", review_kind: "plan" }
-};
-var IDLE_PHASES = ["bootstrap", "awaiting_human", "done", "blocked"];
-var isIdle = (phase) => IDLE_PHASES.includes(phase);
-var agentFor = (phase) => TRANSITIONS[phase]?.agent ?? null;
-var reviewKindFor = (phase) => TRANSITIONS[phase]?.review_kind ?? null;
-var roundKeyFor = (phase) => TRANSITIONS[phase]?.round_key ?? null;
-var RETRY_TO = {
-  bootstrap: "bootstrap",
-  planning: "planning",
-  plan_review: "plan_review",
-  awaiting_human: "awaiting_human",
-  developing: "developing",
-  dev_review: "dev_review",
-  completing: "completing",
-  done: "done",
-  blocked: "blocked"
-};
-var createAppReducer = (config) => reducerWithInitialState(initialApp).case(restore, (s, p) => ({ ...s, ...p.app })).case(agentStarted, (s, p) => ({
-  ...s,
-  total_steps: s.total_steps + 1,
-  plan_review_rounds: s.plan_review_rounds + (s.phase === "plan_review" ? 1 : 0),
-  dev_review_rounds: s.dev_review_rounds + (s.phase === "dev_review" ? 1 : 0),
-  in_flight_agent: p.agent,
-  in_flight_run_id: p.run_id,
+var transitionIncomplete = (phase, event) => `transition_incomplete: ${phase} (${event})`;
+var roundsExceeded = (phase, used, limit) => `${phase}_rounds_exceeded: ${used}/${limit}`;
+function roundLimitReason(state, config) {
+  switch (state.phase) {
+    case "plan_review":
+      return state.plan_review_rounds >= config.limits.plan_review_rounds ? roundsExceeded("plan_review", state.plan_review_rounds, config.limits.plan_review_rounds) : null;
+    case "dev_review":
+      return state.dev_review_rounds >= config.limits.dev_review_rounds ? roundsExceeded("dev_review", state.dev_review_rounds, config.limits.dev_review_rounds) : null;
+    default:
+      return null;
+  }
+}
+function isIdle(phase) {
+  switch (phase) {
+    case "bootstrap":
+    case "awaiting_human":
+    case "done":
+    case "blocked":
+      return true;
+    default:
+      return false;
+  }
+}
+function agentFor(phase) {
+  switch (phase) {
+    case "planning":
+      return "planner";
+    case "plan_review":
+      return "plan-reviewer";
+    case "developing":
+      return "developer";
+    case "dev_review":
+      return "dev-reviewer";
+    case "completing":
+      return "completion";
+    default:
+      return null;
+  }
+}
+var createAppReducer = (config) => reducerWithInitialState(initialApp).case(restore, (state, payload) => ({ ...state, ...payload.app })).case(agentStarted, (state, payload) => ({
+  ...state,
+  total_steps: state.total_steps + 1,
+  plan_review_rounds: state.plan_review_rounds + (state.phase === "plan_review" ? 1 : 0),
+  dev_review_rounds: state.dev_review_rounds + (state.phase === "dev_review" ? 1 : 0),
+  in_flight_agent: payload.agent,
+  in_flight_run_id: payload.run_id,
   last_reason: "started"
-})).case(agentFailed, (s, p) => ({
-  ...s,
-  failure_reason: p.reason,
+})).case(agentFailed, (state, payload) => ({
+  ...state,
+  failure_reason: payload.reason,
   in_flight_agent: null,
   in_flight_run_id: null,
-  last_reason: p.reason
-})).case(agentOk, (s, p) => {
-  const next = TRANSITIONS[s.phase]?.ok;
-  const needsVerdict = roundKeyFor(s.phase) !== null;
-  const acceptance = s.phase === "completing" && !p.acceptance_passed;
-  return {
-    ...s,
-    phase: acceptance || needsVerdict ? s.phase : next ?? s.phase,
-    failure_reason: acceptance ? "acceptance_not_passed" : needsVerdict ? "missing_verdict" : next ? null : `transition_incomplete: ${s.phase} (ok)`,
-    in_flight_agent: null,
-    in_flight_run_id: null,
-    last_reason: s.phase === "completing" ? "acceptance_passed" : "ok"
-  };
-}).case(review, (s, p) => {
-  const key = roundKeyFor(s.phase);
-  const used = key === "dev_review" ? s.dev_review_rounds : s.plan_review_rounds;
-  const limit = key === "dev_review" ? config.limits.dev_review_rounds : config.limits.plan_review_rounds;
-  const exceeded = p.verdict === "request_changes" && used >= limit;
-  const next = TRANSITIONS[s.phase]?.[p.verdict];
-  return {
-    ...s,
-    phase: exceeded ? s.phase : next ?? s.phase,
-    failure_reason: exceeded ? `${key}_rounds_exceeded: ${used}/${limit}` : next ? null : `transition_incomplete: ${s.phase} (${p.verdict})`,
-    in_flight_agent: null,
-    in_flight_run_id: null,
-    last_reason: p.verdict === "approve" ? "approve" : `request_changes (${used}/${limit})`
-  };
-}).case(humanApproval, (s) => ({
-  ...s,
-  phase: TRANSITIONS[s.phase]?.approval ?? s.phase,
-  failure_reason: TRANSITIONS[s.phase]?.approval ? null : `transition_incomplete: ${s.phase} (approval)`,
-  last_reason: "approval"
-})).case(humanRequestChanges, (s) => ({
-  ...s,
-  phase: TRANSITIONS[s.phase]?.request_changes ?? s.phase,
-  failure_reason: TRANSITIONS[s.phase]?.request_changes ? null : `transition_incomplete: ${s.phase} (request_changes)`,
-  last_reason: "request_changes"
-})).case(retry, (s) => ({
-  ...s,
-  phase: RETRY_TO[s.phase],
+  last_reason: payload.reason
+})).case(agentOk, (state, payload) => {
+  const closed = { ...state, in_flight_agent: null, in_flight_run_id: null };
+  switch (state.phase) {
+    case "planning":
+      return { ...closed, phase: "plan_review", failure_reason: null, last_reason: "ok" };
+    case "developing":
+      return { ...closed, phase: "dev_review", failure_reason: null, last_reason: "ok" };
+    case "completing":
+      return payload.acceptance_passed ? { ...closed, phase: "done", failure_reason: null, last_reason: "acceptance_passed" } : {
+        ...closed,
+        failure_reason: "acceptance_not_passed",
+        last_reason: "acceptance_not_passed"
+      };
+    case "plan_review":
+    case "dev_review":
+      return { ...closed, failure_reason: "missing_verdict", last_reason: "missing_verdict" };
+    default:
+      return {
+        ...closed,
+        failure_reason: transitionIncomplete(state.phase, "ok"),
+        last_reason: "ok"
+      };
+  }
+}).case(review, (state, payload) => {
+  const closed = { ...state, in_flight_agent: null, in_flight_run_id: null };
+  if (payload.verdict === "approve") {
+    switch (state.phase) {
+      case "plan_review":
+        return {
+          ...closed,
+          phase: "awaiting_human",
+          failure_reason: null,
+          last_reason: "approve"
+        };
+      case "dev_review":
+        return { ...closed, phase: "completing", failure_reason: null, last_reason: "approve" };
+      default:
+        return {
+          ...closed,
+          failure_reason: transitionIncomplete(state.phase, "approve"),
+          last_reason: "approve"
+        };
+    }
+  }
+  const exceeded = roundLimitReason(state, config);
+  if (exceeded)
+    return { ...closed, failure_reason: exceeded, last_reason: exceeded };
+  switch (state.phase) {
+    case "plan_review":
+      return {
+        ...closed,
+        phase: "planning",
+        failure_reason: null,
+        last_reason: `request_changes (${state.plan_review_rounds}/${config.limits.plan_review_rounds})`
+      };
+    case "dev_review":
+      return {
+        ...closed,
+        phase: "developing",
+        failure_reason: null,
+        last_reason: `request_changes (${state.dev_review_rounds}/${config.limits.dev_review_rounds})`
+      };
+    default:
+      return {
+        ...closed,
+        failure_reason: transitionIncomplete(state.phase, "request_changes"),
+        last_reason: "request_changes"
+      };
+  }
+}).case(humanApproval, (state) => {
+  switch (state.phase) {
+    case "awaiting_human":
+      return { ...state, phase: "developing", failure_reason: null, last_reason: "approval" };
+    default:
+      return {
+        ...state,
+        failure_reason: transitionIncomplete(state.phase, "approval"),
+        last_reason: "approval"
+      };
+  }
+}).case(humanRequestChanges, (state) => {
+  switch (state.phase) {
+    case "awaiting_human":
+      return {
+        ...state,
+        phase: "planning",
+        failure_reason: null,
+        last_reason: "request_changes"
+      };
+    default:
+      return {
+        ...state,
+        failure_reason: transitionIncomplete(state.phase, "request_changes"),
+        last_reason: "request_changes"
+      };
+  }
+}).case(retry, (state) => ({
+  ...state,
   failure_reason: null,
-  last_reason: `retry: ${s.phase}`
+  last_reason: `retry: ${state.phase}`
 })).build();
 
 // src/redux/store/selectors.ts
@@ -1443,8 +1507,7 @@ var authorized = (_root, action, config) => {
   const association = associationOf(action);
   return config.approvers.includes(association) ? null : `not_authorized: ${association}`;
 };
-var canApprove = ({ app }) => TRANSITIONS[app.phase]?.approval ? null : `not_awaiting_approval: phase=${app.phase}`;
-var canRequestChanges = ({ app }) => TRANSITIONS[app.phase]?.request_changes ? null : `not_awaiting_approval: phase=${app.phase}`;
+var awaitingHuman = ({ app }) => app.phase === "awaiting_human" ? null : `not_awaiting_approval: phase=${app.phase}`;
 var mustBeBlocked = (root, _action, config) => selectBlocked(root, config).blocked ? null : `not_blocked: phase=${root.app.phase}`;
 var notLimitReached = (root, _action, config) => {
   const reason = selectBlocked(root, config).reason;
@@ -1453,8 +1516,8 @@ var notLimitReached = (root, _action, config) => {
 var knowsWhereToResume = ({ app }) => app.phase === "blocked" ? "no_records: 実行の記録が無いので戻る先が決まらない" : null;
 var notInFlight = ({ app }) => app.in_flight_agent ? `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}` : null;
 var GUARDS = {
-  [humanApproval.type]: [authorized, canApprove],
-  [humanRequestChanges.type]: [authorized, canRequestChanges],
+  [humanApproval.type]: [authorized, awaitingHuman],
+  [humanRequestChanges.type]: [authorized, awaitingHuman],
   [retry.type]: [authorized, mustBeBlocked, notLimitReached, knowsWhereToResume, notInFlight]
 };
 function rejection(root, action, config) {
@@ -1533,7 +1596,7 @@ var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
   const { info, app } = store.getState();
   outputs.review_path = saveReview({
     dir: info.dir,
-    kind: reviewKindFor(app.phase) ?? "plan",
+    kind: app.phase === "dev_review" ? "dev" : "plan",
     verdict: "request_changes",
     reviewer: a.payload?.by ?? "human",
     body: a.payload?.body ?? ""

@@ -1,6 +1,5 @@
 import { saveReview } from "../../../file/review-file.ts";
 import { humanRequestChanges } from "../app/actions.ts";
-import { reviewKindFor } from "../app/reducer.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";
 
@@ -23,7 +22,8 @@ export const reviewFile: AgentMiddleware =
     const { info, app } = store.getState();
     outputs.review_path = saveReview({
       dir: info.dir,
-      kind: reviewKindFor(app.phase) ?? "plan",
+      // 人間が差し戻せるのは計画の承認待ちだけなので、レビュー種別は計画側
+      kind: app.phase === "dev_review" ? "dev" : "plan",
       verdict: "request_changes",
       reviewer: a.payload?.by ?? "human",
       body: a.payload?.body ?? "",
