@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { isTerminal, nextPhase, reviewKindFor, roundKeyFor } from "../transitions.ts";
+import { isIdle, nextPhase, reviewKindFor, roundKeyFor } from "../transitions.ts";
 import { config } from "./helpers.ts";
 
 const c = config();
@@ -29,7 +29,7 @@ describe("nextPhase", () => {
   });
 });
 
-describe("roundKeyFor / reviewKindFor / isTerminal", () => {
+describe("roundKeyFor / reviewKindFor / isIdle", () => {
   test("ラウンドを数えるのはレビューのフェーズだけ", () => {
     expect(roundKeyFor("plan_review", c)).toBe("plan_review");
     expect(roundKeyFor("dev_review", c)).toBe("dev_review");
@@ -41,10 +41,12 @@ describe("roundKeyFor / reviewKindFor / isTerminal", () => {
     expect(reviewKindFor("planning", c)).toBeNull();
   });
 
-  test("終端フェーズ（continue_chain の判定に使う）", () => {
-    expect(isTerminal("done")).toBe(true);
-    expect(isTerminal("blocked")).toBe(true);
-    expect(isTerminal("awaiting_human")).toBe(false);
-    expect(isTerminal("planning")).toBe(false);
+  test("エージェントを起動しないフェーズ（continue_chain の判定に使う）", () => {
+    expect(isIdle("done")).toBe(true);
+    expect(isIdle("blocked")).toBe(true);
+    // 人間のコメント待ち。push で起動しても route が none を返すだけなので連鎖させない
+    expect(isIdle("awaiting_human")).toBe(true);
+    expect(isIdle("bootstrap")).toBe(true);
+    expect(isIdle("planning")).toBe(false);
   });
 });

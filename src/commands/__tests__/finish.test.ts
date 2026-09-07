@@ -32,11 +32,12 @@ describe("finishRun: 遷移", () => {
     expect(runOnce(makeRun(), "planner", { result: "ok" }).phase).toBe("plan_review");
   });
 
-  test("approve で awaiting_human へ（連鎖は続くが dispatch が止める）", () => {
+  test("approve で awaiting_human へ（人間待ちなので連鎖させない）", () => {
     const dir = makeRun("plan_review");
     const f = runOnce(dir, "plan-reviewer", { result: "ok", verdict: "approve" });
     expect(f.phase).toBe("awaiting_human");
-    expect(f.continue_chain).toBe(true);
+    // [skip ci] で run を起こさない。起きたとしても route が止める（二重の停止）
+    expect(f.continue_chain).toBe(false);
     expect(routeRun({ dir, config: c }).action).toBe("none");
   });
 
