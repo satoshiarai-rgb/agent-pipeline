@@ -133,11 +133,11 @@ describe("reducer: 停止条件", () => {
     }
   });
 
-  test("遷移表に行き先が無い組み合わせは blocked にする（黙って通さない）", () => {
-    // planning は verdict による辺を持たない（レビューのフェーズではない）
-    const f = runOnce(makeRun("planning"), "planner", { result: "ok", verdict: "approve" }, c);
+  test("エージェントが走らないフェーズでの成功報告は blocked にする（黙って通さない）", () => {
+    // awaiting_human は人間を待つフェーズで、エージェントの終了に対応する action が無い
+    const f = runOnce(makeRun("awaiting_human"), "planner", { result: "ok" }, c);
     expect(f.phase).toBe("blocked");
-    expect(f.blocked_reason).toContain("transition_incomplete: planning (approve)");
+    expect(f.blocked_reason).toBe("transition_incomplete: awaiting_human (ok)");
   });
 });
 
@@ -255,8 +255,8 @@ describe("遷移は reducer の中に書いてある（dispatch で確かめる 
     expect(phaseOf(dir).phase).toBe("done");
   });
 
-  test("レビューのフェーズ以外で verdict が来たら黙って通さない", () => {
-    const f = runOnce(makeRun("planning"), "planner", { result: "ok", verdict: "approve" }, c);
-    expect(f.blocked_reason).toBe("transition_incomplete: planning (approve)");
+  test("レビューのフェーズで verdict が無ければ blocked（frontmatter の欠落）", () => {
+    const f = runOnce(makeRun("plan_review"), "plan-reviewer", { result: "ok" }, c);
+    expect(f.blocked_reason).toBe("missing_verdict");
   });
 });

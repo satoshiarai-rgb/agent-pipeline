@@ -1,19 +1,28 @@
 import { describe, expect, test } from "bun:test";
 import {
   agentFailed,
-  agentOk,
   agentStarted,
+  completed,
+  devReviewed,
   humanApproval,
   humanRequestChanges,
+  implemented,
+  planned,
+  planReviewed,
   retry,
-  review,
 } from "../actions.ts";
 
-/** 実行状況を動かす 7 つ（`blocked` は action ではなく導出される状態 / K-26） */
+/**
+ * 実行状況を動かす action（`blocked` は action ではなく導出される状態 / K-26）。
+ * エージェントの終了はフェーズごとに分かれている。
+ */
 const APP_ACTIONS = [
   agentStarted,
-  agentOk,
-  review,
+  planned,
+  planReviewed,
+  implemented,
+  devReviewed,
+  completed,
   agentFailed,
   humanApproval,
   humanRequestChanges,
@@ -30,14 +39,13 @@ describe("FSA の形", () => {
 
   test("type は ducks の名前空間付き（agent-pipeline/app/<TYPE>）", () => {
     expect(agentStarted.type).toBe("agent-pipeline/app/AGENT_STARTED");
-    expect(review.type).toBe("agent-pipeline/app/REVIEW");
     for (const creator of APP_ACTIONS) {
       expect(creator.type).toMatch(/^agent-pipeline\/app\/[A-Z_]+$/);
     }
   });
 
   test("最上位に余分なキーを持たない", () => {
-    const a = review({ ...origin, ...run, verdict: "approve" });
+    const a = planReviewed({ ...origin, ...run, verdict: "approve" });
     expect(Object.keys(a).sort()).toEqual(["payload", "type"]);
     expect(a.payload.verdict).toBe("approve");
   });
@@ -51,7 +59,22 @@ describe("FSA の形", () => {
 
   test("「止まる」action は無い（blocked は導出される状態 / K-26）", () => {
     expect(APP_ACTIONS.map((c) => c.type)).not.toContain("agent-pipeline/app/BLOCK");
-    expect(APP_ACTIONS.length).toBe(7);
+  });
+
+  test("エージェントの終了はフェーズごとに分かれている（reducer に phase の分岐が無い）", () => {
+    expect([
+      planned.type,
+      planReviewed.type,
+      implemented.type,
+      devReviewed.type,
+      completed.type,
+    ]).toEqual([
+      "agent-pipeline/app/PLANNED",
+      "agent-pipeline/app/PLAN_REVIEWED",
+      "agent-pipeline/app/IMPLEMENTED",
+      "agent-pipeline/app/DEV_REVIEWED",
+      "agent-pipeline/app/COMPLETED",
+    ]);
   });
 
   test("いつ・誰が を payload に持つ（人間の介入も同じ形で記録できる）", () => {
@@ -61,8 +84,8 @@ describe("FSA の形", () => {
   });
 
   test("match で payload の型が絞れる（type 文字列の比較を書かない）", () => {
-    const a = review({ ...origin, ...run, verdict: "request_changes" });
-    expect(review.match(a)).toBe(true);
+    const a = planReviewed({ ...origin, ...run, verdict: "request_changes" });
+    expect(planReviewed.match(a)).toBe(true);
     expect(agentStarted.match(a)).toBe(false);
   });
 });

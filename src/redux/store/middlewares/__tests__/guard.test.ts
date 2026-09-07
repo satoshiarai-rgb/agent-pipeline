@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import { config } from "../../../__tests__/helpers.ts";
+import { config } from "../../../../__tests__/helpers.ts";
 import {
   approve,
   cleanupRuns,
@@ -12,7 +12,7 @@ import {
   retry as retryCmd,
   runOnce,
   start,
-} from "../../../__tests__/run-dir-fixture.ts";
+} from "../../../../__tests__/run-dir-fixture.ts";
 
 const c = config();
 afterEach(cleanupRuns);

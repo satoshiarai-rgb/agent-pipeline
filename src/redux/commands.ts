@@ -101,7 +101,8 @@ const transitionOutput = (root: RootState, _outputs: unknown, config: Config) =>
 });
 
 interface Command {
-  action?: (a: Args, config: Config) => PipelineAction;
+  /** dispatch する action。`root` はいまの状態（走っていたフェーズを見るために渡す） */
+  action?: (a: Args, config: Config, root: RootState) => PipelineAction;
   output?: (root: RootState, outputs: Record<string, unknown>, config: Config) => unknown;
   read?: (root: RootState, a: Args, config: Config, configError: string | null) => unknown;
   /** action を使わずにファイルを書き直すもの（スナップショットの再生成） */
@@ -121,8 +122,13 @@ export const COMMANDS: Record<string, Command> = {
     output: (_root, outputs) => ({ record_path: outputs.record_path }),
   },
   finish: {
-    action: (a) =>
-      fromOutcome(outcomeOf(a), { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null }),
+    // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
+    action: (a, _config, root) =>
+      fromOutcome(
+        outcomeOf(a),
+        { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null },
+        root.app.phase,
+      ),
     output: transitionOutput,
   },
   approve: {
@@ -219,7 +225,9 @@ export function runCommand(
   if (cmd.read) return cmd.read(state(), args, config, configError);
   if (cmd.write) return cmd.write(state(), config, configError);
 
-  const result = store.dispatch((cmd.action as NonNullable<Command["action"]>)(args, config));
+  const result = store.dispatch(
+    (cmd.action as NonNullable<Command["action"]>)(args, config, state()),
+  );
   if (isRejection(result)) return result;
   return cmd.output?.(state(), outputs, config);
 }

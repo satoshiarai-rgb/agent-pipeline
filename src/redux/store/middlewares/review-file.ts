@@ -20,10 +20,12 @@ export const reviewFile: AgentMiddleware =
     if (!humanRequestChanges.match(action as never)) return next(action);
 
     const { info, app } = store.getState();
+    // 人間が差し戻せるのは計画の承認待ちだけなので、通常は計画側になる
+    let kind: "plan" | "dev" = "plan";
+    if (app.phase === "dev_review") kind = "dev";
     outputs.review_path = saveReview({
       dir: info.dir,
-      // 人間が差し戻せるのは計画の承認待ちだけなので、レビュー種別は計画側
-      kind: app.phase === "dev_review" ? "dev" : "plan",
+      kind,
       verdict: "request_changes",
       reviewer: a.payload?.by ?? "human",
       body: a.payload?.body ?? "",

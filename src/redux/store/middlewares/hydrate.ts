@@ -40,8 +40,10 @@ export const hydrate: AgentMiddleware = () => (store) => (next) => (action) => {
         phase: file.phase === "blocked" ? (last?.phase ?? "blocked") : file.phase,
         failure_reason: file.phase === "blocked" ? file.blocked_reason : null,
         total_steps: stats.total_steps,
-        plan_review_rounds: stats.rounds.plan_review,
-        dev_review_rounds: stats.rounds.dev_review,
+        // 往復は**判定が付いた実行**で数える（reducer が判定の action で +1 するのと同じ規則）。
+        // 失敗して verdict が無い実行は往復に数えない
+        plan_review_rounds: records.filter((r) => r.agent === "plan-reviewer" && r.verdict).length,
+        dev_review_rounds: records.filter((r) => r.agent === "dev-reviewer" && r.verdict).length,
         in_flight_agent: stats.in_flight?.agent ?? null,
         in_flight_run_id: stats.in_flight?.run_id ?? null,
       },

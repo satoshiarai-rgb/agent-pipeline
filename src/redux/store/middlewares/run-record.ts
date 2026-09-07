@@ -6,7 +6,15 @@ import {
   saveRecord,
 } from "../../../file/run-record.ts";
 import type { RunResult } from "../../../types.ts";
-import { agentFailed, agentOk, agentStarted, review } from "../app/actions.ts";
+import {
+  agentFailed,
+  agentStarted,
+  completed,
+  devReviewed,
+  implemented,
+  planned,
+  planReviewed,
+} from "../app/actions.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";
 
@@ -52,9 +60,16 @@ export const runRecord: AgentMiddleware =
       return next(action);
     }
 
-    if (a.type !== agentOk.type && a.type !== review.type && a.type !== agentFailed.type) {
-      return next(action);
-    }
+    // 終了系の action（フェーズごとに分かれている）でレコードを閉じる
+    const closes: string[] = [
+      planned.type,
+      planReviewed.type,
+      implemented.type,
+      devReviewed.type,
+      completed.type,
+      agentFailed.type,
+    ];
+    if (!closes.includes(a.type)) return next(action);
     const agent = app.in_flight_agent;
     const p = (a.payload ?? {}) as {
       run_id: string;

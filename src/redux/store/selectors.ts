@@ -77,19 +77,23 @@ export function selectBlocked(
   config_error: string | null = null,
 ): { blocked: boolean; reason: string | null } {
   const { phase, failure_reason } = root.app;
-  const reason =
-    failure_reason ??
-    selectEnvStop(root, config, config_error) ??
-    (phase === "blocked" ? "（理由が記録されていません）" : null);
-  return { blocked: reason !== null, reason };
+  if (failure_reason) return { blocked: true, reason: failure_reason };
+  const env = selectEnvStop(root, config, config_error);
+  if (env) return { blocked: true, reason: env };
+  // スナップショットが blocked のまま復元され、理由が残っていない場合
+  if (phase === "blocked") return { blocked: true, reason: "（理由が記録されていません）" };
+  return { blocked: false, reason: null };
 }
 
 /** 導出された phase。止まっていれば blocked、そうでなければ実行位置そのもの */
-export const selectPhase = (
+export function selectPhase(
   root: RootState,
   config: Config,
   config_error: string | null = null,
-): Phase => (selectBlocked(root, config, config_error).blocked ? "blocked" : root.app.phase);
+): Phase {
+  if (selectBlocked(root, config, config_error).blocked) return "blocked";
+  return root.app.phase;
+}
 
 /**
  * false なら HEAD コミットに `[skip ci]` を付けて連鎖を止める（A-36 / V-5）。
