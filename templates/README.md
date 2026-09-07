@@ -21,8 +21,8 @@
 `phase` に入る値: `bootstrap` / `planning` / `plan_review` / `awaiting_human` /
 `developing` / `dev_review` / `completing` / `done` / `blocked`
 
-`blocked_reason` の例: `plan_review_rounds_exceeded: 2/2`、`api_error:429`、
-`total_steps_exceeded: 12/12`、`invalid_artifacts`
+`blocked_reason` の例: `plan_review_rounds_exceeded: 5/5`、`api_error:429`、
+`total_steps_exceeded: 24/24`、`invalid_artifacts: plan.md が無いか空`
 
 JSON にはコメントを書けないため、この説明をファイルの外に置いている。
 `blocked` になったときは issue コメントにも同じ復旧手順を投稿する。
