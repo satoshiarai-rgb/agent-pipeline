@@ -14,6 +14,7 @@
 | [docs/installation.md](docs/installation.md) | **導入手順。** GitHub App、Secrets、ワークフロー、お試し実行での確認 |
 | [docs/customize-prompt.md](docs/customize-prompt.md) | **エージェントの振る舞いを変える。** 規約とプロンプトの差し替え、守らせる決まり |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | **止まったとき。** `blocked` の理由と再開のしかた、症状別の見どころ |
+| [install/](install) | **配布先に置くファイルの原本。** ワークフロー 1 枚と、規約・準備スクリプト・issue フォームの雛形 |
 
 ## 現在の対応状況
 

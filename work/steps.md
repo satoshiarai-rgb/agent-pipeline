@@ -262,7 +262,9 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 ### Step D-0: 実機確認の手順（配線 → 本物）
 
 配布先は `satoshiarai-rgb/compass-wiki`。`dry_run` はリポジトリ変数 `AGENT_DRY_RUN` で
-切り替える（未設定なら dry run。`work/verify/check-dispatch.yml` を配布先にコピーしておく）。
+切り替える（未設定なら dry run。`install/agent.yml` を配布先の `.github/workflows/agent.yml` に
+コピーしておく。以前の原本 `work/verify/check-dispatch.yml` は A-51 で `install/agent.yml` に
+畳んだ。手動起動（`workflow_dispatch` で scenario を選ぶ）は Step B-4〜C-1 用だったので落とした）。
 
 **段 1: dry run で 1 周（トークン消費なし）** — 2026-09-05 に issue #5 で完了
 

@@ -1,0 +1,88 @@
+# 配布先に置く薄いラッパー（原本）
+#
+#   置き場所: あなたのリポジトリの .github/workflows/agent.yml
+#
+# ロジックは中央（satoshiarai-rgb/agent-pipeline）の reusable workflow にあります。
+# ここはイベントを受けて呼び分けるだけなので、原則そのままコピーして使えます。
+#
+# 前提: Secrets に AGENT_APP_CLIENT_ID / AGENT_APP_PRIVATE_KEY / CLAUDE_CODE_OAUTH_TOKEN
+#       （secrets: inherit で中央の reusable workflow に渡ります）
+#
+# 導入手順の全体は docs/installation.md を参照してください。
+
+name: agent
+
+# Actions の一覧に出る run の名前。push（実作業）はコミットメッセージのままにし、
+# それ以外は固定の文言にします（起動条件に合わないイベントでも run 自体は作られるため、
+# 既定のままだと issue のタイトルが付いて実作業と見分けが付きません）
+run-name: >-
+  ${{ github.event_name == 'push' && github.event.head_commit.message || 'agent: trigger check' }}
+
+on:
+  issues:
+    types: [labeled]
+  issue_comment:
+    types: [created]
+  push:
+    branches: ["claude/**"]
+    paths: ["agent-work/**"]
+
+# 呼び出す側より広い権限は要求できないので、本体が使う分をここで与えます。
+# 連鎖させたい push は GitHub App のトークンで行いますが、ラベルの射影と PR への
+# コメントは本体が GITHUB_TOKEN で行うため、issues / pull-requests の write は
+# ここで実際に使われます
+permissions:
+  contents: write
+  pull-requests: write
+  issues: write
+  id-token: write # 将来の認証方式（Workload Identity Federation）で必要になります
+
+# 作業ブランチへの push を直列化します（実行中のものは止めず、順番待ちにします）。
+# キーはイベントごとに変わるため、ラベルや PR コメントの入口はこれとは別のグループに
+# なります（同じ issue の作業でも、それらとの間では直列化されません）
+concurrency:
+  group: agent-${{ github.event.issue.number || github.ref_name }}
+  cancel-in-progress: false
+
+jobs:
+  # 入口: agent:go ラベルで起動します（ラベルを付けるには write / triage 権限が要ります）
+  bootstrap:
+    if: github.event_name == 'issues' && github.event.label.name == 'agent:go'
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/bootstrap.yml@main
+    with:
+      issue: ${{ github.event.issue.number }}
+      actor: ${{ github.actor }}
+    secrets: inherit
+
+  # 入口: PR のコメントで承認・差し戻し・再開を受けます
+  # （/agent approve、/agent request-changes <理由>、/agent retry）。
+  # issue 側のコメントは pull_request == null で弾き、bot のコメントも無視します
+  comment:
+    if: >-
+      github.event_name == 'issue_comment' &&
+      github.event.issue.pull_request != null &&
+      github.event.comment.user.type != 'Bot' &&
+      startsWith(github.event.comment.body, '/agent ')
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/comment.yml@main
+    with:
+      pr: ${{ github.event.issue.number }}
+      body: ${{ github.event.comment.body }}
+      association: ${{ github.event.comment.author_association }}
+    secrets: inherit
+
+  # 作業ブランチへの push が次のフェーズを起動します。
+  # push イベントでは入力を受け取れないので、お試し実行との切り替えは
+  # リポジトリ変数で行います（with: の中では式を使えません）
+  dispatch:
+    if: github.event_name == 'push' && vars.AGENT_DRY_RUN != 'false'
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@main
+    with:
+      dry_run: true
+    secrets: inherit
+
+  dispatch-live:
+    if: github.event_name == 'push' && vars.AGENT_DRY_RUN == 'false'
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@main
+    with:
+      dry_run: false
+    secrets: inherit

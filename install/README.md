@@ -1,0 +1,42 @@
+# 導入セット
+
+配布先（パイプラインを使うリポジトリ）に置くファイルの原本。**手順の説明は
+[`docs/installation.md`](../docs/installation.md) にあります。** ここは置き場所の対応表と、
+コピーする前に確かめることだけを持ちます。
+
+| 原本 | 置き場所 | 必須 |
+|---|---|---|
+| [`agent.yml`](agent.yml) | `.github/workflows/agent.yml` | **必須。** これが唯一の入口 |
+| [`conventions.md`](conventions.md) | `.agent/conventions.md` | 任意。このリポジトリの流儀を伝える唯一の手段 |
+| [`setup.sh`](setup.sh) | `.agent/setup.sh` | 任意。テストを走らせる準備が必要なら |
+| [`issue-template.yml`](issue-template.yml) | `.github/ISSUE_TEMPLATE/agent-task.yml` | 任意。issue の入力を揃える |
+
+`agent.yml` は原則そのままコピーして使えます（中央の reusable workflow を呼ぶだけなので、
+配布先ごとに変える箇所がありません）。残り 3 つは雛形で、中身を書き換えて使います。
+
+役割プロンプトの差し替え（`.agent/prompts/<agent>.md`）はここに雛形を置きません。本体の
+[`prompts/`](../prompts) から必要なものを写してください →
+[`docs/customize-prompt.md`](../docs/customize-prompt.md)。
+
+## 前提
+
+- **生成物が `.gitignore` で無視されていること。** パイプラインは `.agent/setup.sh` を
+  実行したあと、同じワークスペースで成果物をコミットします。無視され忘れている生成物
+  （`coverage/`、ビルド出力、`.venv`、`node_modules/` など）は PR に混ざり、レビュー対象の
+  差分も汚します。パイプライン側では判別できないので、導入前に確かめてください
+- GitHub App が**このリポジトリと本体リポジトリの両方**にインストールされていること
+- Secrets に `AGENT_APP_CLIENT_ID` / `AGENT_APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`
+
+ラベル（`agent:go`、`agent:planning`、…）は事前に作らなくてよく、パイプラインが必要に
+なった時点で作ります。
+
+## コピー
+
+```bash
+BASE=https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install
+mkdir -p .github/workflows .github/ISSUE_TEMPLATE .agent
+curl -fsSL "$BASE/agent.yml"           -o .github/workflows/agent.yml
+curl -fsSL "$BASE/conventions.md"      -o .agent/conventions.md
+curl -fsSL "$BASE/setup.sh"            -o .agent/setup.sh && chmod +x .agent/setup.sh
+curl -fsSL "$BASE/issue-template.yml"  -o .github/ISSUE_TEMPLATE/agent-task.yml
+```

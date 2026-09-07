@@ -50,111 +50,51 @@ GitHub 標準の `GITHUB_TOKEN` で足りるためです。
 
 ## 3. ワークフローを置く
 
-`.github/workflows/agent.yml` を作ります。3 つのイベント（ラベル・PR コメント・push）を
-受けて、あとは本体に任せます。
+置くのは `.github/workflows/agent.yml` の**1 枚だけ**です。本体の
+[`install/agent.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/agent.yml)
+がそのまま使えます（配布先ごとに変える箇所はありません）。
 
-```yaml
-name: agent
-
-# Actions の一覧に出る run の名前。push（実作業）はコミットメッセージのままにし、
-# それ以外は固定の文言にします（起動条件に合わないイベントでも run 自体は作られるため、
-# 既定のままだと issue のタイトルが付いて実作業と見分けが付きません）
-run-name: >-
-  ${{ github.event_name == 'push' && github.event.head_commit.message || 'agent: trigger check' }}
-
-on:
-  issues:
-    types: [labeled]
-  issue_comment:
-    types: [created]
-  push:
-    branches: ["claude/**"]
-    paths: ["agent-work/**"]
-
-# 呼び出す側より広い権限は要求できないので、本体が使う分をここで与えます
-permissions:
-  contents: write
-  pull-requests: write
-  issues: write
-  id-token: write # 将来の認証方式（Workload Identity Federation）で必要になります
-
-# 作業ブランチへの push を直列化します（実行中のものは止めず、順番待ちにします）。
-# キーはイベントごとに変わるため、ラベルや PR コメントの入口はこれとは別のグループに
-# なります（同じ issue の作業でも、それらとの間では直列化されません）
-concurrency:
-  group: agent-${{ github.event.issue.number || github.ref_name }}
-  cancel-in-progress: false
-
-jobs:
-  # 入口: agent:go ラベルで起動します（ラベルを付けるには write / triage 権限が要ります）
-  bootstrap:
-    if: github.event_name == 'issues' && github.event.label.name == 'agent:go'
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/bootstrap.yml@main
-    with:
-      issue: ${{ github.event.issue.number }}
-      actor: ${{ github.actor }}
-    secrets: inherit
-
-  # 入口: PR のコメントで承認・差し戻しを受けます。
-  # issue 側のコメントは pull_request == null で弾き、bot のコメントも無視します
-  comment:
-    if: >-
-      github.event_name == 'issue_comment' &&
-      github.event.issue.pull_request != null &&
-      github.event.comment.user.type != 'Bot' &&
-      startsWith(github.event.comment.body, '/agent ')
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/comment.yml@main
-    with:
-      pr: ${{ github.event.issue.number }}
-      body: ${{ github.event.comment.body }}
-      association: ${{ github.event.comment.author_association }}
-    secrets: inherit
-
-  # 作業ブランチへの push が次のフェーズを起動します。
-  # push イベントでは入力を受け取れないので、お試し実行との切り替えは
-  # リポジトリ変数で行います（with: の中では式を使えません）
-  dispatch:
-    if: github.event_name == 'push' && vars.AGENT_DRY_RUN != 'false'
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@main
-    with:
-      dry_run: true
-    secrets: inherit
-
-  dispatch-live:
-    if: github.event_name == 'push' && vars.AGENT_DRY_RUN == 'false'
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@main
-    with:
-      dry_run: false
-    secrets: inherit
+```bash
+mkdir -p .github/workflows
+curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/agent.yml \
+  -o .github/workflows/agent.yml
 ```
+
+3 つのイベントを受けて、あとは本体の reusable workflow に任せます。
+
+| イベント | 何が起きるか |
+|---|---|
+| issue に `agent:go` ラベルが付く | run を作って計画を始める |
+| draft PR に `/agent ...` のコメント | 承認・差し戻し・再開を受ける（issue 側のコメントは見ません） |
+| `claude/**` ブランチへの `agent-work/**` の push | 次のフェーズを起動する（フェーズの連鎖はこれで起きます） |
+
+呼び出す側より広い権限は要求できないため、このワークフローが `contents` / `pull-requests` /
+`issues` / `id-token` の write を宣言します。作業ブランチへの push は `concurrency` で
+直列化されます（理由はファイル内のコメントに書いてあります）。
 
 参照先は現時点では `@main` を指定してください。版が切られたら `@v1` のようなタグに
 固定できるようになります。
 
 ## 4. リポジトリごとの設定（任意）
 
-無くても動きます。必要なものだけ置いてください。
+無くても動きます。必要なものだけ置いてください。雛形は本体の
+[`install/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/install) にあります。
 
-```
-.agent/
-  conventions.md       全エージェントに渡される、このリポジトリの約束事
-  setup.sh             テストを実行できる状態にするための準備
-  prompts/<agent>.md   エージェントの役割プロンプトの差し替え
-```
+| 置き場所 | 内容 | 雛形 |
+|---|---|---|
+| `.agent/conventions.md` | 全エージェントに渡される、このリポジトリの約束事 | [`install/conventions.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/conventions.md) |
+| `.agent/setup.sh` | テストを実行できる状態にするための準備 | [`install/setup.sh`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/setup.sh) |
+| `.agent/prompts/<agent>.md` | エージェントの役割プロンプトの差し替え | 本体の [`prompts/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/prompts) |
+| `.github/ISSUE_TEMPLATE/agent-task.yml` | issue の入力を揃えるフォーム | [`install/issue-template.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/issue-template.yml) |
 
 - **`conventions.md`** には、命名・ディレクトリ構成・テストの置き場所など、守らせたい約束を
-  書きます。パイプラインはあなたのリポジトリの流儀を知らないので、ここが唯一の伝え方です
+  書きます。パイプラインはあなたのリポジトリの流儀を知らないので、ここが唯一の伝え方です。
+  埋めなかった節は削ってください（見出しだけが残ると、空の規約として渡ります）
 - **`setup.sh`** はエージェントを動かす直前に実行されます（無ければ何もしません）。
-  受け入れ条件に書いたテストコマンドが走る状態を、ここで作ってください
-
-  ```bash
-  #!/usr/bin/env bash
-  set -euo pipefail
-  npm ci
-  ```
-
-- **`.gitignore` を確認してください。** `setup.sh` の実行後に、そのまま成果物をコミットします。
-  無視され忘れている生成物（`coverage/`、ビルド出力、`.venv` など）があると PR に混ざります
+  受け入れ条件に書いたテストコマンドが走る状態を、ここで作ってください。
+  実行の直後にそのまま成果物をコミットするので、**生成物が `.gitignore` で無視されているか
+  確認してください**（→
+  [install/README.md の「前提」](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#前提)）
 - **`prompts/`** はエージェントの考え方そのものを変えたいときに使います
   → [customize-prompt.md](customize-prompt.md)
 

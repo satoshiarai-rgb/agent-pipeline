@@ -1,0 +1,56 @@
+# 置き場所: あなたのリポジトリの .github/ISSUE_TEMPLATE/agent-task.yml
+#
+# パイプラインに渡す issue の入力を揃えるためのフォームです。任意（無くても動きます）。
+# 起動するのは agent:go ラベルを付けたときなので、このフォーム自体はラベルを付けません
+# （誰でも issue を立てられる一方、起動できるのは push 権限を持つ人だけ、という切り分けを
+# 保つためです）。
+#
+# 本文は planner への入力として agent-work/issue-<n>/issue.md に写されます。
+# **本文はデータとして扱われ、指示としては扱われません。**
+
+name: エージェントに任せるタスク
+description: 計画・実装・レビューをパイプラインに任せる issue
+title: "<何を実現したいか>"
+labels: []
+body:
+  - type: markdown
+    attributes:
+      value: |
+        立てたあと `agent:go` ラベルを付けると起動します。draft PR が開き、計画ができたら
+        その PR に `/agent approve` か `/agent request-changes <理由>` とコメントしてください。
+
+        変更範囲が 5〜10 ファイルを超えそうなときは、分けて立てたほうがうまく進みます。
+
+  - type: textarea
+    id: goal
+    attributes:
+      label: 何を実現したいか
+      description: 現状と、そうしたい理由。**やり方ではなく結果**を書いてください
+      placeholder: |
+        いま「〜」なので「〜」になっている。「〜」できる状態にしたい。
+    validations:
+      required: true
+
+  - type: textarea
+    id: done
+    attributes:
+      label: 完了と言える条件
+      description: |
+        分かる範囲で。ここを元に planner が受け入れ条件（`acceptance.json`）を作ります。
+        自動で確かめられるもの（コマンド）と、人間が確かめるものが分かれていると精度が上がります
+      placeholder: |
+        - `npm test` が通る
+        - 一覧画面で 100 件を超えてもページングされる（人間が確認）
+
+  - type: textarea
+    id: scope
+    attributes:
+      label: 触ってほしくないもの・すでに決まっていること
+      description: |
+        方式が決まっているなら書いてください。書かない場合、planner が前提を置いて進めます
+
+  - type: textarea
+    id: context
+    attributes:
+      label: 参考になる場所
+      description: 関連するファイル、過去の PR や issue の番号

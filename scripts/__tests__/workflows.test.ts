@@ -20,6 +20,8 @@ import type { AgentName } from "../../src/types.ts";
 const ROOT = join(import.meta.dir, "../..");
 const CENTRAL = join(ROOT, ".github/workflows");
 const VERIFY = join(ROOT, "work/verify");
+/** 配布先に置くラッパーの原本。docs も検証用リポジトリもこれを参照する（A-51） */
+const CALLER = join(ROOT, "install/agent.yml");
 
 interface Step {
   id?: string;
@@ -43,9 +45,10 @@ interface Workflow {
   doc: Doc;
 }
 
-/** 中央の reusable workflow と、配布先に置く検証用ラッパーを集める */
+/** 中央の reusable workflow と、配布先に置くラッパー（原本・検証用）を集める */
 function workflows(): Workflow[] {
   const files = [
+    CALLER,
     ...readdirSync(CENTRAL)
       .filter((f) => f.endsWith(".yml"))
       .map((f) => join(CENTRAL, f)),
@@ -362,6 +365,42 @@ describe("規模超過の PR コメント（実際に走らせる）", () => {
     expect(r.stdout).toContain("agent-work/issue-11/plan.md");
     expect(r.stdout).toContain("作業は止めずに進めます");
     expect(r.stdout).toContain("::warning title=規模超過");
+  });
+});
+
+describe("install/ の雛形（配布先にそのままコピーされる）", () => {
+  // 壊れていても中央では何も起きず、コピーした配布先で初めて失敗するファイル。
+  // issue フォームは GitHub 側の検証に落ちると issue を立てられなくなる
+  const INSTALL = join(ROOT, "install");
+
+  test("setup.sh のシェル構文が通る", () => {
+    const r = spawnSync("bash", ["-n", join(INSTALL, "setup.sh")], { encoding: "utf8" });
+    expect(r.stderr).toBe("");
+    expect(r.status).toBe(0);
+  });
+
+  test("issue-template.yml が issue フォームの形をしている", () => {
+    const doc = parse(readFileSync(join(INSTALL, "issue-template.yml"), "utf8")) as {
+      name?: string;
+      description?: string;
+      body?: { type?: string; id?: string; attributes?: Record<string, unknown> }[];
+    };
+    expect(doc.name).toBeString();
+    expect(doc.description).toBeString();
+    expect(doc.body?.length).toBeGreaterThan(0);
+    for (const field of doc.body ?? []) {
+      // type と attributes.label は必須（markdown だけは label を持たない）
+      expect(field.type, JSON.stringify(field)).toBeString();
+      if (field.type !== "markdown") expect(field.attributes?.label).toBeString();
+    }
+  });
+
+  test("README.md が置き場所の対応表を持つ", () => {
+    const text = readFileSync(join(INSTALL, "README.md"), "utf8");
+    for (const f of ["agent.yml", "conventions.md", "setup.sh", "issue-template.yml"]) {
+      expect(text, f).toContain(f);
+    }
+    expect(text).toContain(".gitignore"); // A-46 の前提
   });
 });
 
