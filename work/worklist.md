@@ -10,7 +10,7 @@
 
 **フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
 
-- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 288 件 / 28 ファイル、`bunx tsc --noEmit`、
+- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 283 件 / 28 ファイル、`bunx tsc --noEmit`、
   `bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り**コミットする**
   （配布先はルートの `action.yml` から `uses:` で呼ぶ）
 - 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
@@ -70,12 +70,18 @@
 - K-23: **`/agent retry`**（`blocked` から直前のフェーズに戻して再実行）。手で `state.json` を
   書き換えていた操作をコマンドにした。戻る先は実行レコードの履歴が決める
 - I-12: **`install/` 一式を作った。** 配布先に置くファイルの原本（`agent.yml` / `conventions.md` /
-  `setup.sh` / `issue-template.yml` + 対応表と前提を持つ `README.md`）を 1 箇所に集め、**caller の
+  `setup.sh` / `issue-template.yml` + 対応表と前提を持つ `README.md`）を 1 箇所に集め、
+  **`install/install.sh` で 1 コマンドで置ける**ようにした（既存は上書きせず、置いたあとの手順を
+  最後に出す。手元に checkout があればそこから、無ければ raw.githubusercontent から取る）。**caller の
   YAML の正を `install/agent.yml` に決めた**（A-51。`work/verify/check-dispatch.yml` は削除し、
   `docs/installation.md` は inline の YAML をやめて参照に変えた）。`conventions.md` の
   「触ってはいけない領域」は `.github/workflows/**` と `.claude/**` を埋めた状態で配る（A-6）。
   生成物の `.gitignore` は `install/README.md` の前提に置いた（A-46）。`config.json` の雛形だけは
   設定マージ（A-19）と一緒に足す
+- **役目を終えた検証ワークフローを削除した。** `work/verify/step-b1/check-loop.yml`（push 連鎖と
+  `[skip ci]`。結論は V-5 / V-6）と `work/verify/step-a1/check-oauth.yml`（サブスク認証の疎通。
+  結論は V-13）は、同じことを本番経路が毎回やっている。残したのは
+  `work/verify/step-a1/check-wif.yml` だけ（Console 取得後の差し替え A-29 で再実行する）
 - K-22: **ラベルとコメントを `GITHUB_TOKEN` で行い、空の run を作らない。** ハーネス自身の
   ラベル射影が `issues: labeled` を発火し、issue #7 では 15 run のうち 7 本が skipped だった。
   `GITHUB_TOKEN` のイベントは後続ワークフローを起動しないので、この経路が消える。入口イベントの
@@ -286,7 +292,7 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 - [x] A-7: **完了。** `validate` の `noWorkflowChanges`（差分に `.github/workflows/**` があれば `invalid`）。以前の記述: `validate-artifacts` に「差分が `.github/workflows/` を含むなら `invalid`」のガードを追加する。プロンプトの指示だけに頼らず、push が 403 で落ちる前に blocked にする — K-4
 - [x] A-25: **完了。** エージェント step に `GH_TOKEN` を渡さない形で実装済み。GitHub の操作はすべてハーネス側。以前の記述: `base-action` に `github_token` 入力が無い前提を書く。`gh` を使う処理はすべてハーネス step 側で `GH_TOKEN` を渡して行い、エージェント step には `GH_TOKEN` を渡さない（エージェントが GitHub を直接操作できないようにし、露出面を減らす） — V-2、構成案 §1-3
 - [x] A-35: **完了。** `client-id` を使う形で実装済み（Secrets 名は `AGENT_APP_CLIENT_ID`）。以前の記述: `app-token` composite（構成案 §5.1）を `create-github-app-token@v3` の現行入力に合わせる。`app-id` は非推奨で `client-id` が正（値は App 設定ページの Client ID、`Iv23li...` 形式。数値の App ID とは別物）。Secrets 名は `AGENT_APP_CLIENT_ID` にする。あわせて同 action の `permission-*` 入力でジョブごとにトークン権限を絞る: bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents（+ 必要なら pull-requests）、approve は contents / issues。App 自体の権限に加えて実行単位でさらに落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1、設計書 §2.1
-- [x] I-12: **`install/` 一式（2026-09-07）。** 配布先に置くファイルの原本を `install/` に集めた。`agent.yml` → `.github/workflows/agent.yml`、`conventions.md` → `.agent/conventions.md`、`setup.sh` → `.agent/setup.sh`、`issue-template.yml` → `.github/ISSUE_TEMPLATE/agent-task.yml`。`install/README.md` が置き場所の対応表と前提（下の A-46）と `curl` でのコピー手順を持つ。**`config.json` の雛形は A-19（設定マージ）と一緒に足す** — 効かない設定ファイルの雛形を先に置くと、書いても無視される
+- [x] I-12: **`install/` 一式（2026-09-07）。** 配布先に置くファイルの原本を `install/` に集めた。`agent.yml` → `.github/workflows/agent.yml`、`conventions.md` → `.agent/conventions.md`、`setup.sh` → `.agent/setup.sh`、`issue-template.yml` → `.github/ISSUE_TEMPLATE/agent-task.yml`。`install/install.sh` が 4 つをまとめて置く（既存は上書きせず飛ばす / `--force` で上書き、`AGENT_PIPELINE_REF` で版を選べる、置いたあとの手順を最後に出す）。`install/README.md` が置き場所の対応表と前提（下の A-46）とコピー手順を持つ。テストは一時ディレクトリで `install.sh` を実際に走らせる（`bash -n` では見つからない失敗を捕まえる。実際に踏んだ: `$var` の直後に全角文字を書くと bash が変数名の一部として読み、`set -u` で落ちる）。**`config.json` の雛形は A-19（設定マージ）と一緒に足す** — 効かない設定ファイルの雛形を先に置くと、書いても無視される
   - [x] A-51: **配布先ワークフローの正を `install/agent.yml` にした。** `work/verify/check-dispatch.yml` を削除し、`docs/installation.md` は inline の YAML をやめて参照（+ イベントと権限の要約）に変えた。`scripts/__tests__/workflows.test.ts` が `install/agent.yml` を中央のワークフローと一緒に検査する（呼び出し側の権限が中央を満たすか / 式に算術が無いか / 参照 ref が揃っているか）。検証用の手動起動（`workflow_dispatch` で scenario を選ぶ）は Step B-4〜C-1 用だったので落とした
   - [x] A-46: **`install/README.md` の「前提」に「生成物が `.gitignore` で無視されていること」を書いた。** `.agent/setup.sh` の雛形のコメントからもそこを指す。`docs/installation.md` §4 は同じことを繰り返さず参照する
   - [x] A-6: **`install/conventions.md` の「触ってはいけない領域」を埋めた形で置いた**（`.github/workflows/**` は差分に入ると `blocked`、`.claude/**` は Claude Code が拒否する / K-4 / K-19）。planner / developer のプロンプト側には既に入っている

@@ -28,7 +28,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | `docs/installation.md` | 利用者向け: 導入手順（GitHub App、Secrets、ワークフロー、お試し実行） |
 | `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
 | `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
-| `install/` | 配布先に置くファイルの原本（`agent.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）。**配布先ワークフローの正は `install/agent.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
+| `install/` | 配布先に置くファイルの原本（`agent.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
 
 作業前に `work/worklist.md`（何を漏らさないか）と `work/steps.md`（どの順で手を動かすか）を読むこと。以下は全体像の要約であり、仕様の正は設計書側にある。
 

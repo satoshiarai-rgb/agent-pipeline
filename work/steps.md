@@ -128,7 +128,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
   1. ローカルで `claude setup-token` を実行し、長期の OAuth トークンを発行する（Pro / Max / Team / Enterprise プランで利用可能）
   2. 検証用リポジトリの Secrets に `CLAUDE_CODE_OAUTH_TOKEN` として登録する（秘密情報なので Variables ではなく Secrets）
   3. `ANTHROPIC_API_KEY` を登録していないことを確認する（API キーはサブスクトークンより優先される）
-  4. `work/verify/step-a1/check-oauth.yml` を検証用リポジトリの `.github/workflows/check-oauth.yml` にコピーし、Actions タブから手動起動する
+  4. 検証用リポジトリで `base-action` を 1 回呼ぶワークフローを手動起動する（原本 `check-oauth.yml` は**削除した**。同じ認証で本番経路が動いているため。結論は worklist V-13）
   - **このステップに GitHub App は不要**（App トークンが必要になるのは Step B-1 以降）。**OIDC を使わないので `id-token: write` も不要**
 - **確認**: ログに Claude の応答（`subscription auth ok`）が出る
 - **完了条件**: 手動起動で 1 回成功する → **達成**（`result: "subscription auth ok"`、`apiKeySource: "none"`、`claude-opus-5`）
@@ -156,7 +156,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 ### Step B-1: push で自分が再起動する連鎖と、その止め方 ✅ 完了（2026-09-04）
 
 - **学ぶ概念**: `on: push` の `branches` / `paths` フィルタ、`[skip ci]`、`concurrency`
-- **やること**: `work/verify/step-b1/check-loop.yml` を検証用リポジトリの `.github/workflows/check-loop.yml` にコピーし、`mode` を選んで手動起動する。4 モードあり、それぞれ 1 回の起動で 1 つの問いに答える
+- **やること**（原本 `check-loop.yml` は**削除した**。結論は worklist V-5 / V-6 と下の記述に残っている）: 4 モードを選んで手動起動し、それぞれ 1 回の起動で 1 つの問いに答える
   - `normal`: 連鎖が 3 本まで進んで止まる（ループと停止条件）。**カウントは保存せず、`agent-work/loop/runs/` のファイル数から導出する**
   - `skip-single`: `[skip ci]` 付きの単独コミット → 次のランが立たない
   - `skip-mixed`: `[skip ci]` 付きと無しを 1 回の push にまとめる → **立つか立たないかがこの検証の本題**

@@ -1,6 +1,14 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { spawnSync } from "node:child_process";
-import { existsSync, mkdtempSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
+import {
+  existsSync,
+  mkdtempSync,
+  readdirSync,
+  readFileSync,
+  rmSync,
+  statSync,
+  writeFileSync,
+} from "node:fs";
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parse } from "yaml";
@@ -372,6 +380,47 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
   // 壊れていても中央では何も起きず、コピーした配布先で初めて失敗するファイル。
   // issue フォームは GitHub 側の検証に落ちると issue を立てられなくなる
   const INSTALL = join(ROOT, "install");
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  test("install.sh が 4 ファイルを置き、既にあるものを壊さない（実際に走らせる）", () => {
+    // bash -n では見つからない失敗を捕まえる（`$var` の直後に全角文字を書くと、
+    // macOS の bash はそれを変数名の一部として読み、set -u で落ちる）。
+    // 一時ディレクトリで git init するだけで、このリポジトリの git 状態には触らない
+    const dir = mkdtempSync(join(tmpdir(), "install-"));
+    dirs.push(dir);
+    expect(spawnSync("git", ["init", "-q", dir]).status).toBe(0);
+    const run = (...args: string[]) =>
+      spawnSync("bash", [join(INSTALL, "install.sh"), ...args], { cwd: dir, encoding: "utf8" });
+
+    const first = run();
+    expect(first.stderr).toBe("");
+    expect(first.status).toBe(0);
+    const placed = [
+      ".github/workflows/agent.yml",
+      ".agent/conventions.md",
+      ".agent/setup.sh",
+      ".github/ISSUE_TEMPLATE/agent-task.yml",
+    ];
+    for (const rel of placed) expect(existsSync(join(dir, rel)), rel).toBe(true);
+    // setup.sh は実行できる状態で置く
+    expect(statSync(join(dir, ".agent/setup.sh")).mode & 0o111).toBeGreaterThan(0);
+
+    // 2 回目は既にあるものを飛ばす（人が書いた規約を上書きしない）
+    writeFileSync(join(dir, ".agent/conventions.md"), "人が書いた規約");
+    const second = run();
+    expect(second.status).toBe(0);
+    expect(second.stdout).toContain("skip");
+    expect(readFileSync(join(dir, ".agent/conventions.md"), "utf8")).toBe("人が書いた規約");
+
+    // --force なら上書きする
+    expect(run("--force").status).toBe(0);
+    expect(readFileSync(join(dir, ".agent/conventions.md"), "utf8")).toContain(
+      "このリポジトリの規約",
+    );
+  });
 
   test("setup.sh のシェル構文が通る", () => {
     const r = spawnSync("bash", ["-n", join(INSTALL, "setup.sh")], { encoding: "utf8" });
@@ -397,7 +446,13 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
 
   test("README.md が置き場所の対応表を持つ", () => {
     const text = readFileSync(join(INSTALL, "README.md"), "utf8");
-    for (const f of ["agent.yml", "conventions.md", "setup.sh", "issue-template.yml"]) {
+    for (const f of [
+      "install.sh",
+      "agent.yml",
+      "conventions.md",
+      "setup.sh",
+      "issue-template.yml",
+    ]) {
       expect(text, f).toContain(f);
     }
     expect(text).toContain(".gitignore"); // A-46 の前提

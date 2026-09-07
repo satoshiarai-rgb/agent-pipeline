@@ -48,19 +48,30 @@ GitHub 標準の `GITHUB_TOKEN` で足りるためです。
 `CLAUDE_CODE_OAUTH_TOKEN` は実行した人のサブスクリプションに紐づき、使用量もそこに計上されます。
 チームで使うなら、誰のトークンを登録するかを決めておいてください。
 
-## 3. ワークフローを置く
+## 3. ファイルを置く
 
-置くのは `.github/workflows/agent.yml` の**1 枚だけ**です。本体の
-[`install/agent.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/agent.yml)
-がそのまま使えます（配布先ごとに変える箇所はありません）。
+あなたのリポジトリで次を実行します。**既にあるファイルは上書きしません**（上書きするなら
+`--force`）。置いたあとにやることも最後に表示されます。
 
 ```bash
-mkdir -p .github/workflows
-curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/agent.yml \
-  -o .github/workflows/agent.yml
+curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/install.sh | bash
 ```
 
-3 つのイベントを受けて、あとは本体の reusable workflow に任せます。
+置かれるのは 4 つで、**必須はワークフロー 1 枚だけ**です。残りは雛形なので、使わないものは
+ファイルごと削ってかまいません（無くても動きます）。
+
+| 置き場所 | 内容 | 原本 |
+|---|---|---|
+| `.github/workflows/agent.yml` | **必須。** 唯一の入口。中央を呼ぶだけなので直す箇所はありません | [`install/agent.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/agent.yml) |
+| `.agent/conventions.md` | 全エージェントに渡される、このリポジトリの約束事 | [`install/conventions.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/conventions.md) |
+| `.agent/setup.sh` | テストを実行できる状態にするための準備 | [`install/setup.sh`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/setup.sh) |
+| `.github/ISSUE_TEMPLATE/agent-task.yml` | issue の入力を揃えるフォーム | [`install/issue-template.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/issue-template.yml) |
+
+1 枚ずつ置きたい場合や版を指定したい場合は
+[`install/README.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#コピー)
+を参照してください。
+
+ワークフローは 3 つのイベントを受けて、あとは本体の reusable workflow に任せます。
 
 | イベント | 何が起きるか |
 |---|---|
@@ -75,27 +86,21 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 参照先は現時点では `@main` を指定してください。版が切られたら `@v1` のようなタグに
 固定できるようになります。
 
-## 4. リポジトリごとの設定（任意）
+## 4. 置いた雛形を埋める（任意）
 
-無くても動きます。必要なものだけ置いてください。雛形は本体の
-[`install/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/install) にあります。
+無くても動きます。必要なものだけ書いてください。
 
-| 置き場所 | 内容 | 雛形 |
-|---|---|---|
-| `.agent/conventions.md` | 全エージェントに渡される、このリポジトリの約束事 | [`install/conventions.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/conventions.md) |
-| `.agent/setup.sh` | テストを実行できる状態にするための準備 | [`install/setup.sh`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/setup.sh) |
-| `.agent/prompts/<agent>.md` | エージェントの役割プロンプトの差し替え | 本体の [`prompts/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/prompts) |
-| `.github/ISSUE_TEMPLATE/agent-task.yml` | issue の入力を揃えるフォーム | [`install/issue-template.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/issue-template.yml) |
-
-- **`conventions.md`** には、命名・ディレクトリ構成・テストの置き場所など、守らせたい約束を
-  書きます。パイプラインはあなたのリポジトリの流儀を知らないので、ここが唯一の伝え方です。
-  埋めなかった節は削ってください（見出しだけが残ると、空の規約として渡ります）
-- **`setup.sh`** はエージェントを動かす直前に実行されます（無ければ何もしません）。
+- **`.agent/conventions.md`** には、命名・ディレクトリ構成・テストの置き場所など、守らせたい
+  約束を書きます。パイプラインはあなたのリポジトリの流儀を知らないので、ここが唯一の伝え方です。
+  **埋めなかった節は削ってください**（見出しだけが残ると、空の規約として渡ります）
+- **`.agent/setup.sh`** はエージェントを動かす直前に実行されます（無ければ何もしません）。
   受け入れ条件に書いたテストコマンドが走る状態を、ここで作ってください。
   実行の直後にそのまま成果物をコミットするので、**生成物が `.gitignore` で無視されているか
   確認してください**（→
   [install/README.md の「前提」](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#前提)）
-- **`prompts/`** はエージェントの考え方そのものを変えたいときに使います
+- **`.agent/prompts/<agent>.md`** はエージェントの考え方そのものを変えたいときに使います。
+  雛形は置かれないので、本体の
+  [`prompts/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/prompts) から写します
   → [customize-prompt.md](customize-prompt.md)
 
 レビューの往復回数やモデルは、現時点では変更できません（パイプライン側の既定が適用されます）。

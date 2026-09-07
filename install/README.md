@@ -6,6 +6,7 @@
 
 | 原本 | 置き場所 | 必須 |
 |---|---|---|
+| [`install.sh`](install.sh) | （コピーしない。実行するだけ） | 下の「コピー」を参照 |
 | [`agent.yml`](agent.yml) | `.github/workflows/agent.yml` | **必須。** これが唯一の入口 |
 | [`conventions.md`](conventions.md) | `.agent/conventions.md` | 任意。このリポジトリの流儀を伝える唯一の手段 |
 | [`setup.sh`](setup.sh) | `.agent/setup.sh` | 任意。テストを走らせる準備が必要なら |
@@ -32,11 +33,23 @@
 
 ## コピー
 
+上の 4 つをまとめて置きます（**既にあるファイルは上書きしません**。`--force` で上書き）。
+置いたあとに何をするかも最後に出ます。
+
 ```bash
-BASE=https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install
-mkdir -p .github/workflows .github/ISSUE_TEMPLATE .agent
-curl -fsSL "$BASE/agent.yml"           -o .github/workflows/agent.yml
-curl -fsSL "$BASE/conventions.md"      -o .agent/conventions.md
-curl -fsSL "$BASE/setup.sh"            -o .agent/setup.sh && chmod +x .agent/setup.sh
-curl -fsSL "$BASE/issue-template.yml"  -o .github/ISSUE_TEMPLATE/agent-task.yml
+curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/install.sh | bash
+```
+
+手元に本体の checkout があるなら、そこから置くこともできます（同じ内容です）。
+
+```bash
+bash <clone した場所>/install/install.sh
+AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # 版を指定する
+```
+
+1 つだけ欲しいときは、その原本を直接取ってください。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/agent.yml \
+  -o .github/workflows/agent.yml
 ```
