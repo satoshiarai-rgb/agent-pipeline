@@ -18,6 +18,8 @@
 - 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `approve.yml` / `comment.yml`
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
 - 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `validate` が担う
+- 文書: **利用者向けは `docs/`**（overview / installation / customize-prompt / troubleshooting）、
+  **設計と台帳は `work/`**。README は入口で、両方へのリンクだけを持つ
 - 本番経路: `dispatch.yml` の `run` job が `compose` → `base-action@v1.0.215` → `validate` → `finish`
   を通す。`dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）。
   `blocked` になった run は push とラベル更新の後に失敗させるので Actions の一覧で赤く見える
@@ -55,6 +57,8 @@
   2 回捨てていた: $4.05 と $1.42）。`completedCleanly` で分類する
 - K-21: **規模超過は停止条件にしない。** PR に警告を出して作業は続ける
 - K-18: `decisions.md` → `decision-records.jsonl`（1 行 1 レコード、`reversibility` で絞れる）
+- 人間待ちでも連鎖を止めた（`continue_chain` を `isIdle` で決める）。`awaiting_human` に着いた
+  push が起こしていた「route が none を返すだけの run」が消えた
 - K-25: その `decision-records.jsonl` を `decision-records/<run_id>-<attempt>-<slug>.md` に置き換え
   （判断 1 つにつき 1 ファイルの md + frontmatter。名前の prefix をハーネスが決めるので衝突しない）
 - A-47: planner に「差し戻しには直して応える。足さない」と計画の粒度（200 行の目安）
