@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 
 // src/cli.ts
-import { readFileSync as readFileSync9 } from "node:fs";
+import { readFileSync as readFileSync10 } from "node:fs";
 import { parseArgs } from "node:util";
 
 // src/file/state-file.ts
@@ -642,6 +642,19 @@ var ADVICE = [
 - 上限そのものを変えるなら、中央の \`src/defaults.ts\` の \`limits\` を直します`
   },
   {
+    when: "config_invalid",
+    title: "`.agent/config.json` を受け付けられません",
+    body: ({ dir }) => `どのキーがどう違うかは上の \`blocked_reason\` に出ています。**設定は一部だけ適用せず全体を捨てる**ので、
+直すまで中央の既定で動くことはありません（どの設定で動いたのか分からなくなるのを避けるため）。
+
+1. \`.agent/config.json\` を直す。書いたキーだけが上書きされ、\`null\` は「既定を継承」、既定に無いキーはエラーになります
+2. その変更を作業ブランチに push する
+3. ${retryLine}
+
+やり直せない（\`/agent retry\` が「レコードが無い」と返す）場合は、\`${dir}/state.json\` の
+\`phase\` を止まる前のフェーズ（最初なら \`planning\`）に戻して push してください。`
+  },
+  {
     when: "pipeline_version_mismatch",
     title: "中央リポジトリの版が合いません",
     body: ({ dir }) => `進行中の run を壊さないための停止です。
@@ -795,16 +808,18 @@ function retryRun(input) {
 function routeRun(input) {
   const file2 = readStateFile(input.dir);
   const records = readRecords(input.dir);
+  const blocked2 = (reason) => ({
+    action: "block",
+    reason,
+    phase: file2.phase,
+    total_steps: records.length,
+    rounds: { plan_review: 0, dev_review: 0 }
+  });
+  if (input.config_error)
+    return blocked2(`config_invalid: ${input.config_error}`);
   const mismatch = checkPipelineVersion(file2.meta, input.config);
-  if (mismatch) {
-    return {
-      action: "block",
-      reason: mismatch,
-      phase: file2.phase,
-      total_steps: records.length,
-      rounds: { plan_review: 0, dev_review: 0 }
-    };
-  }
+  if (mismatch)
+    return blocked2(mismatch);
   return route({ phase: file2.phase, records, config: input.config });
 }
 // src/commands/start.ts
@@ -980,6 +995,108 @@ var defaults = {
     }
   }
 };
+// src/file/config-file.ts
+import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
+import { join as join9 } from "node:path";
+
+// src/utils/merge-config.ts
+var OVERRIDABLE = [
+  "models",
+  "limits",
+  "tool_profiles",
+  "agents",
+  "approvers",
+  "labels"
+];
+var CONSISTENCY = [
+  (c) => {
+    const dangling = Object.entries(c.agents).filter(([, a]) => !(a.tools in c.tool_profiles)).map(([name, a]) => `agents.${name}.tools=${a.tools}`);
+    return dangling.length === 0 ? null : `tool_profiles に無いプロファイルを指しています: ${dangling.join(", ")}（使えるのは ${Object.keys(c.tool_profiles).join(" / ")}）`;
+  }
+];
+var isRecord = (v) => typeof v === "object" && v !== null && !Array.isArray(v);
+function mergeValue(path, base, over, errors) {
+  if (over === null)
+    return base;
+  if (base === null)
+    return over;
+  if (isRecord(base)) {
+    if (!isRecord(over)) {
+      errors.push(`${path}: オブジェクトを書いてください`);
+      return base;
+    }
+    const merged = { ...base };
+    for (const [key, value] of Object.entries(over)) {
+      if (!(key in base)) {
+        errors.push(`${path}.${key}: 既定にないキーです（使えるのは ${Object.keys(base).join(" / ")}）`);
+        continue;
+      }
+      merged[key] = mergeValue(`${path}.${key}`, base[key], value, errors);
+    }
+    return merged;
+  }
+  if (Array.isArray(base)) {
+    if (!Array.isArray(over)) {
+      errors.push(`${path}: 配列を書いてください`);
+      return base;
+    }
+    const wrong = over.filter((v) => typeof v !== typeof base[0]);
+    if (wrong.length > 0) {
+      errors.push(`${path}: 要素は ${typeof base[0]} で書いてください`);
+      return base;
+    }
+    return over;
+  }
+  if (typeof base !== typeof over) {
+    errors.push(`${path}: ${typeof base} で書いてください（いまは ${typeof over}）`);
+    return base;
+  }
+  if (typeof over === "number" && (!Number.isInteger(over) || over < 1)) {
+    errors.push(`${path}: 1 以上の整数で書いてください（いまは ${over}）`);
+    return base;
+  }
+  return over;
+}
+function mergeConfig(base, override) {
+  const errors = [];
+  if (!isRecord(override))
+    return { config: base, errors: ["最上位はオブジェクトで書いてください"] };
+  const merged = { ...base };
+  for (const [key, value] of Object.entries(override)) {
+    if (!OVERRIDABLE.includes(key)) {
+      errors.push(`${key}: 配布先では上書きできません（上書きできるのは ${OVERRIDABLE.join(" / ")}）`);
+      continue;
+    }
+    merged[key] = mergeValue(key, merged[key], value, errors);
+  }
+  const config = merged;
+  errors.push(...CONSISTENCY.map((check) => check(config)).filter((e) => e !== null));
+  return errors.length > 0 ? { config: base, errors } : { config, errors };
+}
+
+// src/file/config-file.ts
+var CONFIG_PATH = join9(".agent", "config.json");
+function readConfig(repo) {
+  const path = join9(repo, CONFIG_PATH);
+  if (!existsSync9(path))
+    return { config: defaults, source: null, error: null };
+  let raw;
+  try {
+    raw = JSON.parse(readFileSync9(path, "utf8"));
+  } catch (e) {
+    const detail = e instanceof Error ? e.message : String(e);
+    return {
+      config: defaults,
+      source: path,
+      error: `${CONFIG_PATH} が JSON として壊れています: ${detail}`
+    };
+  }
+  const { config, errors } = mergeConfig(defaults, raw);
+  if (errors.length > 0) {
+    return { config: defaults, source: path, error: `${CONFIG_PATH}: ${errors.join(" / ")}` };
+  }
+  return { config, source: path, error: null };
+}
 // src/cli.ts
 var USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 
@@ -998,6 +1115,9 @@ commands:
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
                                               [--repo]
+
+--repo は配布先のチェックアウト（既定はカレント）。.agent/config.json があれば
+既定値に重ねる。書いたキーだけが上書きされ、null は継承、既定に無いキーはエラー
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -1039,6 +1159,12 @@ ${USAGE}`);
 };
 var command = positionals[0];
 var dir = need(values.dir, "dir");
+var loaded = readConfig(values.repo ?? ".");
+var config = loaded.config;
+if (loaded.error && command !== "route") {
+  console.error(loaded.error);
+  process.exit(2);
+}
 var outcome = () => ({
   result: need(values.result, "result"),
   verdict: values.verdict ?? null,
@@ -1052,53 +1178,53 @@ var run = () => {
     case "start":
       return startRun({
         dir,
-        config: defaults,
+        config,
         agent: need(values.agent, "agent"),
         run_id: need(values["run-id"], "run-id"),
         attempt: Number(values.attempt),
-        model: values.model ?? defaults.models.default
+        model: values.model ?? config.models.default
       });
     case "route":
-      return routeRun({ dir, config: defaults });
+      return routeRun({ dir, config, config_error: loaded.error });
     case "finish":
       return finishRun({
         dir,
-        config: defaults,
+        config,
         record_path: need(values["record-path"], "record-path"),
         outcome: outcome(),
         session_id: values["session-id"] ?? null
       });
     case "approve":
-      return approveRun({ dir, config: defaults, association: need(values.association, "association") });
+      return approveRun({ dir, config, association: need(values.association, "association") });
     case "request-changes":
       return requestChangesRun({
         dir,
-        config: defaults,
+        config,
         association: need(values.association, "association"),
         body: need(values.body, "body")
       });
     case "retry":
-      return retryRun({ dir, config: defaults, association: need(values.association, "association") });
+      return retryRun({ dir, config, association: need(values.association, "association") });
     case "block":
-      return blockRun({ dir, config: defaults, reason: need(values.reason, "reason") });
+      return blockRun({ dir, config, reason: need(values.reason, "reason") });
     case "explain":
-      return explainRun({ dir, config: defaults });
+      return explainRun({ dir, config });
     case "label":
-      return labelRun({ dir, config: defaults });
+      return labelRun({ dir, config });
     case "validate":
       return validateRun({
         dir,
-        config: defaults,
+        config,
         agent: need(values.agent, "agent"),
         agent_failed: values["agent-failed"],
         execution_file: values["execution-file"] ?? null,
-        changed_files: values["changed-files"] ? readFileSync9(values["changed-files"], "utf8").split(`
+        changed_files: values["changed-files"] ? readFileSync10(values["changed-files"], "utf8").split(`
 `).filter(Boolean) : []
       });
     case "compose":
       return composeRun({
         dir,
-        config: defaults,
+        config,
         agent: need(values.agent, "agent"),
         repo: values.repo ?? ".",
         central: need(values.central, "central"),

@@ -67,7 +67,8 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 | `.agent/setup.sh` | テストを実行できる状態にするための準備 | [`install/setup.sh`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/setup.sh) |
 | `.github/ISSUE_TEMPLATE/agent-task.yml` | issue の入力を揃えるフォーム | [`install/issue-template.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/issue-template.yml) |
 
-1 枚ずつ置きたい場合や版を指定したい場合は
+上限やモデルを変えるための `.agent/config.json` は既定では置きません（必要になってから
+手順 4 で足します）。1 枚ずつ置きたい場合や版を指定したい場合は
 [`install/README.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#コピー)
 を参照してください。
 
@@ -98,12 +99,28 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
   実行の直後にそのまま成果物をコミットするので、**生成物が `.gitignore` で無視されているか
   確認してください**（→
   [install/README.md の「前提」](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#前提)）
+- **`.agent/config.json`** で、レビューの往復回数・モデル・エージェントの上限・ツールを
+  このリポジトリだけ変えられます（雛形は
+  [`install/config.json`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/config.json)
+  で、**上書きできるキーの一覧**です。値はすべて `null` = 既定を継承なので、変えたいキーにだけ
+  値を書きます）
+
+  ```json
+  {
+    "limits": { "dev_review_rounds": 3 },
+    "models": { "reviewer": "claude-sonnet-5" },
+    "agents": { "developer": { "timeout_minutes": 60 } }
+  }
+  ```
+
+  規則は 3 つです。**書いたキーだけが上書きされ**（書かなかったキーは本体の既定に追従します）、
+  **`null` は「既定を継承」**、**既定に無いキーや型違いはエラー**になります（誤字を黙って
+  無視しないため）。エラーのときは一部だけ適用せず、`blocked` にして理由を PR にコメントします。
+  状態機械（`transitions`）と版（`pipeline_version`）は本体のもので、上書きできません
 - **`.agent/prompts/<agent>.md`** はエージェントの考え方そのものを変えたいときに使います。
   雛形は置かれないので、本体の
   [`prompts/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/prompts) から写します
   → [customize-prompt.md](customize-prompt.md)
-
-レビューの往復回数やモデルは、現時点では変更できません（パイプライン側の既定が適用されます）。
 
 ## 5. お試し実行で配線を確かめる
 

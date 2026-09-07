@@ -114,6 +114,20 @@ const ADVICE: Advice[] = [
 - 上限そのものを変えるなら、中央の \`src/defaults.ts\` の \`limits\` を直します`,
   },
   {
+    when: "config_invalid",
+    title: "`.agent/config.json` を受け付けられません",
+    body: ({ dir }) =>
+      `どのキーがどう違うかは上の \`blocked_reason\` に出ています。**設定は一部だけ適用せず全体を捨てる**ので、
+直すまで中央の既定で動くことはありません（どの設定で動いたのか分からなくなるのを避けるため）。
+
+1. \`.agent/config.json\` を直す。書いたキーだけが上書きされ、\`null\` は「既定を継承」、既定に無いキーはエラーになります
+2. その変更を作業ブランチに push する
+3. ${retryLine}
+
+やり直せない（\`/agent retry\` が「レコードが無い」と返す）場合は、\`${dir}/state.json\` の
+\`phase\` を止まる前のフェーズ（最初なら \`planning\`）に戻して push してください。`,
+  },
+  {
     when: "pipeline_version_mismatch",
     title: "中央リポジトリの版が合いません",
     body: ({ dir }) =>

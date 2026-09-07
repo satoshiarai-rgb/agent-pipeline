@@ -20,4 +20,6 @@ export { startRun } from "./commands/start.ts";
 export { validateRun } from "./commands/validate.ts";
 export type { Config } from "./defaults.ts";
 export { defaults } from "./defaults.ts";
+export type { LoadedConfig } from "./file/config-file.ts";
+export { CONFIG_PATH, readConfig } from "./file/config-file.ts";
 export type { RouteResult } from "./transitions.ts";

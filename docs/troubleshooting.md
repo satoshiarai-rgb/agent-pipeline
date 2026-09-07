@@ -28,6 +28,7 @@ cat agent-work/issue-<n>/state.json
 | `agent_failed` | エージェントの実行が失敗した、またはタイムアウトした | Actions のログ（`##[error]` の行）を読む。一時的な失敗なら `/agent retry` で進みます |
 | `total_steps_exceeded: 24/24` | 実行回数の総数が上限に達した | 往復が多すぎます。issue を分割して立て直すことを検討してください |
 | `api_error:429` など | Claude API のエラー（429 は使用量の上限、404 はモデル名などの設定ミス） | 設定ミスなら直す。使用量なら時間をおいて `/agent retry` |
+| `config_invalid: <詳細>` | `.agent/config.json` の上書きを受け付けられなかった（既定に無いキー、型違い、1 未満の数値 など） | 詳細に**どのキーがどう違うか**が出ます。直して push してから `/agent retry`（記録がまだ無い最初の実行で止まった場合は `state.json` の `phase` を `planning` に戻して push）。設定は一部だけ適用せず全体を捨てるので、直すまで既定で動くことはありません |
 | `pipeline_version_mismatch: run=1 harness=2` | パイプライン本体が更新され、進行中の作業と噛み合わなくなった | `/agent retry` では戻れません（走る前のフェーズが失われているため）。`state.json` の `phase` を手で書き換えるか、issue を立て直します |
 
 ### `/agent retry` が断られたとき

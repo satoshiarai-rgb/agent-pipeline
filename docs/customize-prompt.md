@@ -16,6 +16,7 @@
 | レビューで見る観点を足す（セキュリティ、性能、既存 API との互換） | `.agent/prompts/plan-reviewer.md` / `dev-reviewer.md` |
 | 実装の進め方を変える（先にテストを書かせる、など） | `.agent/prompts/developer.md` |
 | 完了報告の宛先・書式を変える | `.agent/prompts/completion.md` |
+| レビューの往復回数・モデル・エージェントの上限・ツールを変える | `.agent/config.json`（→ [installation.md 手順 4](installation.md)） |
 
 ## 手順
 

@@ -5,11 +5,11 @@ import {
   approveRun,
   blockRun,
   composeRun,
-  defaults as config,
   explainRun,
   finishRun,
   labelRun,
   type Outcome,
+  readConfig,
   requestChangesRun,
   retryRun,
   routeRun,
@@ -39,6 +39,9 @@ commands:
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
                                               [--repo]
+
+--repo は配布先のチェックアウト（既定はカレント）。.agent/config.json があれば
+既定値に重ねる。書いたキーだけが上書きされ、null は継承、既定に無いキーはエラー
 
 出力: 結果を JSON で標準出力に書く
 `;
@@ -82,6 +85,21 @@ const need = <T>(v: T | undefined, name: string): T => {
 const command = positionals[0];
 const dir = need(values.dir, "dir");
 
+/**
+ * 既定値（src/defaults.ts）に配布先の `.agent/config.json` を重ねる（A-19）。
+ * すべてのコマンドが同じ設定で動く必要があるので、入口で 1 回だけ解決する。
+ *
+ * 上書きが壊れていたときの扱いは route と他で分ける。**route は状態を書く唯一の入口**
+ * なので、落とさず `blocked` として返す（ここで exit すると state が git に載らないまま
+ * job が落ち、run が無音で止まる）。他のコマンドは人間の操作が起点なので即座に失敗させる。
+ */
+const loaded = readConfig(values.repo ?? ".");
+const config = loaded.config;
+if (loaded.error && command !== "route") {
+  console.error(loaded.error);
+  process.exit(2);
+}
+
 const outcome = (): Outcome => ({
   result: need(values.result, "result") as RunResult,
   verdict: (values.verdict as Verdict | undefined) ?? null,
@@ -103,7 +121,7 @@ const run = () => {
         model: values.model ?? config.models.default,
       });
     case "route":
-      return routeRun({ dir, config });
+      return routeRun({ dir, config, config_error: loaded.error });
     case "finish":
       return finishRun({
         dir,

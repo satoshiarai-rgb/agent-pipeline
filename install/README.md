@@ -11,9 +11,14 @@
 | [`conventions.md`](conventions.md) | `.agent/conventions.md` | 任意。このリポジトリの流儀を伝える唯一の手段 |
 | [`setup.sh`](setup.sh) | `.agent/setup.sh` | 任意。テストを走らせる準備が必要なら |
 | [`issue-template.yml`](issue-template.yml) | `.github/ISSUE_TEMPLATE/agent-task.yml` | 任意。issue の入力を揃える |
+| [`config.json`](config.json) | `.agent/config.json` | 任意。往復回数・モデル・上限・ツールを変えたいときだけ |
 
 `agent.yml` は原則そのままコピーして使えます（中央の reusable workflow を呼ぶだけなので、
-配布先ごとに変える箇所がありません）。残り 3 つは雛形で、中身を書き換えて使います。
+配布先ごとに変える箇所がありません）。残りは雛形で、中身を書き換えて使います。
+
+**`config.json` は `install.sh` では置きません。** 中身は上書きできるキーの一覧で、値はすべて
+`null`（= 既定を継承）です。何も変えないなら置く必要がなく、置いたまま値を書き入れると
+その項目は中央の既定に追従しなくなります。変えたくなってから取ってください。
 
 役割プロンプトの差し替え（`.agent/prompts/<agent>.md`）はここに雛形を置きません。本体の
 [`prompts/`](../prompts) から必要なものを写してください →
@@ -49,9 +54,10 @@ bash <clone した場所>/install/install.sh
 AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # 版を指定する
 ```
 
-1 つだけ欲しいときは、その原本を直接取ってください。
+1 つだけ欲しいときは、その原本を直接取ってください（`config.json` はこの方法だけです）。
 
 ```bash
-curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/agent.yml \
-  -o .github/workflows/agent.yml
+BASE=https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install
+curl -fsSL "$BASE/agent.yml"   -o .github/workflows/agent.yml
+curl -fsSL "$BASE/config.json" -o .agent/config.json
 ```

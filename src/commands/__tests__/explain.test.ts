@@ -74,6 +74,15 @@ describe("理由ごとの案内（上から順に最初に一致したもの）"
     expect(md).not.toContain("`/agent retry` とコメントする");
   });
 
+  test("config_invalid は直す場所（.agent/config.json）と規則を案内する", () => {
+    const md =
+      explain(blocked("config_invalid: .agent/config.json: limits.plan_rounds: 既定にないキーです"))
+        ?.markdown ?? "";
+    expect(md).toContain(".agent/config.json");
+    expect(md).toContain("null");
+    expect(md).toContain("/agent retry");
+  });
+
   test("版の不一致は retry ではなく手で直す 1 ケース", () => {
     const md = explain(blocked("pipeline_version_mismatch: run=1 harness=2"))?.markdown ?? "";
     expect(md).toContain("state.json");

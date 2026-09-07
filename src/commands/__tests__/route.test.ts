@@ -15,6 +15,18 @@ describe("routeRun", () => {
     expect(r.run?.agent).toBe("planner");
   });
 
+  test("config.json が受け付けられなければ block（例外にしない / A-19）", () => {
+    // ここで投げると状態が git に載らないまま job が落ち、run が無音で止まる
+    const r = routeRun({
+      dir: makeRun(),
+      config: c,
+      config_error: "limits.plan_rounds: 既定にないキー",
+    });
+    expect(r.action).toBe("block");
+    expect(r.reason).toContain("config_invalid");
+    expect(r.reason).toContain("limits.plan_rounds");
+  });
+
   test("pipeline_version が合わなければ block", () => {
     const dir = makeRun();
     const p = join(dir, "state.json");

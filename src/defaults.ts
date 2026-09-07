@@ -32,7 +32,8 @@ export interface Config {
  *   - 説明のコメントを書ける（JSON には書けない）
  *   - 型チェックが効く（遷移表の phase 名の誤字を tsc が見つける）
  *   - YAML パーサが不要になり、バンドルが 248KB → 15KB になった
- * 配布先の `.agent/config.json` による上書き（深いマージ）は Step B-5 で実装する（A-19）。
+ * 配布先の `.agent/config.json` による上書きは `src/file/config-file.ts` が重ねる（A-19）。
+ * 上書きできるキーと規則は `src/utils/merge-config.ts` の表が正。
  */
 export const defaults: Config = {
   /** 中央リポジトリのメジャー版。合わない run は blocked にする */

@@ -10,7 +10,7 @@
 
 **フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
 
-- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 283 件 / 28 ファイル、`bunx tsc --noEmit`、
+- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 305 件 / 30 ファイル、`bunx tsc --noEmit`、
   `bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り**コミットする**
   （配布先はルートの `action.yml` から `uses:` で呼ぶ）
 - 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
@@ -76,8 +76,12 @@
   YAML の正を `install/agent.yml` に決めた**（A-51。`work/verify/check-dispatch.yml` は削除し、
   `docs/installation.md` は inline の YAML をやめて参照に変えた）。`conventions.md` の
   「触ってはいけない領域」は `.github/workflows/**` と `.claude/**` を埋めた状態で配る（A-6）。
-  生成物の `.gitignore` は `install/README.md` の前提に置いた（A-46）。`config.json` の雛形だけは
-  設定マージ（A-19）と一緒に足す
+  生成物の `.gitignore` は `install/README.md` の前提に置いた（A-46）。`config.json` の雛形は
+  設定マージ（A-19、同日）で足した
+- A-19: **配布先の `.agent/config.json` で上限・モデル・ツールを変えられるようにした。**
+  書いたキーだけを重ね、`null` は継承、既定に無いキーと型違いはエラー。`transitions` と
+  `pipeline_version` は上書き不可。壊れていれば `route` が `config_invalid` で `blocked` に
+  する（例外にしない）。雛形は `install/config.json`（全キー `null` = そのまま置いても無変化）
 - **役目を終えた検証ワークフローを削除した。** `work/verify/step-b1/check-loop.yml`（push 連鎖と
   `[skip ci]`。結論は V-5 / V-6）と `work/verify/step-a1/check-oauth.yml`（サブスク認証の疎通。
   結論は V-13）は、同じことを本番経路が毎回やっている。残したのは
@@ -97,9 +101,8 @@
   Console 待ちが 11 件（§4）、展開が 2 件（§5）
 - 番号は CLAUDE.md や設計書から参照されているので消していない
 
-**次の一手**: `.agent/config.json` のマージ（A-19。`install/config.json` の雛形と
-`docs/installation.md` §4 の「変更できません」もここで片付く）→ タグ `v1`（I-13）
-→ 2 つ目の配布先（R-2）。プロンプトの直し（A-48）は独立して先に入れてもよい。
+**次の一手**: タグ `v1` / `v1.0.0`（I-13）→ 2 つ目の配布先（R-2。ここで `install/` と
+`.agent/config.json` の過不足が実際に分かる）。プロンプトの直し（A-48）は独立して先に入れてもよい。
 `stale.yml`（I-8 / A-14）は発生条件が狭く手で直せるため後回しにした（§1 の末尾に判断を残した）。
 
 ---
@@ -129,7 +132,7 @@
 | K-15 | **プロンプトは配布先で差し替えられる。中央は既定を提供する** | 解決順は `.agent/prompts/<agent>.md` → 中央 `prompts/<agent>.md`。一部だけ差し替えることもできる。技術スタック・レビュー観点・コミットの作法はプロダクトごとに違うため。設計書 §4.1 の「プロンプトは中央のみ、固有の調整は conventions.md」から変更 |
 | K-16 | **契約（入力と出力）は中央が持ち、`validate` が強制する** | プロンプトが何であれ、成果物の形が契約を満たさなければ `blocked` になる。契約は `work/agent-contract.md`。ハーネスは成果物の形だけを見て遷移を決めるので、この 1 箇所を通れば状態機械は壊れない |
 | K-14 | **同一 issue の 2 周目は行わない。作り直しが必要なら新しい issue を起票する** | bootstrap はブランチが存在すれば何もしない（冪等）ため、`done` 後にラベルを付け直しても再実行されない。この挙動をそのまま仕様とする（K-10 と同じ方針） |
-| K-11 | **ハーネスが読み書きするファイルは JSON、既定値はコード（`src/defaults.ts`）** | `state.json` / `runs/*.json` / `acceptance.json`。理由: ワークフローの shell から `jq` で直接読める（`yq` 不要）、書き戻しが厳密、キー順固定で差分が安定する。**npm 依存がゼロになり、コミットする `dist/cli.js` が 248KB → 16KB になった**（`dist/` は git 履歴に積まれるため効果が大きい）。既定値をコードにしたのはコメントと型チェックを保つため（YAML パーサを外すと JSON にはコメントが書けない）。`state.json` に書いていた復旧手順は `templates/README.md` と `blocked` 時の issue コメントへ移した。配布先の上書きは `.agent/config.json`（B-5 / A-19） |
+| K-11 | **ハーネスが読み書きするファイルは JSON、既定値はコード（`src/defaults.ts`）** | `state.json` / `runs/*.json` / `acceptance.json`。理由: ワークフローの shell から `jq` で直接読める（`yq` 不要）、書き戻しが厳密、キー順固定で差分が安定する。**npm 依存がゼロになり、コミットする `dist/cli.js` が 248KB → 16KB になった**（`dist/` は git 履歴に積まれるため効果が大きい）。既定値をコードにしたのはコメントと型チェックを保つため（YAML パーサを外すと JSON にはコメントが書けない）。`state.json` に書いていた復旧手順は `templates/README.md` と `blocked` 時の issue コメントへ移した。配布先の上書きは `.agent/config.json`（A-19 で実装。規則は `src/utils/merge-config.ts`） |
 | K-10 | **`done` は終端。PR を見た人間がコードに変更を求める経路は用意しない。作り直しが必要なら新しい issue を立てる** | 検討して却下したもの: `done → planning` の差し戻し辺と、人間の差し戻しごとにカウントを数え直す「サイクル」の仕組み（レコードのファイル名に世代を入れる案）。実装して動かしたうえで、**やり直すなら最初からやり直す方が単純**という判断で削除した。`awaiting_human` からの差し戻し（計画段階、`/request-changes`）は残す — 設計書 §1「マージまでが責務」と整合 |
 | K-9 | **ハーネスの実装言語は TypeScript。ランタイムは Node、bun は開発ツールチェーンとして使う** | 手順は composite action ではなく **JS action**（`runs.using: node24` / `main: dist/index.js`）にし、bun でビルドしたバンドルをコミットする。ランナーに bun は同梱されていないため、ランタイムに bun を要求しない形にする。設計書 §4.1 の `scripts/*.py` は `src/*.ts` + `dist/` に置き換わる。選定理由: npm の `yaml` が **YAML のコメントと書式を保持**して round-trip できる（`state.yml` は人間が復旧時に編集するファイル）／`execution_file` の JSON 解析が自然（A-31）／`claude-code-action` 自体が TS で書かれている／`@actions/core` で入出力を型付きに扱える／`bun test` で遷移表の網羅テストが速い。代償はビルド成果物 `dist/` をコミットすることと、タグを切る前にビルドする手順が必要になること |
 | K-8 | **配布先リポジトリの Claude Code 設定（`.claude/settings.json`）は読ませる。** ハーネスは `settings` 入力で上書きしない | 配布先固有の調整は `conventions.md` と同じ信頼境界にある（そのリポジトリの管理者が置くもの）。ただし配布先が意図せず権限を広げることは起きるため、**最低限の禁止はハーネス側が `--disallowed-tools` で明示的に重ねる**（設定で緩められない側に置く。フラグが設定より優先されることは D-1 で確認する） |
@@ -142,7 +145,6 @@
 
 棚卸し（2026-09-07）後に本当に残っているもの。おおむね上から順に手を動かせる。
 
-- [ ] A-19: **`src/defaults.ts` と配布先 `.agent/config.json` のマージを実装する**（深いマージ、`null` は「継承」、未知キーはエラー / K-11）。担当は `route`（状態を読むところ）。配布先ごとに上限・モデル・ツールを変えられるようにする。**2 つ目の配布先（R-2）を入れる時点で必要になる**。あわせて `install/config.json`（雛形）と `docs/installation.md` §4 の「変更できません」を直す — I-12、構成案 §5.2、設計書 §5.7
 - [ ] I-13: タグ `v1` / `v1.0.0` を打つ
 - [ ] A-48: **`.claude/**` の扱いをプロンプトで 2 点直す（実機 3 本目 / issue #11 の plan-reviewer の指摘）。** (1) **理由を計画に書かせる**。planner プロンプトは「書き込めない」という事実だけを渡しているため、planner が根拠なしに前提へ写し、レビュアーが「このリポジトリには `.claude/skills/**` など追跡済みファイルがあるのに、書けないというのは自明でない」と差し戻した。**レビュアーには成果物しか渡らない**（設計書 §3.3）ので、理由（Claude Code が sensitive file として拒否する / K-19）を前提に明示させないと同じ差し戻しが構造的に起き続ける。(2) **設置用の完成品を `agent-work/issue-<n>/` に置かせない**。現在の developer プロンプトは `staged/` に置くよう指示しているが、run ディレクトリは issue ごとに閉じるハーネスのスクラッチで、`state.json` / `runs/` / `reviews/` が同居する。**恒久的に参照される設置元は issue 番号に依存しない場所**（例: リポジトリ直下の `settings.example.json`）に置き、README に設置手順を書かせる — K-19、実機 3 本目
 - [ ] A-50: **App トークンの権限を実行単位で絞る（A-35 の残り）。** `create-github-app-token@v3` の `permission-*` 入力で、ジョブごとに必要な権限だけを取る（bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents、comment は contents / pull-requests）。App 自体の権限に加えて実行単位でも落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1
@@ -187,7 +189,7 @@
 - [ ] A-42: **設計書のファイル形式を実装に合わせて更新する（K-11 / K-25）。** §5.4 の `decisions.md` を `decision-records/<run_id>-<attempt>-<slug>.md`（判断 1 つにつき 1 ファイル、frontmatter は `type` / `title` / `reversibility`、本文が判断の内容）に置き換え、命名の理由（prefix はハーネスが決めるので過去のラウンドの記録を上書きできない）も書く。§3.2 の各エージェントの入出力欄と §4.1 の run ディレクトリの木も同様。 §4.1 の `templates/` 一覧、§5.1（`state.yml` → `state.json`、コメント付き例を JSON に）、§5.2（`acceptance.yml` → `acceptance.json`）、§4.1 の `defaults.yml` → `src/defaults.ts`。あわせて planner / developer のプロンプトに「`acceptance.json` を JSON で書く」ことを明記する（エージェントが書くファイルなので形式の指示が必要）— 実装は完了済み
 - [ ] A-45: **設計書 §5.5 のレビュー frontmatter を契約 §4 に合わせる。** 設計書は frontmatter に `blocking` / `non_blocking` のリストを持たせているが、契約は `verdict` / `round` / `reviewer` の 3 キーだけを定め「本文の書式は自由」としている。ハーネスは `verdict` の 1 行しか読まないので、機械が読む面は最小に保ち、差し戻し理由と任意の指摘は**本文の節**として書かせる（既定プロンプト 5 本はこの形で書いた）。設計書側を契約に寄せる — 契約 §4、I-9c
 - [ ] A-49: **設計書 §1 の規模上限の記述を K-21 に合わせる。** 「planner は、この上限を超えると判断した場合、実装に進まず issue の分割案を返して停止する」を「分割案を添えて計画を完成させ、ハーネスが PR に警告を出して作業は続ける。分割するかは人間が決める」に書き換える。§7.2 の停止条件の一覧からも規模超過を外す（停止条件はラウンド上限と `total_steps`、契約違反、実行失敗の 4 つになる） — K-21
-- [ ] A-52: **設計書 §4.1 の `install/` の一覧と §9 の展開手順を実装に合わせる（I-12）。** `install/config.yml` → `config.json`（K-11。雛形自体は A-19 で足す）、`templates/issue-template.yml` → `install/issue-template.yml`（`templates/` は run ディレクトリに置かれるファイルの雛形だけを持つ場所になった）、`install/README.md`（置き場所の対応表と前提）が増えた。§9 手順 6 の「ラベルを一括作成」は不要（パイプラインが必要になった時点で作る。`scripts/project-labels.sh` は張り替え用）。手順 1〜5 は `install/README.md` と `docs/installation.md` に実物があるので、設計書側は列挙をやめてそこを指す — I-12、A-51
+- [ ] A-52: **設計書 §4.1 の `install/` の一覧と §9 の展開手順を実装に合わせる（I-12）。** `install/config.yml` → `config.json`（K-11。雛形は A-19 で追加済み）、`templates/issue-template.yml` → `install/issue-template.yml`（`templates/` は run ディレクトリに置かれるファイルの雛形だけを持つ場所になった）、`install/README.md`（置き場所の対応表と前提）が増えた。§9 手順 6 の「ラベルを一括作成」は不要（パイプラインが必要になった時点で作る。`scripts/project-labels.sh` は張り替え用）。手順 1〜5 は `install/README.md` と `docs/installation.md` に実物があるので、設計書側は列挙をやめてそこを指す — I-12、A-51
 
 ---
 
@@ -239,6 +241,11 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - 実装は src 239 行（実コード）/ テスト 26 件。うち `route` + `finish` の判断ロジックが約 90 行で、残りは YAML の読み書きと型宣言。分岐は設計書 §7.2 の停止条件と 1 対 1 で対応する
 - [x] I-6: **ダミー版 `check-dispatch.yml` で状態機械を実機で一巡させた（2026-09-04）**。`planning` から `done` まで、人間の承認を挟んで 6 本の push ランで完走。`[skip ci]` による二重起動の抑止、`awaiting_human` での停止、`done` での連鎖停止をすべて確認
   - 途中で見つけた問題 2 件: (1) `case` の内側の heredoc は終端子の字下げが残って閉じない（`run:` ブロックの基準インデントに関数として置く）(2) `finish` に `result: ok` を固定で渡すと**エージェントの失敗が成功として遷移し、原因が state に残らない**（`steps.<id>.outcome` から決める。本番は `validate-artifacts` の責務 / 構成案 §5.4）
+- [x] A-19: **配布先の `.agent/config.json` を既定に重ねる（2026-09-07）。** 規則は `src/utils/merge-config.ts` の 4 つ: 書いたキーだけを深く重ねる / `null` は継承 / **既定に無いキーと型違いはエラー**（誤字を黙って無視しない。回数と分数は 1 以上の整数に限る） / 上書きできるのは `OVERRIDABLE` の表にある 6 キー（models・limits・tool_profiles・agents・approvers・labels）だけで、**状態機械 `transitions` と `pipeline_version` は中央のもの**。読み込みは `src/file/config-file.ts`（`readConfig`）で、**受け付けられないときは一部だけ適用せず全体を捨てる**（どの設定で動いたのか分からなくなるため）。マージ後にしか分からない整合性（`agents.*.tools` が `tool_profiles` にあるか）は `CONSISTENCY` の表で見る
+  - **解決するのは cli.ts の入口で 1 回だけ。** 全コマンドが同じ設定で動く必要がある（`finish` は `limits`、`compose` は `agents`、`approve` は `approvers` を読む）ので、`route` の中では解決しない。パスは `--repo`（既定はカレント = 配布先のチェックアウト）
+  - **壊れた設定は `route` が `config_invalid: <詳細>` で `blocked` にする。** 例外を投げると状態が git に載らないまま job が落ち、run が無音で止まる（設計書 §7.1）。人間の操作が起点の他コマンド（label / approve / retry など）は入口で exit 2 にする。`explain` に案内を足したので PR に直し方が出る（K-24）
+  - 雛形 `install/config.json` は**上書きできるキーの一覧**で、値はすべて `null`（= 継承）。そのまま置いても何も変わらないことをテストで固定した（`install.sh` では置かない — 置いたまま値を書くと、そのキーが中央の既定に追従しなくなるため、変えたくなってから取る）
+  - 文書: `docs/installation.md` 手順 4 の「変更できません」を書き換え、`docs/troubleshooting.md` に `config_invalid` の行、`docs/customize-prompt.md` の表に行を足した。README の制約リストからも 1 行消えた
 - [x] I-9: **`compose` コマンド**（K-15 / K-16、2026-09-05）。解決順は `src/file/prompt-file.ts`、組み立ては `src/commands/compose.ts` の表（契約 §4 の「入力」列の写し）。テスト 21 件
   - 入力の部品を「ラベル + run ディレクトリから実在するパスを拾う関数」として定義し、エージェントごとの契約を `Record<AgentName, { inputs: Input[]; review?: "plan" | "dev" }>` の表にした。`validate` と同じ形（`CONTRACT` の表 + 小さな汎用処理）
   - 出力は `{ prompt_path, role_prompt, inputs, review_path }`。`prompt_path` を base-action の `prompt_file` に渡し、`role_prompt` で「配布先の上書きか中央の既定か」を記録できる
@@ -292,7 +299,7 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 - [x] A-7: **完了。** `validate` の `noWorkflowChanges`（差分に `.github/workflows/**` があれば `invalid`）。以前の記述: `validate-artifacts` に「差分が `.github/workflows/` を含むなら `invalid`」のガードを追加する。プロンプトの指示だけに頼らず、push が 403 で落ちる前に blocked にする — K-4
 - [x] A-25: **完了。** エージェント step に `GH_TOKEN` を渡さない形で実装済み。GitHub の操作はすべてハーネス側。以前の記述: `base-action` に `github_token` 入力が無い前提を書く。`gh` を使う処理はすべてハーネス step 側で `GH_TOKEN` を渡して行い、エージェント step には `GH_TOKEN` を渡さない（エージェントが GitHub を直接操作できないようにし、露出面を減らす） — V-2、構成案 §1-3
 - [x] A-35: **完了。** `client-id` を使う形で実装済み（Secrets 名は `AGENT_APP_CLIENT_ID`）。以前の記述: `app-token` composite（構成案 §5.1）を `create-github-app-token@v3` の現行入力に合わせる。`app-id` は非推奨で `client-id` が正（値は App 設定ページの Client ID、`Iv23li...` 形式。数値の App ID とは別物）。Secrets 名は `AGENT_APP_CLIENT_ID` にする。あわせて同 action の `permission-*` 入力でジョブごとにトークン権限を絞る: bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents（+ 必要なら pull-requests）、approve は contents / issues。App 自体の権限に加えて実行単位でさらに落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1、設計書 §2.1
-- [x] I-12: **`install/` 一式（2026-09-07）。** 配布先に置くファイルの原本を `install/` に集めた。`agent.yml` → `.github/workflows/agent.yml`、`conventions.md` → `.agent/conventions.md`、`setup.sh` → `.agent/setup.sh`、`issue-template.yml` → `.github/ISSUE_TEMPLATE/agent-task.yml`。`install/install.sh` が 4 つをまとめて置く（既存は上書きせず飛ばす / `--force` で上書き、`AGENT_PIPELINE_REF` で版を選べる、置いたあとの手順を最後に出す）。`install/README.md` が置き場所の対応表と前提（下の A-46）とコピー手順を持つ。テストは一時ディレクトリで `install.sh` を実際に走らせる（`bash -n` では見つからない失敗を捕まえる。実際に踏んだ: `$var` の直後に全角文字を書くと bash が変数名の一部として読み、`set -u` で落ちる）。**`config.json` の雛形は A-19（設定マージ）と一緒に足す** — 効かない設定ファイルの雛形を先に置くと、書いても無視される
+- [x] I-12: **`install/` 一式（2026-09-07）。** 配布先に置くファイルの原本を `install/` に集めた。`agent.yml` → `.github/workflows/agent.yml`、`conventions.md` → `.agent/conventions.md`、`setup.sh` → `.agent/setup.sh`、`issue-template.yml` → `.github/ISSUE_TEMPLATE/agent-task.yml`。`install/install.sh` が 4 つをまとめて置く（既存は上書きせず飛ばす / `--force` で上書き、`AGENT_PIPELINE_REF` で版を選べる、置いたあとの手順を最後に出す）。`install/README.md` が置き場所の対応表と前提（下の A-46）とコピー手順を持つ。テストは一時ディレクトリで `install.sh` を実際に走らせる（`bash -n` では見つからない失敗を捕まえる。実際に踏んだ: `$var` の直後に全角文字を書くと bash が変数名の一部として読み、`set -u` で落ちる）。`config.json` の雛形は設定マージ（A-19）と同じ日に足した — 効かない設定ファイルの雛形を先に置かないため、順序をこうした
   - [x] A-51: **配布先ワークフローの正を `install/agent.yml` にした。** `work/verify/check-dispatch.yml` を削除し、`docs/installation.md` は inline の YAML をやめて参照（+ イベントと権限の要約）に変えた。`scripts/__tests__/workflows.test.ts` が `install/agent.yml` を中央のワークフローと一緒に検査する（呼び出し側の権限が中央を満たすか / 式に算術が無いか / 参照 ref が揃っているか）。検証用の手動起動（`workflow_dispatch` で scenario を選ぶ）は Step B-4〜C-1 用だったので落とした
   - [x] A-46: **`install/README.md` の「前提」に「生成物が `.gitignore` で無視されていること」を書いた。** `.agent/setup.sh` の雛形のコメントからもそこを指す。`docs/installation.md` §4 は同じことを繰り返さず参照する
   - [x] A-6: **`install/conventions.md` の「触ってはいけない領域」を埋めた形で置いた**（`.github/workflows/**` は差分に入ると `blocked`、`.claude/**` は Claude Code が拒否する / K-4 / K-19）。planner / developer のプロンプト側には既に入っている
