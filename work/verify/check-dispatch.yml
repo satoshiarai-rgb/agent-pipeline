@@ -25,7 +25,7 @@ name: check-dispatch
 # /agent 以外のコメント）の run は空になるが、既定では issue のタイトルが付くため
 # 実作業の run と見分けが付かない（K-22 で消せなかった分の見え方の対処）
 run-name: >-
-  ${{ github.event_name == 'push' && github.event.head_commit.message || 'エージェントの入口を確認' }}
+  ${{ github.event_name == 'push' && github.event.head_commit.message || 'agent: trigger check' }}
 
 on:
   workflow_dispatch:
