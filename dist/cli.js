@@ -184,9 +184,12 @@ function route(input) {
 }
 
 // src/commands/human-transition.ts
+function authorized(association, config) {
+  return config.approvers.includes(association);
+}
 function humanTransition(input) {
   const { phase, association, config, event } = input;
-  if (!config.approvers.includes(association)) {
+  if (!authorized(association, config)) {
     return { ok: false, reason: `not_authorized: ${association}` };
   }
   const next = nextPhase(phase, event, config);
@@ -384,6 +387,9 @@ function saveRecord(dir, record) {
   writeFileSync4(path, renderRecord(record));
   return path;
 }
+function latestRecord(records) {
+  return records.reduce((latest, r) => !latest || r.started_at > latest.started_at ? r : latest, undefined);
+}
 function findRecord(records, path) {
   return records.find((r) => path.endsWith(recordFileName(r)));
 }
@@ -537,6 +543,27 @@ function requestChangesRun(input) {
   });
   writeStateFile(dir, file2, { phase: decision.phase, blocked_reason: null }, now);
   return { ...decision, review_path };
+}
+// src/commands/retry.ts
+function retryRun(input) {
+  const { dir, association, config, now = new Date } = input;
+  if (!authorized(association, config)) {
+    return { ok: false, reason: `not_authorized: ${association}` };
+  }
+  const file2 = readStateFile(dir);
+  if (file2.phase !== "blocked")
+    return { ok: false, reason: `not_blocked: phase=${file2.phase}` };
+  if (file2.blocked_reason?.includes("_exceeded")) {
+    return { ok: false, reason: `limit_reached: ${file2.blocked_reason}` };
+  }
+  const last = latestRecord(readRecords(dir));
+  if (!last)
+    return { ok: false, reason: "no_records: 実行の記録が無いので戻る先が決まらない" };
+  if (last.finished_at === null) {
+    return { ok: false, reason: `run_in_progress: ${last.agent} run=${last.run_id}` };
+  }
+  writeStateFile(dir, file2, { phase: last.phase, blocked_reason: null }, now);
+  return { ok: true, phase: last.phase, agent: last.agent };
 }
 // src/commands/route.ts
 function routeRun(input) {
@@ -830,6 +857,7 @@ commands:
                                               [--oversize] [--acceptance-passed] [--session-id]
   approve  /approve による遷移                --association
   request-changes  /request-changes による差し戻し  --association --body
+  retry    blocked から直前のフェーズに戻す    --association
   block    phase を blocked にする            --reason
   label    いま付いているべきラベルを返す
   validate 成果物が契約を満たすか検証し Outcome を返す
@@ -914,6 +942,8 @@ var run = () => {
         association: need(values.association, "association"),
         body: need(values.body, "body")
       });
+    case "retry":
+      return retryRun({ dir, config: defaults, association: need(values.association, "association") });
     case "block":
       return blockRun({ dir, config: defaults, reason: need(values.reason, "reason") });
     case "label":

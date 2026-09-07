@@ -10,6 +10,7 @@ import {
   labelRun,
   type Outcome,
   requestChangesRun,
+  retryRun,
   routeRun,
   startRun,
   validateRun,
@@ -29,6 +30,7 @@ commands:
                                               [--oversize] [--acceptance-passed] [--session-id]
   approve  /approve による遷移                --association
   request-changes  /request-changes による差し戻し  --association --body
+  retry    blocked から直前のフェーズに戻す    --association
   block    phase を blocked にする            --reason
   label    いま付いているべきラベルを返す
   validate 成果物が契約を満たすか検証し Outcome を返す
@@ -116,6 +118,8 @@ const run = () => {
         association: need(values.association, "association"),
         body: need(values.body, "body"),
       });
+    case "retry":
+      return retryRun({ dir, config, association: need(values.association, "association") });
     case "block":
       return blockRun({ dir, config, reason: need(values.reason, "reason") });
     case "label":

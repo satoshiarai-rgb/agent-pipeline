@@ -85,7 +85,7 @@ agent-work/issue-42/
 | 状態 | 意味 | 次の一手 |
 |---|---|---|
 | `awaiting_human` | 計画ができた。承認を待っている | PR に `/agent approve` か `/agent request-changes <理由>` |
-| `blocked` | 続けられない（成果物が契約を満たさない、レビューが収束しない、実行が失敗した等） | 理由が `state.json` と issue コメントに残る。読んで判断し、`state.json` を直して push すれば再開 |
+| `blocked` | 続けられない（成果物が契約を満たさない、レビューが収束しない、実行が失敗した等） | 理由が `state.json` に残る。読んで原因を直したら PR に `/agent retry`（直前のフェーズに戻して再実行） |
 
 現在の状態は issue のラベル（`agent:planning`、`agent:awaiting-human`、`agent:done`、
 `agent:blocked` など）に射影されます。
@@ -96,7 +96,12 @@ agent-work/issue-42/
 2. `agent:go` ラベルを付ける（push 権限を持つ人だけが起動できます）
 3. draft PR が開く。計画ができたら `plan.md` と `acceptance.json` を読む
 4. PR にコメントして承認する（`/agent approve`）か、理由を添えて差し戻す
+   （`/agent request-changes <理由>`）
 5. 実装とレビューが終わると draft が外れる。あとは通常の PR レビュー
+
+途中で `blocked` になったら、理由を読んで原因を直し、PR に `/agent retry` とコメントすれば
+直前のフェーズから再実行されます。上限に達して止まった場合はやり直しても同じ理由で止まるので、
+issue を分けて立て直してください。
 
 配布先のリポジトリごとに、役割プロンプト・規約・上限・テストの準備手順を差し替えられます
 （`.agent/`）。差し替えても、成果物の形（契約）は中央が強制します。

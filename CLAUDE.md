@@ -42,7 +42,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 
 - **状態の正は git 上の `agent-work/issue-<n>/state.yml` であり、書くのはハーネス（`run.yml` / `approve.yml` / `bootstrap.yml`）のみ。** エージェント（Claude Code 実行）は `state.yml` と `log.md` を書かない。エージェントに自己完了宣言をさせるとクラッシュ時に状態が不整合になる。
 - **issue ラベルは状態の射影**（`scripts/labels.py`）。ラベル操作の失敗が状態を壊してはいけない。
-- **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧も人間が `state.yml` を書き換えて push するだけで再開する。
+- **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧は PR への `/agent retry`（直前のフェーズに戻して再実行 / K-23）か、`state.json` を書き換えて push するだけで再開する。
 - **遷移判定は `reviews/*.md` の frontmatter `verdict`（`approve` | `request_changes`）のみを見る。** 本文は次のエージェントへの入力。frontmatter が欠落・不正なら `blocked`。
 - **レビュアーには成果物と元 issue のみを渡す。** 生成側のセッションログや思考過程は渡さない（追認を防ぐため）。
 - **停止条件は多層。** フェーズ別ラウンド上限（既定 5）と、その上に自走ループの最終防波堤として `total_steps`（既定 24、正常系 5〜8）。`total_steps` はラウンド上限から到達しうる最悪（21）より大きく取る — 先に総数で止まると「どのレビューが収束しなかったか」が残らないため。認可チェックは入口（bootstrap のラベル付与者、approve のコメント投稿者の `author_association`）のみで、dispatch には掛けない。

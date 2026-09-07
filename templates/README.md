@@ -15,7 +15,19 @@
 
 ## blocked からの復旧
 
-`state.json` の `phase` を戻したい地点に書き換えて push すれば再開する。
+**まず理由（`blocked_reason`）を読んで原因を直し、PR に `/agent retry` とコメントする。**
+直前に走っていたフェーズ（`runs/` の最新レコードの `phase`）に戻して再実行する。
+
+受け付けないのは次の 3 つで、いずれも理由が PR に返る。
+
+- `blocked` 以外の phase（取り違えを黙って進めない）
+- 上限で止まったもの（`*_exceeded`）。やり直しても同じ理由で止まるので、issue を分けて立て直す
+- 実行の記録が無いもの（戻る先が決まらない）
+- 直前のレコードが閉じていないもの（`finished_at` が `null`）。実行中か、途中で落ちて記録が
+  閉じられていない状態。戻しても `route` が「実行中」と見て動かさないため、断る
+
+別のフェーズから始めたいときや、`pipeline_version_mismatch` で止まったとき（走る前のフェーズが
+state から失われている）は、`state.json` の `phase` を書き換えて push する。
 `agent-work/**` の変更で dispatch が起動するため、それ以外の操作は不要。
 
 `phase` に入る値: `bootstrap` / `planning` / `plan_review` / `awaiting_human` /
