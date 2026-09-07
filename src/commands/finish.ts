@@ -19,7 +19,7 @@ import type { CommandInput } from "./input.ts";
 export interface Outcome {
   result: RunResult;
   verdict?: Verdict | null;
-  /** planner の規模判定が上限超過 */
+  /** planner の規模判定が上限超過。止めずに PR へ警告を出すために使う（K-21） */
   oversize?: boolean;
   /** completing で acceptance.json が全 passed だったか */
   acceptance_passed?: boolean;
@@ -79,7 +79,9 @@ function finish(input: {
     return blocked(outcome.detail ? `invalid_artifacts: ${outcome.detail}` : "invalid_artifacts");
   }
   if (outcome.result === "agent_failed") return blocked("agent_failed");
-  if (outcome.oversize) return blocked("oversize: issue の分割が必要");
+
+  // 規模超過（planner の判断）は止めない。PR に警告を残して先へ進める（K-21）。
+  // 上限は目安であって停止条件ではなく、分割するかどうかは人間が PR を見て決める
 
   // 2. レビューのフェーズ: verdict を遷移イベントに落とし、差し戻しはラウンド上限を見る
   const roundKey = roundKeyFor(phase, config);

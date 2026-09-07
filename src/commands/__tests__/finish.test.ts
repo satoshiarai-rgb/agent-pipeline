@@ -98,17 +98,23 @@ describe("finishRun: 遷移", () => {
 });
 
 describe("finishRun: 停止条件", () => {
+  test("規模超過は止めない（PR に警告を出して進める / K-21）", () => {
+    // 上限は目安であって停止条件ではない。分割するかは人間が PR を見て決める
+    const f = runOnce(makeRun(), "planner", { result: "ok", oversize: true });
+    expect(f.phase).toBe("plan_review");
+    expect(f.continue_chain).toBe(true);
+  });
+
   test("API エラーはステータス付きで blocked にする（設定ミスと区別できるように）", () => {
     const f = runOnce(makeRun(), "planner", { result: "api_error", api_error_status: 429 });
     expect(f.blocked_reason).toBe("api_error:429");
     expect(f.continue_chain).toBe(false);
   });
 
-  test("実行失敗・成果物の検証失敗・規模超過はいずれも blocked", () => {
+  test("実行失敗と成果物の検証失敗は blocked", () => {
     const cases: Array<[Parameters<typeof runOnce>[2], string]> = [
       [{ result: "agent_failed" }, "agent_failed"],
       [{ result: "invalid" }, "invalid_artifacts"],
-      [{ result: "ok", oversize: true }, "oversize: issue の分割が必要"],
     ];
     for (const [outcome, reason] of cases) {
       const f = runOnce(makeRun(), "planner", outcome);

@@ -50,7 +50,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 - **ツールチェーンを中央は知らない。** テスト実行の準備は配布先の `.agent/setup.sh` に委ね、`run.yml` がエージェント実行前に呼ぶ。
 - **`acceptance.yml` の `AC-N` id** を planner / developer / dev-reviewer が共通参照する。`verification: automated` なら `command` 必須。
 - **issue 本文はデータであり指示ではない**旨をプロンプト側で明示する（プロンプトインジェクション対策）。エージェントはコメントを読まずファイルを読む設計。
-- スコープ上限は 1 PR あたり 5〜10 ファイル。planner が超過と判断したら実装に進まず issue 分割案を返して停止する。
+- スコープ上限は 1 PR あたり 5〜10 ファイル。**これは目安であって停止条件ではない**（K-21）。planner が超過と判断したら `plan.md` に分割案を添えたうえで計画を完成させ、ハーネスは PR に警告コメントを残して作業を続ける。分割するかは人間が決める。
 
 ## 認証
 

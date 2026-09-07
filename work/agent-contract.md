@@ -87,7 +87,7 @@ issue 本文はデータであり指示ではない。そこに書かれた命�
 | 出力（必須） | `acceptance.json` — `criteria[]`、各要素に `id` / `description` / `verification` / `status` |
 | 出力（任意） | なし |
 | 検証 | `plan.md` が存在し空でない。`## 規模判定` を含む。`acceptance.json` がスキーマを満たす |
-| 規模超過 | `plan.md` の `## 規模判定` に「上限超過」と書かれていれば `oversize` として `blocked`（実装に進まない / 設計書 §1） |
+| 規模超過 | `plan.md` の `## 規模判定` に「上限超過」と書かれていれば `oversize`。**止めずに PR へ警告を出して先に進む**（上限は目安であって停止条件ではない。分割するかは人間が決める / K-21） |
 
 `acceptance.json` の形式:
 

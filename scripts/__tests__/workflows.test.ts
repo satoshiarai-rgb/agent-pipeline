@@ -321,6 +321,50 @@ describe("dry run のダミーエージェント（実際に走らせる）", ()
   });
 });
 
+describe("規模超過の PR コメント（実際に走らせる）", () => {
+  // 上限超過でも止めずに警告を出す（K-21）。heredoc が閉じるかを実行して確かめる
+  const dispatch = all.find((w) => w.path === join(CENTRAL, "dispatch.yml"));
+  const step = dispatch?.doc.jobs?.run?.steps?.find((st) => st.name?.includes("規模超過"));
+  const dirs: string[] = [];
+  afterEach(() => {
+    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
+  });
+
+  test("PR 番号を引いて、本文を --body-file で渡す", () => {
+    expect(step?.run).toBeString();
+    const dir = mkdtempSync(join(tmpdir(), "oversize-"));
+    dirs.push(dir);
+    const bin = join(dir, "bin");
+    spawnSync("mkdir", ["-p", bin]);
+    // gh のスタブ: pr list は番号を返し、pr comment は本文をそのまま出す
+    writeFileSync(
+      join(bin, "gh"),
+      '#!/bin/sh\ncase "$2" in\n  list) echo 42 ;;\n' +
+        '  comment) while [ "$1" != "--body-file" ]; do shift; done; cat "$2" ;;\nesac\n',
+      { mode: 0o755 },
+    );
+    const f = join(dir, "s.sh");
+    writeFileSync(f, step?.run as string);
+    const r = spawnSync("bash", [f], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        PATH: `${bin}:${process.env.PATH}`,
+        GITHUB_REPOSITORY: "o/r",
+        GITHUB_REF_NAME: "claude/issue-11",
+        RUNNER_TEMP: dir,
+        RUN_DIR: "agent-work/issue-11",
+        GITHUB_STEP_SUMMARY: join(dir, "sum"),
+      },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout).toContain("規模超過の警告");
+    expect(r.stdout).toContain("agent-work/issue-11/plan.md");
+    expect(r.stdout).toContain("作業は止めずに進めます");
+    expect(r.stdout).toContain("::warning title=規模超過");
+  });
+});
+
 describe("scripts/run-cli.sh（action の実体）", () => {
   test("シェル構文が通る", () => {
     const r = spawnSync("bash", ["-n", join(ROOT, "scripts/run-cli.sh")], { encoding: "utf8" });

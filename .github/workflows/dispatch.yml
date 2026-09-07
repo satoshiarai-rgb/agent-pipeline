@@ -344,6 +344,33 @@ jobs:
           export PR
           bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"
 
+      # ---- 規模超過は止めずに PR へ警告を残す（K-21）
+      # 上限（1 PR あたり 5〜10 ファイル）は目安であって停止条件ではない。
+      # 分割するかどうかは、この警告と plan.md を見た人間が決める
+      - name: 規模超過を PR に警告する
+        if: always() && steps.validate.outputs.oversize == 'true'
+        env:
+          GH_TOKEN: ${{ steps.app.outputs.token }}
+          RUN_DIR: ${{ needs.route.outputs.dir }}
+        run: |
+          set -uo pipefail
+          echo "::warning title=規模超過::planner が上限超過と判断した（作業は継続する）"
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --json number -q '.[0].number' 2>/dev/null || true)
+          [ -n "$PR" ] || exit 0
+          # heredoc の終端子は run ブロックの基準インデントに置く（字下げが残ると閉じない）
+          cat > "$RUNNER_TEMP/oversize.md" <<EOF
+          **規模超過の警告**
+
+          planner が、この計画は 1 PR あたりの目安（5〜10 ファイル）を超えると判断しました。
+          **作業は止めずに進めます。** 分割するかどうかは人間が決めてください。
+
+          - 判断の根拠: \`$RUN_DIR/plan.md\` の \`## 規模判定\`
+          - 分割するなら: この PR を閉じ、issue を分けて立て直す（同一 issue の 2 周目は行いません）
+          - そのまま進めるなら: 何もしなくてよい。レビューは通常どおり続きます
+          EOF
+          gh pr comment "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$RUNNER_TEMP/oversize.md" 2>/dev/null ||
+            echo "::warning::PR へのコメントに失敗した（状態には影響しない）"
+
       # ---- blocked なら run を失敗させる（Actions の一覧で赤く見えるようにする）
       #
       # 必ず push とラベル更新の後に置く。先に失敗させると後続がスキップされ、

@@ -464,8 +464,6 @@ function finish(input) {
   }
   if (outcome.result === "agent_failed")
     return blocked("agent_failed");
-  if (outcome.oversize)
-    return blocked("oversize: issue の分割が必要");
   const roundKey = roundKeyFor(phase, config);
   if (roundKey) {
     if (outcome.verdict === "approve")
