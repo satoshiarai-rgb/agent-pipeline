@@ -7,11 +7,11 @@ import type { Criterion } from "../file/acceptanceFile.ts";
 import { appendEvent } from "../file/eventLog.ts";
 import { nextReviewNumber, reviewPath, saveReview } from "../file/reviewFile.ts";
 import { readStateFile } from "../file/stateFile.ts";
+import type { ValidationReport } from "../redux/effects/validate.ts";
 import type { Args } from "../redux/runCommand.ts";
 import { runCommand } from "../redux/runCommand.ts";
 import { agentFailed, agentStarted } from "../redux/store/app/actions.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
-import type { ValidationReport } from "../redux/validate.ts";
 import type { AgentName, Phase } from "../types.ts";
 import { stringifyJson } from "../utils/stringifyJson.ts";
 

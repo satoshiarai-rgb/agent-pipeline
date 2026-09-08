@@ -1,7 +1,7 @@
-import type { Config } from "../defaults.ts";
-import { hasAcceptance, readAcceptance } from "../file/acceptanceFile.ts";
-import type { RootState } from "./store/createStore.ts";
-import { selectStatus } from "./store/global/selectors.ts";
+import type { Config } from "../../defaults.ts";
+import { hasAcceptance, readAcceptance } from "../../file/acceptanceFile.ts";
+import type { RootState } from "../store/createStore.ts";
+import { selectStatus } from "../store/global/selectors.ts";
 
 /**
  * 止まった理由と次の一手を markdown で返す（`blocked` になったとき PR に貼る）。

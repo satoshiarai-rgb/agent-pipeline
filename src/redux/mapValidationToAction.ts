@@ -1,5 +1,6 @@
 import type { Phase, RunResult } from "../types.ts";
 import type { Action } from "../utils/typescriptFsa.ts";
+import type { ValidationReport } from "./effects/validate.ts";
 import {
   type AppPayload,
   agentFailed,
@@ -9,7 +10,6 @@ import {
   planned,
   planReviewed,
 } from "./store/app/actions.ts";
-import type { ValidationReport } from "./validate.ts";
 
 /** action に必ず載る「いつ・誰が」と、どの実行か */
 interface Context {

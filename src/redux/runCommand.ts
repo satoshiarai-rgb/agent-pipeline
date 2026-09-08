@@ -5,7 +5,8 @@ import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
 import type { AgentName } from "../types.ts";
 import { formatTimestamp } from "../utils/timestamp.ts";
-import { explainRun } from "./explain.ts";
+import { explainRun } from "./effects/explain.ts";
+import { type ValidationReport, validateRun } from "./effects/validate.ts";
 import { mapValidationToAction } from "./mapValidationToAction.ts";
 import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
@@ -19,7 +20,6 @@ import {
   selectSnapshot,
   selectStatus,
 } from "./store/global/selectors.ts";
-import { type ValidationReport, validateRun } from "./validate.ts";
 
 /**
  * CLI の語彙を store 操作に写す層。**判断は 1 つも持たない。**

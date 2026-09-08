@@ -1,16 +1,18 @@
+// 読み取りの副作用（`effects/`）。**書き込みの副作用は dispatch の中で起きるので
+// `store/middlewares/`**、こちらは dispatch の外で成果物を読む側に置く。
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Config } from "../defaults.ts";
+import type { Config } from "../../defaults.ts";
 import {
   acceptanceProblems,
   allPassed,
   hasAcceptance,
   readAcceptance,
-} from "../file/acceptanceFile.ts";
-import { decisionRecordProblems } from "../file/decisionRecords.ts";
-import { completedCleanly, readApiErrorStatus } from "../file/executionLog.ts";
-import { latestReviewPath, readVerdict } from "../file/reviewFile.ts";
-import type { AgentName, RunResult, Verdict } from "../types.ts";
+} from "../../file/acceptanceFile.ts";
+import { decisionRecordProblems } from "../../file/decisionRecords.ts";
+import { completedCleanly, readApiErrorStatus } from "../../file/executionLog.ts";
+import { latestReviewPath, readVerdict } from "../../file/reviewFile.ts";
+import type { AgentName, RunResult, Verdict } from "../../types.ts";
 
 /**
  * 「1 回の実行の検証結果」。成果物（`plan.md` / `acceptance.json` / `reviews/*.md` /
