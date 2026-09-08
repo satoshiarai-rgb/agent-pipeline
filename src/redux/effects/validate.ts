@@ -1,5 +1,6 @@
-// 読み取りの副作用（`effects/`）。**書き込みの副作用は dispatch の中で起きるので
-// `store/middlewares/`**、こちらは dispatch の外で成果物を読む側に置く。
+// `effects/` は **dispatch の外で走る I/O**。`store/middlewares/` は dispatch の中で走る
+// もの（`hydrate` の読み取りも含む）で、分かれ目は読み書きではなく dispatch の内か外か。
+// ここは finish が action を作る前に成果物を読む側。
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Config } from "../../defaults.ts";

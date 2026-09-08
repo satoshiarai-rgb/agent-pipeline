@@ -2,9 +2,9 @@
  * redux 層の公開 IF。store の中身（ducks・middleware・ガード・selector）は
  * `store/` 以下にあり、外から使うものだけをここに並べる。
  *
- * **store の値で実行を判断するものはこの層に置く。** 状態を読んでファイルに触るもの
- * （`validate` は成果物、`explain` は受け入れ条件）は `effects/` にまとめる —
- * 書き込みの副作用は dispatch の中で起きるので `store/middlewares/` にある。
+ * **store の値で実行を判断するものはこの層に置く。** うち **dispatch の外で走る I/O**
+ * （`validate` は成果物を読み、`explain` は受け入れ条件を読む）は `effects/` にまとめる。
+ * dispatch の中で走るものは `store/middlewares/`（`hydrate` の読み取りも含む）。
  */
 
 export { explainRun } from "./effects/explain.ts";
