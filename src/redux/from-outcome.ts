@@ -2,6 +2,7 @@ import type { Phase, RunResult, Verdict } from "../types.ts";
 import type { Action } from "../utils/typescript-fsa.ts";
 import {
   type AppPayload,
+  agentFailed,
   completed,
   devReviewed,
   implemented,
@@ -16,11 +17,6 @@ import {
  * **どのフェーズが走っていたかで action が決まる**（エージェントの終了は
  * フェーズごとに別の action / K-26）。フェーズは状態が持っているので、
  * 呼び出し側（`redux/commands.ts`）が渡す。
- *
- * **止まる結果は `RunFailed` を投げる。** この関数の戻り値は「先へ進む action」だけに
- * なり、止まったことを記録する action（`agentFailed`）は呼び出し側が catch して 1 箇所で
- * 組み立てる。**catch を忘れると状態が書かれないまま run が無音で止まる**ので、
- * 投げる先は必ず `redux/commands.ts` の `finish` である（そこにしか呼び出しが無い）。
  */
 export interface Outcome {
   result: RunResult;
@@ -48,21 +44,9 @@ interface Context {
 }
 
 /**
- * 止まる結果。`reason` がそのまま `blocked_reason` になる。
- *
- * **この文字列は `explain` の案内・`docs/troubleshooting.md` の表・プロンプトが
- * 依存している**（K-26 の受け入れ条件）。
+ * 失敗の理由の文字列。**移行前の `blocked_reason` と 1 文字も違わない**
+ * （`explain` の案内・`docs/troubleshooting.md` の表・プロンプトが依存している）。
  */
-export class RunFailed extends Error {
-  constructor(
-    readonly reason: string,
-    readonly api_error_status: number | null = null,
-  ) {
-    super(reason);
-  }
-}
-
-/** `result` ごとの理由の文字列 */
 const FAILURE_REASON: Record<Exclude<RunResult, "ok">, (outcome: Outcome) => string> = {
   api_error: (outcome) => `api_error:${outcome.api_error_status ?? "unknown"}`,
   invalid: (outcome) => {
@@ -74,7 +58,11 @@ const FAILURE_REASON: Record<Exclude<RunResult, "ok">, (outcome: Outcome) => str
 
 export function fromOutcome(outcome: Outcome, context: Context, phase: Phase): Action<AppPayload> {
   if (outcome.result !== "ok") {
-    throw new RunFailed(FAILURE_REASON[outcome.result](outcome), outcome.api_error_status ?? null);
+    return agentFailed({
+      ...context,
+      reason: FAILURE_REASON[outcome.result](outcome),
+      api_error_status: outcome.api_error_status ?? null,
+    });
   }
 
   switch (phase) {
@@ -86,13 +74,13 @@ export function fromOutcome(outcome: Outcome, context: Context, phase: Phase): A
       return completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false });
     // レビューのフェーズは verdict が無いと遷移を決められない（frontmatter の欠落）
     case "plan_review":
-      if (!outcome.verdict) throw new RunFailed("missing_verdict");
+      if (!outcome.verdict) return agentFailed({ ...context, reason: "missing_verdict" });
       return planReviewed({ ...context, verdict: outcome.verdict });
     case "dev_review":
-      if (!outcome.verdict) throw new RunFailed("missing_verdict");
+      if (!outcome.verdict) return agentFailed({ ...context, reason: "missing_verdict" });
       return devReviewed({ ...context, verdict: outcome.verdict });
     // エージェントが走らないフェーズでの成功報告（ハーネスかワークフローの壊れ）
     default:
-      throw new RunFailed(`transition_incomplete: ${phase} (ok)`);
+      return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
   }
 }
