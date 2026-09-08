@@ -2,6 +2,7 @@ import type { Config } from "../../../defaults.ts";
 import type { Snapshot } from "../../../file/stateFile.ts";
 import type { AgentName, Phase, RoundKey } from "../../../types.ts";
 import { resolveAgent } from "../../../utils/resolveAgent.ts";
+import { parseTimestamp } from "../../../utils/timestamp.ts";
 import { agentFor, isIdle } from "../app/reducer.ts";
 import type { RootState } from "../createStore.ts";
 
@@ -21,6 +22,25 @@ import type { RootState } from "../createStore.ts";
  * null なら実行が記録されていない（`start` を通っていない = ワークフローの壊れ）。
  */
 export const selectInFlightAgent = (root: RootState): AgentName | null => root.app.in_flight_agent;
+
+/**
+ * **実行が死んでいるか（stale / I-8・A-14）。** job のタイムアウトやキャンセルで run が
+ * 落ちると開始のイベントだけが残り、`route` は「実行中」と見て何もしないので run が
+ * 無音で止まる。**唯一の復旧手段が `/agent retry`** なので、その入口だけがこれを見る。
+ *
+ * 判定は「開始からジョブの上限（エージェントの上限 + 10 分）を過ぎたか」。現在時刻は
+ * 人間の操作の `payload.timestamp`（ハーネスが打った時刻）を渡す — selector は
+ * 時計を持たない（同じ state から同じ答えが出る状態を保つ）。
+ */
+export function selectStale(root: RootState, config: Config, now: string): boolean {
+  const { in_flight_agent, in_flight_since } = root.app;
+  if (!in_flight_agent || !in_flight_since) return false;
+  const started = parseTimestamp(in_flight_since);
+  const at = parseTimestamp(now);
+  if (started === null || at === null) return false;
+  const limit = resolveAgent(config, in_flight_agent).job_timeout_minutes;
+  return at - started > limit * 60_000;
+}
 
 /** phase をラベル名に射影する。`plan_review` → `agent:plan-review`（設計書 §2.3） */
 export const labelFor = (phase: Phase, prefix: string): string =>
@@ -151,7 +171,8 @@ export function selectNextAction(
   // 記録済みの停止（失敗・上限・契約違反）と人間待ちは何もしない
   if (app.failure_reason || isIdle(phase))
     return { ...base, action: "none", reason: `phase_${phase}` };
-  // 実行中の再入による二重起動を防ぐ。ここで止まったまま落ちた run は stale 検知が拾う（A-14）
+  // 実行中の再入による二重起動を防ぐ。ここで止まったまま落ちた run は `/agent retry` が拾う
+  // （記録の上では走っているので route は動けない。判定は selectStale / I-8）
   if (app.in_flight_agent) {
     return {
       ...base,

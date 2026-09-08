@@ -78,9 +78,8 @@ jobs:
           client-id: ${{ secrets.AGENT_APP_CLIENT_ID }}
           private-key: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
 
-      # fetch-depth: 0 は 2 つの理由から必要。
-      # dev-reviewer が差分を git から読む（既定ブランチとの比較に履歴がいる）ことと、
-      # push が rejected されたときの再試行（A-32）のため
+      # fetch-depth: 0 は dev-reviewer が差分を git から読むため
+      # （既定ブランチとの比較に履歴がいる）
       - uses: actions/checkout@v7
         with:
           token: ${{ steps.app.outputs.token }}

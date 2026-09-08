@@ -5,6 +5,7 @@ import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
 import type { AgentName } from "../types.ts";
+import { formatTimestamp } from "../utils/timestamp.ts";
 import { mapValidationToAction, type ValidationReport } from "./mapValidationToAction.ts";
 import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
@@ -68,13 +69,6 @@ const need = <T>(v: T | undefined, name: string): T => {
   return v;
 };
 
-/** ISO 基本形式。イベントのファイル名の先頭になる */
-const timestamp = () =>
-  new Date()
-    .toISOString()
-    .replace(/[-:]/g, "")
-    .replace(/\.\d{3}Z$/, "Z");
-
 /** ガードが弾いたとき、dispatch はこの形を返す（middleware が戻り値を差し替える） */
 const isRejection = (r: unknown): r is { ok: false; reason: string } =>
   typeof r === "object" && r !== null && (r as { ok?: unknown }).ok === false;
@@ -107,6 +101,8 @@ export function runCommand(
     });
 
   const dir = need(args.dir, "dir");
+  // action に載る「いつ」。1 起動で dispatch する action は 1 つなので 1 回作れば足りる
+  const now = formatTimestamp(new Date());
   const { store, outputs, state } = createStore({
     dir,
     config,
@@ -132,7 +128,7 @@ export function runCommand(
   if (command === "bootstrap") {
     const issue = need(args.issue, "issue");
     const action = bootstrap({
-      timestamp: timestamp(),
+      timestamp: now,
       by: "harness",
       issue: Number(issue),
       branch: need(args.branch, "branch"),
@@ -145,7 +141,7 @@ export function runCommand(
 
   if (command === "start") {
     const action = agentStarted({
-      timestamp: timestamp(),
+      timestamp: now,
       by: "harness",
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
@@ -188,7 +184,7 @@ export function runCommand(
       }
     }
     const action = mapValidationToAction(report, state().app.phase, {
-      timestamp: timestamp(),
+      timestamp: now,
       by: "harness",
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
@@ -210,7 +206,7 @@ export function runCommand(
   // 弾かれた dispatch は理由を返すので、そのまま出力にして PR に貼る
   if (command === "approve") {
     const association = need(args.association, "association");
-    const action = humanApproval({ timestamp: timestamp(), by: `human:${association}` });
+    const action = humanApproval({ timestamp: now, by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
     const { phase } = selectStatus(state(), config);
@@ -220,7 +216,7 @@ export function runCommand(
   if (command === "request-changes") {
     const association = need(args.association, "association");
     const action = humanRequestChanges({
-      timestamp: timestamp(),
+      timestamp: now,
       by: `human:${association}`,
       body: need(args.body, "body"),
     });
@@ -232,7 +228,7 @@ export function runCommand(
 
   if (command === "retry") {
     const association = need(args.association, "association");
-    const action = retry({ timestamp: timestamp(), by: `human:${association}` });
+    const action = retry({ timestamp: now, by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
     const { phase } = selectStatus(state(), config);

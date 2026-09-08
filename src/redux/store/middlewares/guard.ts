@@ -3,7 +3,7 @@ import type { Action, AnyAction } from "../../../utils/typescriptFsa.ts";
 import type { AppPayload, Origin } from "../app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "../app/actions.ts";
 import type { RootState } from "../createStore.ts";
-import { selectStatus } from "../global/selectors.ts";
+import { selectStale, selectStatus } from "../global/selectors.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";
 
@@ -44,9 +44,15 @@ const awaitingHuman: Guard = ({ app }) => {
   return `not_awaiting_approval: phase=${app.phase}`;
 };
 
-/** 「止まっている」は導出された状態（`selectBlocked`）で判断する */
-const mustBeBlocked: Guard = (root, _action, config) => {
+/**
+ * 「止まっている」は導出された状態（`selectStatus`）で判断する。
+ * **死んだ実行（stale）も「止まっている」に含める** — 記録の上では走っているが、
+ * ジョブはもう居ないので誰も次を書かない（I-8）。
+ */
+const mustBeBlocked: Guard = (root, action, config) => {
   if (selectStatus(root, config).blocked_reason) return null;
+  const now = (action.payload as Origin).timestamp;
+  if (selectStale(root, config, now)) return null;
   return `not_blocked: phase=${root.app.phase}`;
 };
 
@@ -57,12 +63,16 @@ const notLimitReached: Guard = (root, _action, config) => {
   return null;
 };
 
-/** route は実行中のレコードを見て何もしないので、戻しても静かに止まったままになる */
-const notInFlight: Guard = ({ app }) => {
-  if (app.in_flight_agent) {
-    return `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}`;
-  }
-  return null;
+/**
+ * route は実行中のレコードを見て何もしないので、走っている最中に戻しても静かに
+ * 止まったままになる。**ただし死んだ実行は戻してよい**（それが復旧手段 / I-8）。
+ */
+const notInFlight: Guard = (root, action, config) => {
+  const { in_flight_agent, in_flight_run_id } = root.app;
+  if (!in_flight_agent) return null;
+  const now = (action.payload as Origin).timestamp;
+  if (selectStale(root, config, now)) return null;
+  return `run_in_progress: ${in_flight_agent} run=${in_flight_run_id}`;
 };
 
 /** action ごとのガード。**上から順に適用し、最初に返った理由を使う** */

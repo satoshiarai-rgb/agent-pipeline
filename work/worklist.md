@@ -177,22 +177,16 @@
     - **この dry run で実機バグ 2 件が出た**（どちらも修正・push 済み）:
       1. **配布先のラッパーが無効化されていた。** 削除した `approve.yml` を検証用の `check-dispatch.yml` がまだ参照していて、**ワークフローファイル自体が invalid**（どのイベントでも 0 秒で失敗）。承認は `/agent approve` のコメント経路だけなので `approve-manual` ジョブを削除した。**`install/agent.yml`（配布の正）には参照が無いので配布先は無事**
       2. **`bootstrap` に `--issue` が届いていなかった。** `bootstrap.yml` は `with: issue:` を渡していたが `action.yml` に入力の宣言が無く、**composite action は未宣言の `with:` を黙って捨てる**ため `--issue が必要です` で exit 2。入力（`issue` / `branch`）を宣言し `run-cli.sh` から転送した。あわせて `scripts/__tests__/workflows.test.ts` に **drift を捕まえるテスト 2 件**（`with:` のキーが `action.yml` にあるか / 宣言した入力が `run-cli.sh` を通るか）を足した — 段取り 2 で heredoc を CLI に置き換えたときの取りこぼしで、テストが無ければ次も同じ形で漏れる
-  - [ ] 6: **A-32 を「不要になった」として閉じ、`stale.yml`（I-8 / A-14）を `in_flight` の判定に寄せる**（開始イベントに対応する終了イベントが無い状態）
+  - [x] 6: **完了（2026-09-08）。A-32 を不要として閉じ、stale 検知を `/agent retry` に畳んだ。**
+    - **stale の判定は selector 1 つ**（`selectStale(root, config, now)`）。`agent_started` の時刻を `in_flight_since` として state に持ち、**開始からジョブの上限（そのエージェントの `timeout_minutes` + 10 分）を過ぎていれば死んだ実行**と見る。`now` は人間の操作の `payload.timestamp` を渡す（selector に時計を持たせない）。時刻の形式の読み書きは `src/utils/timestamp.ts` に閉じた
+    - **`stale.yml` は作らない。** ガード 2 つ（`mustBeBlocked` / `notInFlight`）が stale を通すようにし、`retry` の case で実行中の記録を落とすだけ。cron も専用ジョブも増えていない
+    - `docs/troubleshooting.md` に「実行が死んで止まったとき」を追加（`/agent retry` が上限経過後に受け付ける。それより早く戻したいときは失敗イベントを 1 件足す）
 - [ ] A-54: **文書の食い違いを直す（2026-09-08 の精査。実装が正しく文書が古い）。** (1) **`CLAUDE.md` に消えたファイル名が 5 種**: `state.yml` → `state.json`、`run.yml` → `dispatch.yml`（書く主体の一覧に `comment.yml` を足す。`approve.yml` は削除済み）、`scripts/labels.py` → `scripts/project-labels.sh`、`acceptance.yml` → `acceptance.json`、`log.md`（未実装なので言及を落とす）。同じ文書の別行では正しい名前を使っており、次のセッションを誤らせるので優先度は高い (2) `docs/customize-prompt.md` と `docs/troubleshooting.md` の「**どのプロンプトで動かしたかが `runs/*.json` に残る**」— 実行レコードにそのフィールドは無い（`role_prompt` は `compose` の戻り値で記録していない）。記録したいなら実装側を直す判断 (3) `install/` の「原本 → 置き場所」の表が 3 箇所（`install.sh` が実物、`install/README.md` と `docs/installation.md` が写し）。README 自身が「対応表はここ」と宣言しているので docs 側を参照 1 行に (4) `docs/installation.md` の `id-token: write` が「使っている」と読める（WIF に切り替えるまで未使用）(5) `action.yml` のコマンド一覧が同一ファイル内で二重（`name` の description と `command` の description）。`run-id` / `attempt` の説明と `# validate` の見出しは A-53 段取り 7 で直した
 - [ ] A-55: **判断が要る 3 件（2026-09-08 の精査で挙がったが、方針を決めないと直せないもの）。** (1) **到達しない分岐を消すか**: `middlewares/reviewFile.ts` の `kind = "dev"`（ガードが `awaiting_human` 以外を弾くので届かない）と `store/selectors.ts` の `no_transition_for_phase`（非 idle の 5 フェーズは全部エージェントを持つ）。消すと「将来 dev_review でも人間が差し戻せるようにする」余地が明示的に消える (2) **公開 IF の barrel を 2 段から 1 段にするか**: 外から使われているのは `defaults` と `validateRun` の 2 つだけ（`scripts/__tests__/workflows.test.ts`）。`redux/index.ts` を消して `src/index.ts` を 2 つに絞る案 (3) **`install/config.json` の `labels.trigger`**: 上書きしても起動ラベルは `install/agent.yml` の `if: 'agent:go'` 直書きなので黙って効かない。キーを外すか、`docs/installation.md` 手順 4 に明記するか
 - [ ] I-13: タグ `v1` / `v1.0.0` を打つ
 - [ ] A-48: **`.claude/**` の扱いをプロンプトで 2 点直す（実機 3 本目 / issue #11 の plan-reviewer の指摘）。** (1) **理由を計画に書かせる**。planner プロンプトは「書き込めない」という事実だけを渡しているため、planner が根拠なしに前提へ写し、レビュアーが「このリポジトリには `.claude/skills/**` など追跡済みファイルがあるのに、書けないというのは自明でない」と差し戻した。**レビュアーには成果物しか渡らない**（設計書 §3.3）ので、理由（Claude Code が sensitive file として拒否する / K-19）を前提に明示させないと同じ差し戻しが構造的に起き続ける。(2) **設置用の完成品を `agent-work/issue-<n>/` に置かせない**。現在の developer プロンプトは `staged/` に置くよう指示しているが、run ディレクトリは issue ごとに閉じるハーネスのスクラッチで、`state.json` / `runs/` / `reviews/` が同居する。**恒久的に参照される設置元は issue 番号に依存しない場所**（例: リポジトリ直下の `settings.example.json`）に置き、README に設置手順を書かせる — K-19、実機 3 本目
 - [ ] A-50: **App トークンの権限を実行単位で絞る（A-35 の残り）。** `create-github-app-token@v3` の `permission-*` 入力で、ジョブごとに必要な権限だけを取る（bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents、comment は contents / pull-requests）。App 自体の権限に加えて実行単位でも落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1
 - [ ] A-34: **`log.md` の追記も同じ問題を持つ。** 追記専用でも同じ行域（末尾）を触るため、並行時は rebase で競合する（自動マージされて順序が入れ替わる可能性もある）。A-33 の `runs/` レコードがそのまま実行ログになるので、`log.md` は**ハーネスが書く実体ではなく、completing フェーズで `runs/` を時刻順に連結して生成する読み物**に変える。人間が PR で 1 ファイルとして読める利点は維持できる — A-33、設計書 §5.6
-- [ ] A-32: **`finalize` の push 再試行を「rebase」から「状態の再計算」に変える。** 構成案 §5.5 は rejected 時に `git pull --rebase` して 1 回再試行するとしているが、`state.yml` は複数行の YAML なので、2 つの並行更新が別の行を触っていると **rebase が競合を出さずに自動マージし、どちらのランも書いていない状態が生まれる**（例: ラン A が `phase` を、ラン B が `rounds` を更新 → 両方が混ざった状態）。競合すれば `blocked` になって気付けるが、きれいにマージされると誰も気付かない。**唯一の silent corruption 経路**。正しい再試行は「リモートの `state.yml` を fetch して読み直し、遷移を再計算してから書く」。コード変更（developer の成果物）は rebase して構わないが、状態ファイルは再計算する。あわせて穴 2（`concurrency.group` がイベントごとに変わる、A-13 の周辺）を直せば発生確率自体が下がる。**A-33 で state.json の可変値が `phase` と `blocked_reason` だけになったので混ざる余地は小さくなったが、再試行そのものが未実装**（いまは push が rejected したらジョブが落ちるだけ。実機では concurrency で直列化されているため未発生） — 構成案 §5.5、設計書 §6.4 手順 8、A-33
-
-- [ ] I-8 / A-14: **`stale.yml`（stale 検知）。優先度は低い（2026-09-07 に後回しと判断）。** `run` job が **job の**タイムアウトやキャンセルで死ぬと、開始レコードが `finished_at: null` のまま残り、`state.json` はエージェントのフェーズのままで誰も push しないため run が無音で停止する（`route` は `in_flight` を見て何もしない）。
-  - **発生条件は狭い**: エージェント step には自前の `timeout-minutes` があるので時間切れは step 側で先に起き、そのときは `if: always()` で `validate` / `finish` が走って状態が書かれる。job の上限（step + 10 分）に到達するのは、compose・validate・push・ラベルが 10 分を使い切った場合だけ。ほかはランナーの異常と手動キャンセル
-  - **手では直せる**: `runs/*.json` の `finished_at` を埋め、`state.json` の `phase` を戻して push する（`templates/README.md` に手順を書いた）。影響は 1 issue で、PR が動かないので人間は気づく。`/agent retry` も `run_in_progress: <agent> run=<id>` と理由を返す
-  - **やるときは cron ではなく `/agent retry` に寄せる**: 「レコードの `started_at` がそのエージェントの上限 + 余裕より古ければ、retry がそのレコードを閉じて戻す」にすれば、新しいワークフローもブランチの巡回も要らない。諦めるのは自動通知だけ
-  - 以前の記述: 中央に `stale.yml`（`schedule` 起動、`started_at` が閾値超過かつ `finished_at` が null の run を `blocked` にしてコメント）を追加し、配布先 `agent.yml` から呼ぶ — 構成案 §4.2、設計書 §6.4 手順 4、K-23
----
-
 ## 2. 判断が必要
 
 - [ ] A-40: 中止の経路を決める（**復旧は K-23 の `/agent retry` で入ったので、残るのは「中止」だけ**）。**実機で 1 件中止した（2026-09-07、issue #9）。現状の手順は「issue にコメントして閉じる → draft PR を閉じる → 作業ブランチは記録として残す」の 3 手で、ハーネスは何も関与しない**（`state.json` は `blocked` のまま残り、ラベルも `agent:blocked` のまま残る）。閉じた issue に再びラベルが付いても bootstrap はブランチがあるので何もしない（K-14）ため実害は無いが、「中止した」ことが状態に残らない。以前の記述: 現状は `state.yml` を手で `done` か `blocked` に書き換えるしかない。候補は (a) `/abort` コメント、(b) issue を閉じたら止める（`issues: closed` を受ける）、(c) `agent:abort` ラベル。draft PR とブランチをどう片付けるか（閉じる / 残す）も併せて決める — 設計書 §3.1
@@ -388,6 +382,11 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 - [x] I-10: **完了。** 実機 #11 で planner が通り、`plan.md` と `acceptance.json` が出た。以前の記述: planner だけで 1 issue 通す（plan.md と acceptance.yml が出るところまで）
 - [x] I-11: **完了。** 実機 #11 で 5 エージェントすべてを本物で通した。以前の記述: plan-reviewer / developer / dev-reviewer / completion のプロンプトと検証を順に追加する
 - [x] R-1: **完了。** 実機 #11 で issue から `done` まで到達（10 実行 / $10.37）。以前の記述: 小さな issue で 1 本通す（設計書 §9-9）
+
+### 追いかけなくなったもの（2026-09-08）
+
+- [x] A-32: **不要になった（silent corruption の経路が構造的に消えた）。** 元の懸念は「複数行の `state.yml` を並行更新すると rebase が競合を出さずに自動マージし、どちらの run も書いていない状態が生まれる」こと。**正が追記専用のイベントログに移り、`state.json` はその射影**になったので、(1) イベントは 1 ファイル 1 件で名前が `<連番>-<timestamp>-<run_id>-<attempt>-<type>` と一意なのでマージは常に両方を保持し、(2) `state.json` が変な内容でマージされても次の畳み込みが上書きする。**push が rejected されたときの再試行は足さない** — ジョブが赤く落ちるので気付けるし、`concurrency` がブランチ単位で直列化している。復旧は `/agent retry`（段取り 6）。残る細部は「同じ連番の 2 ファイルの畳み込み順が名前順（`run_id` の文字列順）になる」ことだけで、イベントは両方残るので黙って失われるものは無い
+- [x] I-8 / A-14: **`stale.yml` を作らずに閉じた（2026-09-08。段取り 6 に畳んだ）。** 死んだ実行の検知は `selectStale` 1 つで、見るのは `/agent retry` の入口だけ。定期実行のワークフローも、状態を書き換える別経路も増やしていない
 
 ### 決定として閉じたもの
 

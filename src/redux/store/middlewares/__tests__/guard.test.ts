@@ -6,10 +6,12 @@ import {
   approve,
   cleanupRuns,
   makeBlocked,
+  makeInFlight,
   makeRun,
   phaseOf,
   requestChanges,
   retry as retryCmd,
+  route,
   runOnce,
   start,
 } from "../../../../__tests__/runDirFixture.ts";
@@ -155,5 +157,29 @@ describe("人間の action の認可（入口でのみ見る / 設計書 §7.3�
     expect(requestChanges(dir, "NONE", "x", c).ok).toBe(false);
     expect(readdirSync(join(dir, "reviews")).length).toBe(before);
     expect(phaseOf(dir).phase).toBe("awaiting_human");
+  });
+});
+
+/**
+ * job のタイムアウトやキャンセルで死んだ実行（開始イベントだけが残った状態）。
+ * `route` は「実行中」と見て何もしないので、**復旧手段は `/agent retry` だけ**（I-8）。
+ */
+describe("死んだ実行からの復旧（stale / I-8）", () => {
+  test("走っている最中は戻せない（まだ止まっていない）", () => {
+    const dir = makeRun("developing");
+    start(dir, "developer", "999", c);
+    // 先に見るのは「止まっているか」。走っている実行はまだ死んでいないので弾かれる
+    const rejected = retry(dir);
+    expect(rejected.ok === false && rejected.reason).toBe("not_blocked: phase=developing");
+  });
+
+  test("ジョブの上限を過ぎた実行は戻せる。実行中の記録は落ちる", () => {
+    const dir = makeRun("developing");
+    makeInFlight(dir, "developer", "20260101T000000Z");
+    const r = retry(dir);
+    expect(r.ok).toBe(true);
+    expect(r.ok && r.agent).toBe("developer");
+    // route が次を出せる状態に戻っている（実行中のままだと何もしない）
+    expect(route(dir, c)).toMatchObject({ action: "run", run: { agent: "developer" } });
   });
 });

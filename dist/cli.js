@@ -487,6 +487,16 @@ function claudeArgs(a) {
   ].join(" ");
 }
 
+// src/utils/timestamp.ts
+var formatTimestamp = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+function parseTimestamp(timestamp) {
+  const parts = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(timestamp);
+  if (!parts)
+    return null;
+  const [, year, month, day, hour, minute, second] = parts;
+  return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+}
+
 // src/utils/typescriptFsaReducers.ts
 function reducerWithInitialState(initialState) {
   return makeReducer(initialState);
@@ -587,7 +597,8 @@ var initialApp = {
   plan_review_rounds: 0,
   dev_review_rounds: 0,
   in_flight_agent: null,
-  in_flight_run_id: null
+  in_flight_run_id: null,
+  in_flight_since: null
 };
 function roundLimitReason(phase, used, limit) {
   if (used >= limit)
@@ -609,12 +620,17 @@ var AGENTS = {
   completing: "completion"
 };
 var agentFor = (phase) => AGENTS[phase] ?? null;
-var closed = { in_flight_agent: null, in_flight_run_id: null };
+var closed = {
+  in_flight_agent: null,
+  in_flight_run_id: null,
+  in_flight_since: null
+};
 var createAppReducer = (config) => reducerWithInitialState(initialApp).case(bootstrap, (state) => ({ ...state, phase: "planning" })).case(agentStarted, (state, payload) => ({
   ...state,
   total_steps: state.total_steps + 1,
   in_flight_agent: payload.agent,
-  in_flight_run_id: payload.run_id
+  in_flight_run_id: payload.run_id,
+  in_flight_since: payload.timestamp
 })).case(agentFailed, (state, payload) => ({
   ...state,
   ...closed,
@@ -707,11 +723,23 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(boot
   failure_reason: null
 })).case(retry, (state) => ({
   ...state,
+  ...closed,
   failure_reason: null
 })).build();
 
 // src/redux/store/global/selectors.ts
 var selectInFlightAgent = (root) => root.app.in_flight_agent;
+function selectStale(root, config, now) {
+  const { in_flight_agent, in_flight_since } = root.app;
+  if (!in_flight_agent || !in_flight_since)
+    return false;
+  const started = parseTimestamp(in_flight_since);
+  const at = parseTimestamp(now);
+  if (started === null || at === null)
+    return false;
+  const limit = resolveAgent(config, in_flight_agent).job_timeout_minutes;
+  return at - started > limit * 60000;
+}
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
 function selectLabel(root, config) {
   const { prefix, trigger } = config.labels;
@@ -1493,8 +1521,11 @@ var awaitingHuman = ({ app }) => {
     return null;
   return `not_awaiting_approval: phase=${app.phase}`;
 };
-var mustBeBlocked = (root, _action, config) => {
+var mustBeBlocked = (root, action, config) => {
   if (selectStatus(root, config).blocked_reason)
+    return null;
+  const now = action.payload.timestamp;
+  if (selectStale(root, config, now))
     return null;
   return `not_blocked: phase=${root.app.phase}`;
 };
@@ -1504,11 +1535,14 @@ var notLimitReached = (root, _action, config) => {
     return `limit_reached: ${reason}`;
   return null;
 };
-var notInFlight = ({ app }) => {
-  if (app.in_flight_agent) {
-    return `run_in_progress: ${app.in_flight_agent} run=${app.in_flight_run_id}`;
-  }
-  return null;
+var notInFlight = (root, action, config) => {
+  const { in_flight_agent, in_flight_run_id } = root.app;
+  if (!in_flight_agent)
+    return null;
+  const now = action.payload.timestamp;
+  if (selectStale(root, config, now))
+    return null;
+  return `run_in_progress: ${in_flight_agent} run=${in_flight_run_id}`;
 };
 var GUARDS = {
   [humanApproval.type]: [authorized, awaitingHuman],
@@ -1629,7 +1663,6 @@ var need = (v, name) => {
     throw new MissingArg(name);
   return v;
 };
-var timestamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
 function runCommand(command, args, config, configError = null) {
   if (command === "compose")
@@ -1644,6 +1677,7 @@ function runCommand(command, args, config, configError = null) {
       attempt: Number(args.attempt ?? 1)
     });
   const dir = need(args.dir, "dir");
+  const now = formatTimestamp(new Date);
   const { store, outputs, state } = createStore2({
     dir,
     config,
@@ -1665,7 +1699,7 @@ function runCommand(command, args, config, configError = null) {
   if (command === "bootstrap") {
     const issue = need(args.issue, "issue");
     const action = bootstrap({
-      timestamp: timestamp(),
+      timestamp: now,
       by: "harness",
       issue: Number(issue),
       branch: need(args.branch, "branch"),
@@ -1677,7 +1711,7 @@ function runCommand(command, args, config, configError = null) {
   }
   if (command === "start") {
     const action = agentStarted({
-      timestamp: timestamp(),
+      timestamp: now,
       by: "harness",
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
@@ -1713,7 +1747,7 @@ function runCommand(command, args, config, configError = null) {
       }
     }
     const action = mapValidationToAction(report, state().app.phase, {
-      timestamp: timestamp(),
+      timestamp: now,
       by: "harness",
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
@@ -1731,7 +1765,7 @@ function runCommand(command, args, config, configError = null) {
   }
   if (command === "approve") {
     const association = need(args.association, "association");
-    const action = humanApproval({ timestamp: timestamp(), by: `human:${association}` });
+    const action = humanApproval({ timestamp: now, by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
@@ -1741,7 +1775,7 @@ function runCommand(command, args, config, configError = null) {
   if (command === "request-changes") {
     const association = need(args.association, "association");
     const action = humanRequestChanges({
-      timestamp: timestamp(),
+      timestamp: now,
       by: `human:${association}`,
       body: need(args.body, "body")
     });
@@ -1753,7 +1787,7 @@ function runCommand(command, args, config, configError = null) {
   }
   if (command === "retry") {
     const association = need(args.association, "association");
-    const action = retry({ timestamp: timestamp(), by: `human:${association}` });
+    const action = retry({ timestamp: now, by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;

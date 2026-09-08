@@ -37,6 +37,8 @@ export interface AppState {
   /** 実行中のエージェント。終了系の action で null に戻る（二重起動の防止 / A-14） */
   in_flight_agent: AgentName | null;
   in_flight_run_id: string | null;
+  /** 実行の開始時刻。**死んだ実行（stale）の判定に使う**（I-8 / A-14） */
+  in_flight_since: string | null;
 }
 
 export const initialApp: AppState = {
@@ -47,6 +49,7 @@ export const initialApp: AppState = {
   dev_review_rounds: 0,
   in_flight_agent: null,
   in_flight_run_id: null,
+  in_flight_since: null,
 };
 
 /**
@@ -91,7 +94,11 @@ export const agentFor = (phase: Phase): AgentName | null => AGENTS[phase] ?? nul
 // -------------------------------------------------------------------- reducer
 
 /** エージェントの実行が終わったときに毎回落とすもの（実行中の記録） */
-const closed = { in_flight_agent: null, in_flight_run_id: null } as const;
+const closed = {
+  in_flight_agent: null,
+  in_flight_run_id: null,
+  in_flight_since: null,
+} as const;
 
 /**
  * **どの action がどう状態を変えるかの表。** 1 action = 1 遷移で、遷移先は case の中に
@@ -111,6 +118,7 @@ export const createAppReducer = (config: Config) =>
       total_steps: state.total_steps + 1,
       in_flight_agent: payload.agent,
       in_flight_run_id: payload.run_id,
+      in_flight_since: payload.timestamp,
     }))
 
     // 実行そのものの失敗と契約違反。理由がそのまま停止の理由になる
@@ -235,6 +243,9 @@ export const createAppReducer = (config: Config) =>
      */
     .case(retry, (state) => ({
       ...state,
+      // 死んだ実行（stale）から戻すときは、実行中の記録も落とす
+      // — 残っていると route が「実行中」と見て何もしない（I-8）
+      ...closed,
       failure_reason: null,
     }))
 

@@ -10,7 +10,7 @@ import { readStateFile } from "../file/stateFile.ts";
 import type { ValidationReport } from "../redux/mapValidationToAction.ts";
 import type { Args } from "../redux/runCommand.ts";
 import { runCommand } from "../redux/runCommand.ts";
-import { agentFailed } from "../redux/store/app/actions.ts";
+import { agentFailed, agentStarted } from "../redux/store/app/actions.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
 import type { AgentName, Phase } from "../types.ts";
 import { stringifyJson } from "../utils/stringifyJson.ts";
@@ -183,6 +183,20 @@ export function makeRun(target: Phase | string = "planning"): string {
 export function makeBlocked(reason: string, phase: Phase | string = "planning"): string {
   const dir = makeRun(phase);
   return markBlocked(dir, reason);
+}
+
+/**
+ * **死んだ実行**（開始イベントだけが残った状態）を作る。job のタイムアウトや
+ * キャンセルで run が落ちた形で、`timestamp` の古さが stale の判定を決める。
+ */
+export function makeInFlight(dir: string, agent: AgentName, timestamp: string): string {
+  const run_id = nextRun();
+  appendEvent(
+    dir,
+    agentStarted({ timestamp, by: "harness", run_id, attempt: 1, agent, model: "claude-opus-5" }),
+    { run_id, attempt: 1 },
+  );
+  return dir;
 }
 
 /** すでにある run に「止まった」イベントを 1 件足す */

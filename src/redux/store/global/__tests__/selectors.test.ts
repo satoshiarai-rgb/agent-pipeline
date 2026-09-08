@@ -8,6 +8,7 @@ import {
   selectLabel,
   selectNextAction,
   selectSnapshot,
+  selectStale,
 } from "../selectors.ts";
 
 const c = config();
@@ -155,5 +156,35 @@ describe("selectContinueChain / selectSnapshot", () => {
       phase: "blocked",
       blocked_reason: "agent_failed",
     });
+  });
+});
+
+/**
+ * 死んだ実行の判定（I-8）。上限は**エージェントごと**のジョブの上限
+ * （`timeout_minutes` + 10）で、developer は 45 + 10 = 55 分。
+ */
+describe("selectStale: 実行が死んでいるか", () => {
+  const inFlight = {
+    phase: "developing" as const,
+    in_flight_agent: "developer" as const,
+    in_flight_run_id: "1",
+    in_flight_since: "20260908T000000Z",
+  };
+
+  test("ジョブの上限内なら死んでいない", () => {
+    expect(selectStale(rootOf(inFlight), c, "20260908T005400Z")).toBe(false);
+  });
+
+  test("上限を過ぎたら死んでいる", () => {
+    expect(selectStale(rootOf(inFlight), c, "20260908T005501Z")).toBe(true);
+  });
+
+  test("実行中でなければ常に false", () => {
+    expect(selectStale(rootOf({ phase: "developing" }), c, "20270101T000000Z")).toBe(false);
+  });
+
+  test("読めない時刻は false（判定に使えないものでは戻せない）", () => {
+    const broken = { ...inFlight, in_flight_since: "2026-09-08T00:00:00Z" };
+    expect(selectStale(rootOf(broken), c, "20260908T235900Z")).toBe(false);
   });
 });
