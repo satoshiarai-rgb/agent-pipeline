@@ -1,6 +1,6 @@
 import type { Config } from "../../../defaults.ts";
 import type { Snapshot } from "../../../file/stateFile.ts";
-import type { Phase, RoundKey } from "../../../types.ts";
+import type { AgentName, Phase, RoundKey } from "../../../types.ts";
 import { resolveAgent } from "../../../utils/resolveAgent.ts";
 import { agentFor, isIdle } from "../app/reducer.ts";
 import type { RootState } from "../createStore.ts";
@@ -14,6 +14,13 @@ import type { RootState } from "../createStore.ts";
  *  `selectBlocked` は comment subscriber と explain コマンド）。
  * `reselect` は入れない（1 起動 1 dispatch なのでメモ化する対象が無い）。
  */
+
+/**
+ * 契約の検査対象。**いま走っているエージェントはイベントログが知っている**
+ * （`start` が `agent_started` に記録した）ので、`validate` は引数で受け取らない。
+ * null なら実行が記録されていない（`start` を通っていない = ワークフローの壊れ）。
+ */
+export const selectInFlightAgent = (root: RootState): AgentName | null => root.app.in_flight_agent;
 
 /** phase をラベル名に射影する。`plan_review` → `agent:plan-review`（設計書 §2.3） */
 export const labelFor = (phase: Phase, prefix: string): string =>

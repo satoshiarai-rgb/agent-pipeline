@@ -12,6 +12,7 @@ import { createStore } from "./store/createStore.ts";
 import { bootstrap } from "./store/global/actions.ts";
 import {
   selectContinueChain,
+  selectInFlightAgent,
   selectLabel,
   selectNextAction,
   selectSnapshot,
@@ -86,7 +87,7 @@ const isRejection = (r: unknown): r is { ok: false; reason: string } =>
  * コマンドを 1 つ実行する。**1 起動で dispatch する action は 1 つだけ**。
  * 知らないコマンドなら undefined を返す（CLI が使い方を出す）。
  *
- * 上から「store を使わない 2 つ」「読むだけの 3 つ」「スナップショットを書き直す 1 つ」
+ * 上から「store を使わない 1 つ」「読むだけの 4 つ」「スナップショットを書き直す 1 つ」
  * 「状態を変える 6 つ」の順。語彙を足すときに書くのは分岐 1 つ。
  */
 export function runCommand(
@@ -95,20 +96,7 @@ export function runCommand(
   config: Config,
   configError: string | null = null,
 ): unknown {
-  // store を使わない 2 つ。成果物と契約だけを見る
-  if (command === "validate")
-    return validateRun({
-      dir: need(args.dir, "dir"),
-      config,
-      agent: need(args.agent, "agent") as AgentName,
-      agent_failed: args["agent-failed"] ?? false,
-      execution_file: args["execution-file"] ?? null,
-      // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
-      changed_files: args["changed-files"]
-        ? readFileSync(args["changed-files"], "utf8").split("\n").filter(Boolean)
-        : [],
-    });
-
+  // store を使わない 1 つ。プロンプトを組み立てるだけ
   if (command === "compose")
     return composeRun({
       dir: need(args.dir, "dir"),
@@ -129,6 +117,24 @@ export function runCommand(
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
+
+  // 成果物を契約に照らす。**検査する相手は引数で受け取らない** — `start` が記録した
+  // in_flight を selector で読む（route が決めた agent を再度渡させない）
+  if (command === "validate") {
+    const agent = selectInFlightAgent(state());
+    if (!agent) return { result: "invalid", detail: "実行が記録されていない（start が無い）" };
+    return validateRun({
+      dir,
+      config,
+      agent,
+      agent_failed: args["agent-failed"] ?? false,
+      execution_file: args["execution-file"] ?? null,
+      // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
+      changed_files: args["changed-files"]
+        ? readFileSync(args["changed-files"], "utf8").split("\n").filter(Boolean)
+        : [],
+    });
+  }
 
   // 読むだけの 3 つ。selector を読み、何も書かない
   if (command === "route") return selectNextAction(state(), config, configError);

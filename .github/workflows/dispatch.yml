@@ -287,7 +287,7 @@ jobs:
         with:
           command: validate
           dir: ${{ needs.route.outputs.dir }}
-          agent: ${{ needs.route.outputs.agent }}
+          # agent は渡さない。検査する相手は start が記録した in_flight から取る
           agent-failed: ${{ steps.outcome.outputs.agent_failed }}
           execution-file: ${{ steps.agent.outputs.execution_file }}
           changed-files: ${{ steps.outcome.outputs.changed }}

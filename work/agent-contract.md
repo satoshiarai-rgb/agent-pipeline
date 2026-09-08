@@ -263,7 +263,8 @@ compose --dir <run dir> --agent <name> --central <中央のパス> --out <書き
 `validate` コマンドが上の「検証」列を実装し、`finish` に渡す `Outcome` を組み立てる。
 
 ```
-validate --dir <run dir> --agent <name> [--execution-file <path>]
+validate --dir <run dir> [--execution-file <path>] [--changed-files <path>]
+  # 検査する相手（agent）は引数ではなく、start が記録した in_flight から取る
   → { result, verdict?, oversize?, acceptance_passed?, api_error_status? }
 ```
 

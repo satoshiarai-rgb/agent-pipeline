@@ -18,7 +18,7 @@ inputs:
     description: "run のディレクトリ（agent-work/issue-<n>）"
     required: true
   # start
-  agent: { description: "start: 実行するエージェント", required: false }
+  agent: { description: "start / compose: 実行するエージェント（validate は state から取るので不要）", required: false }
   run-id: { description: "start / compose: GitHub Actions のラン ID", required: false }
   attempt: { description: "start / compose: 再実行の回数", required: false }
   model: { description: "start: モデル（既定は src/defaults.ts の models.default）", required: false }

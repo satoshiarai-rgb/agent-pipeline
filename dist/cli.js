@@ -711,6 +711,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(boot
 })).build();
 
 // src/redux/store/global/selectors.ts
+var selectInFlightAgent = (root) => root.app.in_flight_agent;
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
 function selectLabel(root, config) {
   const { prefix, trigger } = config.labels;
@@ -1636,16 +1637,6 @@ var need = (v, name) => {
 var timestamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
 function runCommand(command, args, config, configError = null) {
-  if (command === "validate")
-    return validateRun({
-      dir: need(args.dir, "dir"),
-      config,
-      agent: need(args.agent, "agent"),
-      agent_failed: args["agent-failed"] ?? false,
-      execution_file: args["execution-file"] ?? null,
-      changed_files: args["changed-files"] ? readFileSync10(args["changed-files"], "utf8").split(`
-`).filter(Boolean) : []
-    });
   if (command === "compose")
     return composeRun({
       dir: need(args.dir, "dir"),
@@ -1664,6 +1655,20 @@ function runCommand(command, args, config, configError = null) {
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1)
   });
+  if (command === "validate") {
+    const agent = selectInFlightAgent(state());
+    if (!agent)
+      return { result: "invalid", detail: "実行が記録されていない（start が無い）" };
+    return validateRun({
+      dir,
+      config,
+      agent,
+      agent_failed: args["agent-failed"] ?? false,
+      execution_file: args["execution-file"] ?? null,
+      changed_files: args["changed-files"] ? readFileSync10(args["changed-files"], "utf8").split(`
+`).filter(Boolean) : []
+    });
+  }
   if (command === "route")
     return selectNextAction(state(), config, configError);
   if (command === "label")
