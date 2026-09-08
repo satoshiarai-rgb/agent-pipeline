@@ -8,7 +8,7 @@
 # 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
-description: エージェントパイプラインの状態機械を操作する（start / route / finish / approve / request-changes / retry / snapshot / label / explain / compose）
+description: エージェントパイプラインの状態機械を操作する（コマンドの一覧は command 入力の説明）
 
 inputs:
   command:

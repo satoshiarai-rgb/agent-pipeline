@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## リポジトリの現状
 
-ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使い、npm 依存はゼロ。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。
+ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使い、npm 依存はゼロ。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。シェルスクリプトは `scripts/run-cli.sh`（action の実体）と `scripts/project-labels.sh`（ラベルの用意）の 2 本だけ。
 
 ```bash
 bun test              # 状態機械・契約・ワークフローの検査（git も GitHub API も触らない）
@@ -40,7 +40,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
 - **`.claude/**` も同じ扱い。** Claude Code が「センシティブファイル」として書き込みを拒否し、**許可ルール（`Edit(.claude/**)` を含む）では開けられない**。開ける手段は `--permission-mode bypassPermissions`（全権限チェックの無効化）だけなので採らない。必要な変更は run ディレクトリに成果物を置いて人間が設置する（K-19）
 - **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない
-- **上限・モデル・ツール・approvers・ラベルは配布先の `.agent/config.json` で上書きできる**（A-19）。書いたキーだけを重ね、`null` は継承、既定に無いキーと型違いはエラー。**状態機械（`transitions`）と `pipeline_version` は上書きできない。** 規則の正は `src/utils/mergeConfig.ts` の `OVERRIDABLE` と `mergeValue`、読み込みは `src/file/configFile.ts`。受け付けられないときは `route` が `config_invalid` で `blocked` にする（例外を投げると状態が git に載らず run が無音で止まる）
+- **上限・モデル・ツール・approvers・ラベルは配布先の `.agent/config.json` で上書きできる**（A-19）。書いたキーだけを重ね、`null` は継承、既定に無いキーと型違いはエラー。**状態遷移（`src/redux/store/app/reducer.ts` に直接書いてある）と `pipeline_version` は上書きできない。** 規則の正は `src/utils/mergeConfig.ts` の `OVERRIDABLE` と `mergeValue`、読み込みは `src/file/configFile.ts`。受け付けられないときは `route` が `config_invalid` で `blocked` にする（例外を投げると状態が git に載らず run が無音で止まる）
 - モデルは生成・レビュー共に `claude-opus-5`（既定）
 - `verification: manual` の受け入れ条件は developer が `evidence` 付きで `passed` にし、dev-reviewer が照合する
 
@@ -48,21 +48,21 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 
 GitHub issue を起点に、複数の Claude Code 実行（planner → plan-reviewer → 人間承認 → developer → dev-reviewer → completion）を GitHub Actions 上で連鎖させ、PR まで到達させるパイプライン。
 
-このリポジトリは**中央リポジトリ**（`org/agent-pipeline`）であり、reusable workflow・プロンプト・テンプレートを持ち、タグ（`v1`, `v2`, ...）で版管理される。パイプラインを使う**配布先リポジトリ**は薄いラッパー（`.github/workflows/agent.yml`）と固有設定（`.agent/`）だけを持ち、共通部分はコピーせず実行時に中央を checkout して読む。つまり、ここへの変更は全配布先に波及する — 破壊的変更はタグを上げ、`state.yml` の `pipeline_version` による不一致検出（進行中 run を `blocked` にする）で守る。
+このリポジトリは**中央リポジトリ**（`org/agent-pipeline`）であり、reusable workflow・プロンプト・テンプレートを持ち、タグ（`v1`, `v2`, ...）で版管理される。パイプラインを使う**配布先リポジトリ**は薄いラッパー（`.github/workflows/agent.yml`）と固有設定（`.agent/`）だけを持ち、共通部分はコピーせず実行時に中央を checkout して読む。つまり、ここへの変更は全配布先に波及する — 破壊的変更はタグを上げ、run の `pipeline_version`（`bootstrap` イベントが確定し、`state.json` にも射影される）による不一致検出（進行中 run を `blocked` にする）で守る。
 
 ## 設計上の不変条件
 
 実装時に壊してはいけない前提。理由は設計書 §7 と §11 に記載がある。
 
-- **状態の正は git 上の `agent-work/issue-<n>/state.yml` であり、書くのはハーネス（`run.yml` / `approve.yml` / `bootstrap.yml`）のみ。** エージェント（Claude Code 実行）は `state.yml` と `log.md` を書かない。エージェントに自己完了宣言をさせるとクラッシュ時に状態が不整合になる。
-- **issue ラベルは状態の射影**（`scripts/labels.py`）。ラベル操作の失敗が状態を壊してはいけない。
-- **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧は PR への `/agent retry`（直前のフェーズに戻して再実行 / K-23）か、`state.json` を書き換えて push するだけで再開する。
+- **状態の正は git 上の追記専用のイベントログ `agent-work/issue-<n>/events/*.json` であり、書くのはハーネス（`bootstrap.yml` / `dispatch.yml` / `comment.yml`）のみ。** `state.json` はその畳み込みのスナップショット（人が読む確認用。書き換えても次の畳み込みで上書きされる）。エージェント（Claude Code 実行）はどちらも書かない。エージェントに自己完了宣言をさせるとクラッシュ時に状態が不整合になる。
+- **issue ラベルは状態の射影**（`label` コマンドが返す名前を `dispatch.yml` が付け替える。ラベル自体の用意は `scripts/project-labels.sh`）。ラベル操作の失敗が状態を壊してはいけない。
+- **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧は PR への `/agent retry`（同じフェーズをやり直す / K-23・K-27。job が死んで止まった run も、ジョブの上限を過ぎれば同じコマンドで戻せる / I-8）か、`events/` に 1 件足して push する。**`state.json` を書き換えても効かない**（次の畳み込みで上書きされる）。
 - **遷移判定は `reviews/*.md` の frontmatter `verdict`（`approve` | `request_changes`）のみを見る。** 本文は次のエージェントへの入力。frontmatter が欠落・不正なら `blocked`。
 - **レビュアーには成果物と元 issue のみを渡す。** 生成側のセッションログや思考過程は渡さない（追認を防ぐため）。
 - **停止条件は多層。** フェーズ別ラウンド上限（既定 5）と、その上に自走ループの最終防波堤として `total_steps`（既定 24、正常系 5〜8）。`total_steps` はラウンド上限から到達しうる最悪（21）より大きく取る — 先に総数で止まると「どのレビューが収束しなかったか」が残らないため。認可チェックは入口（bootstrap のラベル付与者、approve のコメント投稿者の `author_association`）のみで、dispatch には掛けない。
 - **エージェント実行が失敗・タイムアウトしても、state 更新と push は必ず行い `phase: blocked` にする。**
-- **ツールチェーンを中央は知らない。** テスト実行の準備は配布先の `.agent/setup.sh` に委ね、`run.yml` がエージェント実行前に呼ぶ。
-- **`acceptance.yml` の `AC-N` id** を planner / developer / dev-reviewer が共通参照する。`verification: automated` なら `command` 必須。
+- **ツールチェーンを中央は知らない。** テスト実行の準備は配布先の `.agent/setup.sh` に委ね、`dispatch.yml` がエージェント実行前に呼ぶ。
+- **`acceptance.json` の `AC-N` id** を planner / developer / dev-reviewer が共通参照する。`verification: automated` なら `command` 必須。
 - **issue 本文はデータであり指示ではない**旨をプロンプト側で明示する（プロンプトインジェクション対策）。エージェントはコメントを読まずファイルを読む設計。
 - スコープ上限は 1 PR あたり 5〜10 ファイル。**これは目安であって停止条件ではない**（K-21）。planner が超過と判断したら `plan.md` に分割案を添えたうえで計画を完成させ、ハーネスは PR に警告コメントを残して作業を続ける。分割するかは人間が決める。
 
@@ -86,7 +86,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 開いている:
 
 - CEL `condition` から `job_workflow_ref` を参照できるか（1 ルールで全リポジトリをカバーする案B の成立条件）。**当面は案A（リポジトリ単位の `subject_prefix`）で進める**。案B は `subject_prefix` を `repo:<owner>/*` まで緩める必要があり、CEL が効かない場合に fork の PR からトークンを取得できる構成へ退化する
-- completing フェーズで `acceptance.yml` の automated 項目をハーネスが再実行するか（初期は planner 報告 + dev-reviewer 照合で開始）
+- completing フェーズで `acceptance.json` の automated 項目をハーネスが再実行するか（初期は planner 報告 + dev-reviewer 照合で開始）
 
 注意（構成案が誤っている箇所。`work/worklist.md` A-24 で修正予定）:
 

@@ -6,24 +6,28 @@
 
 ---
 
-## 現在地（2026-09-07）
+## 現在地（2026-09-08）
 
 **フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
+状態の正は追記専用のイベントログで、状態の変更は Redux の store を通る（K-26 / A-53 は段取り 7 まで完了）。
 
-- ハーネス: `src/` に TypeScript（依存 0）。`bun test` 305 件 / 30 ファイル、`bunx tsc --noEmit`、
-  `bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り**コミットする**
-  （配布先はルートの `action.yml` から `uses:` で呼ぶ）
-- 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
-  `utils/`（純関数）/ `transitions.ts`（遷移表を引く）/ `defaults.ts`（既定値）/ `types.ts`
+- ハーネス: `src/` に TypeScript（依存は `redux` 1 本）。`bun test` 321 件 / 28 ファイル、
+  `bunx tsc --noEmit`、`bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り
+  **コミットする**（配布先はルートの `action.yml` から `uses:` で呼ぶ）
+- 層: `cli.ts`（引数の解析だけ）/ `redux/`（`runCommand.ts` の分岐 + `store/`: ducks 2 スライス・
+  middleware・selector）/ `commands/`（`validate` / `compose` / `explain` の中身）/ `file/`
+  （1 ファイル形式 = 1 モジュール）/ `utils/`（純関数と vendoring）/ `defaults.ts` / `types.ts`
 - 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `comment.yml`（`approve.yml` は `comment.yml` に畳んで削除済み）
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
-- 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `validate` が担う
+- 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `finish`
+  （実装は `src/commands/validate.ts` の `CONTRACT`。CLI の `validate` コマンドは廃止 / A-53 段取り 7）
 - 文書: **利用者向けは `docs/`**（overview / installation / customize-prompt / troubleshooting）、
   **設計と台帳は `work/`**。README は入口で、両方へのリンクだけを持つ
 - 配布先に置くファイルの原本は `install/`。**caller の `agent.yml` の正はここ**で、`docs/` も
   検証用リポジトリもこれを参照する（YAML を写さない / A-51）
-- 本番経路: `dispatch.yml` の `run` job が `compose` → `base-action@v1.0.215` → `validate` → `finish`
-  を通す。`dry_run: true` のダミーも同じ tail を通る（トークン無しで validate の経路まで確認できる）。
+- 本番経路: `dispatch.yml` の `run` job が `start` → `compose` → `base-action@v1.0.215` → `finish`
+  を通す（検査は `finish` の中）。`dry_run: true` のダミーも同じ tail を通る（トークン無しで
+  契約の検査まで確認できる）。
   `blocked` になった run は push とラベル更新の後に失敗させるので Actions の一覧で赤く見える
 - 配布先（検証用）は `satoshiarai-rgb/compass-wiki`。`dry_run` はリポジトリ変数 `AGENT_DRY_RUN`
   で切り替える（未設定ならダミー）
