@@ -154,8 +154,7 @@ export function runCommand(
       branch: need(args.branch, "branch"),
       pipeline_version: config.pipeline_version,
     });
-    const result = store.dispatch(action);
-    if (isRejection(result)) return result;
+    store.dispatch(action);
     const root = state();
     return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
@@ -169,8 +168,7 @@ export function runCommand(
       agent: need(args.agent, "agent") as AgentName,
       model: args.model ?? config.models.default,
     });
-    const result = store.dispatch(action);
-    if (isRejection(result)) return result;
+    store.dispatch(action);
     return { event_path: outputs.event_path };
   }
 
@@ -196,18 +194,20 @@ export function runCommand(
         session_id: args["session-id"] ?? null,
       },
     );
-    const result = store.dispatch(action);
-    if (isRejection(result)) return result;
+    store.dispatch(action);
     const root = state();
     return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
 
+  // 人間起点の 3 つはガードが弾くことがある（`middlewares/guard.ts` の GUARDS）。
+  // 弾かれた dispatch は理由を返すので、そのまま出力にして PR に貼る
   if (command === "approve") {
     const association = need(args.association, "association");
     const action = humanApproval({ timestamp: timestamp(), by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    return { ok: true, phase: selectStatus(state(), config).phase };
+    const { phase } = selectStatus(state(), config);
+    return { ok: true, phase };
   }
 
   if (command === "request-changes") {
@@ -219,7 +219,8 @@ export function runCommand(
     });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    return { ok: true, phase: state().app.phase, review_path: outputs.review_path };
+    const { phase } = selectStatus(state(), config);
+    return { ok: true, phase, review_path: outputs.review_path };
   }
 
   if (command === "retry") {

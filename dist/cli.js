@@ -1685,9 +1685,7 @@ function runCommand(command, args, config, configError = null) {
       branch: need(args.branch, "branch"),
       pipeline_version: config.pipeline_version
     });
-    const result = store.dispatch(action);
-    if (isRejection(result))
-      return result;
+    store.dispatch(action);
     const root = state();
     return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
@@ -1700,9 +1698,7 @@ function runCommand(command, args, config, configError = null) {
       agent: need(args.agent, "agent"),
       model: args.model ?? config.models.default
     });
-    const result = store.dispatch(action);
-    if (isRejection(result))
-      return result;
+    store.dispatch(action);
     return { event_path: outputs.event_path };
   }
   if (command === "finish") {
@@ -1723,9 +1719,7 @@ function runCommand(command, args, config, configError = null) {
       attempt: Number(args.attempt ?? 1),
       session_id: args["session-id"] ?? null
     });
-    const result = store.dispatch(action);
-    if (isRejection(result))
-      return result;
+    store.dispatch(action);
     const root = state();
     return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
@@ -1735,7 +1729,8 @@ function runCommand(command, args, config, configError = null) {
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    return { ok: true, phase: selectStatus(state(), config).phase };
+    const { phase } = selectStatus(state(), config);
+    return { ok: true, phase };
   }
   if (command === "request-changes") {
     const association = need(args.association, "association");
@@ -1747,7 +1742,8 @@ function runCommand(command, args, config, configError = null) {
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    return { ok: true, phase: state().app.phase, review_path: outputs.review_path };
+    const { phase } = selectStatus(state(), config);
+    return { ok: true, phase, review_path: outputs.review_path };
   }
   if (command === "retry") {
     const association = need(args.association, "association");
