@@ -534,7 +534,7 @@ function claudeArgs(a) {
   ].join(" ");
 }
 
-// src/utils/typescript-fsa-reducers.ts
+// src/utils/typescriptFsaReducers.ts
 function reducerWithInitialState(initialState) {
   return makeReducer(initialState);
 }
@@ -566,7 +566,7 @@ function getReducerFunction(initialState, handlersByActionType, defaultHandler) 
   };
 }
 
-// src/utils/typescript-fsa.ts
+// src/utils/typescriptFsa.ts
 function actionCreatorFactory(prefix, defaultIsError = (p) => p instanceof Error) {
   const actionTypes = {};
   const base = prefix ? `${prefix}/` : "";
@@ -605,15 +605,15 @@ function actionCreatorFactory(prefix, defaultIsError = (p) => p instanceof Error
   }
   return Object.assign(actionCreator, { async: asyncActionCreators });
 }
-var typescript_fsa_default = actionCreatorFactory;
+var typescriptFsa_default = actionCreatorFactory;
 
 // src/redux/store/global/actions.ts
-var create = typescript_fsa_default("agent-pipeline");
+var create = typescriptFsa_default("agent-pipeline");
 var init = create("INIT", { hydrate: true });
 var restore = create("RESTORE", { hydrate: true });
 
 // src/redux/store/app/actions.ts
-var create2 = typescript_fsa_default("agent-pipeline/app");
+var create2 = typescriptFsa_default("agent-pipeline/app");
 var agentStarted = create2("AGENT_STARTED");
 var planned = create2("PLANNED");
 var planReviewed = create2("PLAN_REVIEWED");
@@ -1474,7 +1474,7 @@ function applyMiddleware(...middlewares) {
 var app_default = createAppReducer;
 
 // src/redux/store/info/actions.ts
-var create3 = typescript_fsa_default("agent-pipeline/info");
+var create3 = typescriptFsa_default("agent-pipeline/info");
 var configure = create3("CONFIGURE");
 
 // src/redux/store/info/reducer.ts

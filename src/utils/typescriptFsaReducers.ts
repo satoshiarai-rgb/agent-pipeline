@@ -9,12 +9,13 @@
  * `reducerWithInitialState(初期状態).case(creator, handler)...build()` で reducer を組む。
  * action type ごとの `switch` を書かずに済み、**どの action がどう状態を変えるかが表として並ぶ**。
  *
- * npm から入れずにここへ写している理由は `typescript-fsa.ts` と同じ。
+ * npm から入れずにここへ写している理由は `typescriptFsa.ts` と同じ。
  * **変更は 1 行（import 文）だけ**: 型の import 先を `"typescript-fsa"` から同居する
- * `"./typescript-fsa.ts"` に変え、`verbatimModuleSyntax` に合わせて `import type` にしている。
- * 書式も含め、それ以外は上流のまま。
+ * `"./typescriptFsa.ts"` に変え、`verbatimModuleSyntax` に合わせて `import type` にしている。
+ * 書式も含め、それ以外は上流のまま。ファイル名だけ、このリポジトリの規則
+ * （lowerCamelCase）に合わせている。
  */
-import type { Action, ActionCreator, AnyAction } from "./typescript-fsa.ts";
+import type { Action, ActionCreator, AnyAction } from "./typescriptFsa.ts";
 
 export interface ReducerBuilder<InS, OutS = InS, PassedS = InS | undefined> {
     case<P>(

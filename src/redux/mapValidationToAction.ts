@@ -1,5 +1,5 @@
 import type { Phase, RunResult, Verdict } from "../types.ts";
-import type { Action } from "../utils/typescript-fsa.ts";
+import type { Action } from "../utils/typescriptFsa.ts";
 import {
   type AppPayload,
   agentFailed,

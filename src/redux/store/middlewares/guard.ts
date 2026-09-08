@@ -1,5 +1,5 @@
 import type { Config } from "../../../defaults.ts";
-import type { Action, AnyAction } from "../../../utils/typescript-fsa.ts";
+import type { Action, AnyAction } from "../../../utils/typescriptFsa.ts";
 import type { AppPayload, Origin } from "../app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "../app/actions.ts";
 import type { RootState } from "../createStore.ts";

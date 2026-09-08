@@ -1,5 +1,5 @@
 import type { Dispatch } from "redux";
-import actionCreatorFactory, { type Action } from "../../../utils/typescript-fsa.ts";
+import actionCreatorFactory, { type Action } from "../../../utils/typescriptFsa.ts";
 import type { AppPayload } from "../app/actions.ts";
 import type { AppState } from "../app/reducer.ts";
 import type { InfoPayload } from "../info/actions.ts";

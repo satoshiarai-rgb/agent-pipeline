@@ -11,8 +11,8 @@
       "**",
       "!dist",
       "!bun.lock",
-      "!src/utils/typescript-fsa.ts",
-      "!src/utils/typescript-fsa-reducers.ts"
+      "!src/utils/typescriptFsa.ts",
+      "!src/utils/typescriptFsaReducers.ts"
     ]
   },
   "formatter": {

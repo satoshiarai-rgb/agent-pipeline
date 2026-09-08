@@ -1,5 +1,5 @@
 import type { AgentName, Verdict } from "../../../types.ts";
-import actionCreatorFactory from "../../../utils/typescript-fsa.ts";
+import actionCreatorFactory from "../../../utils/typescriptFsa.ts";
 
 /**
  * 実行状況を動かす action（FSA）。**型定義と creator だけを置き、判断は持たない。**

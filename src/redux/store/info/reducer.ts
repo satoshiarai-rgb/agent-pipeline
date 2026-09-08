@@ -1,4 +1,4 @@
-import { reducerWithInitialState } from "../../../utils/typescript-fsa-reducers.ts";
+import { reducerWithInitialState } from "../../../utils/typescriptFsaReducers.ts";
 import { restore } from "../global/actions.ts";
 import { configure } from "./actions.ts";
 
