@@ -30,6 +30,7 @@ describe("公開 IF（index.ts）", () => {
     for (const name of vocabulary) {
       expect(() => runCommand(name, {}, defaults), name).toThrow(MissingArg);
     }
-    expect(runCommand("nope", {}, defaults)).toBeUndefined();
+    // 知らないコマンドはどの分岐にも当たらず undefined（--dir は分岐の手前で要る）
+    expect(runCommand("nope", { dir: "/nonexistent-run" }, defaults)).toBeUndefined();
   });
 });

@@ -10,7 +10,7 @@ import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store
 import { agentFor } from "./store/app/reducer.ts";
 import type { RootState } from "./store/createStore.ts";
 import { createStore } from "./store/createStore.ts";
-import { bootstrap, type PipelineAction } from "./store/global/actions.ts";
+import { bootstrap } from "./store/global/actions.ts";
 import {
   selectContinueChain,
   selectLabel,
@@ -21,11 +21,8 @@ import {
 
 /**
  * CLI の語彙を store 操作に写す層。**判断は 1 つも持たない。**
- * コマンドは 4 つのケース（`Dispatching` / `Reading` / `Writing` / `Plain`）のいずれかで、
- * それぞれ必要な関数だけを持ち、`commandFor` の分岐が返す。
- *
- * 移行前は 9 ファイルに分かれていたが、中身が「action を作って dispatch する」だけに
- * なったので分ける意味が無くなった。
+ * 中身は `runCommand` のコマンド名ごとの分岐だけ。移行前は 9 ファイルに分かれていたが、
+ * 「action を作って dispatch する」だけになったので分ける意味が無くなった。
  */
 
 /**
@@ -100,176 +97,21 @@ const reportOf = (a: Args): ValidationReport => ({
 });
 
 /** 遷移の結果を返すコマンドの出力（ワークフローが読む形） */
-const transitionOutput = (root: RootState, _outputs: unknown, config: Config) => ({
+const transitionOutput = (root: RootState, config: Config) => ({
   ...selectStatus(root, config),
   continue_chain: selectContinueChain(root, config),
 });
-
-/** 状態を変える 6 つ。action を作って dispatch し、その後の状態を出力に射影する */
-interface Dispatching {
-  /** dispatch する action。`root` はいまの状態（走っていたフェーズを見るために渡す） */
-  action: (a: Args, config: Config, root: RootState) => PipelineAction;
-  output: (root: RootState, outputs: Record<string, unknown>, config: Config) => unknown;
-}
-
-/** 読むだけの 3 つ。selector を読み、何も書かない */
-interface Reading {
-  read: (root: RootState, a: Args, config: Config, configError: string | null) => unknown;
-}
-
-/** action を使わずファイルを書き直す 1 つ（スナップショットの再生成） */
-interface Writing {
-  write: (root: RootState, config: Config, configError: string | null) => unknown;
-}
-
-/** store を使わない 2 つ。成果物と契約だけを見る */
-interface Plain {
-  plain: (a: Args, config: Config) => unknown;
-}
-
-/**
- * ケースごとの union。持つ関数が必須になるので、`output` を書き忘れた `Dispatching` の行は
- * 型が通らず、`runCommand` 側のキャストも要らなくなる。絞り込みは下の 3 つの type guard で行う。
- */
-type Command = Dispatching | Reading | Writing | Plain;
-
-const isPlain = (command: Command): command is Plain => "plain" in command;
-const isReading = (command: Command): command is Reading => "read" in command;
-const isWriting = (command: Command): command is Writing => "write" in command;
 
 /** ガードが弾いたとき、dispatch はこの形を返す（middleware が戻り値を差し替える） */
 export const isRejection = (r: unknown): r is { ok: false; reason: string } =>
   typeof r === "object" && r !== null && (r as { ok?: unknown }).ok === false;
 
 /**
- * CLI の語彙 → store 操作。**判断は 1 つも持たない。**知らないコマンドなら undefined
- * （`runCommand` がそのまま返し、CLI が使い方を出す）。
- * action を 1 つ足すときに触るのはこの関数の分岐 1 つ。
- */
-function commandFor(command: string): Command | undefined {
-  /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
-  if (command === "bootstrap")
-    return {
-      action: (a, config) =>
-        bootstrap({
-          ...harness(),
-          issue: Number(need(a.issue, "issue")),
-          branch: need(a.branch, "branch"),
-          pipeline_version: config.pipeline_version,
-        }),
-      output: transitionOutput,
-    };
-
-  if (command === "start")
-    return {
-      action: (a, config) =>
-        agentStarted({
-          ...harness(),
-          ...runOf(a),
-          agent: need(a.agent, "agent") as AgentName,
-          model: a.model ?? config.models.default,
-        }),
-      output: (_root, outputs) => ({ event_path: outputs.event_path }),
-    };
-
-  // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
-  if (command === "finish")
-    return {
-      action: (a, _config, root) =>
-        mapValidationToAction(reportOf(a), root.app.phase, {
-          ...harness(),
-          ...runOf(a),
-          session_id: a["session-id"] ?? null,
-        }),
-      output: transitionOutput,
-    };
-
-  if (command === "approve")
-    return {
-      action: (a) => humanApproval(human(a)),
-      output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase }),
-    };
-
-  if (command === "request-changes")
-    return {
-      action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
-      output: (root, outputs) => ({
-        ok: true,
-        phase: root.app.phase,
-        review_path: outputs.review_path,
-      }),
-    };
-
-  if (command === "retry")
-    return {
-      action: (a) => retry(human(a)),
-      output: (root, _outputs, config) => {
-        const { phase } = selectStatus(root, config);
-        return { ok: true, phase, agent: agentFor(phase) };
-      },
-    };
-
-  /**
-   * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
-   * なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）。
-   */
-  if (command === "snapshot")
-    return {
-      write: (root, config, configError) => {
-        writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date());
-        return transitionOutput(root, null, config);
-      },
-    };
-
-  if (command === "route")
-    return { read: (root, _a, config, configError) => selectNextAction(root, config, configError) };
-
-  if (command === "label") return { read: (root, _a, config) => selectLabel(root, config) };
-
-  if (command === "explain")
-    return {
-      read: (root, a, config, configError) =>
-        explainRun(root, need(a.dir, "dir"), config, configError),
-    };
-
-  if (command === "validate")
-    return {
-      plain: (a, config) =>
-        validateRun({
-          dir: need(a.dir, "dir"),
-          config,
-          agent: need(a.agent, "agent") as AgentName,
-          agent_failed: a["agent-failed"] ?? false,
-          execution_file: a["execution-file"] ?? null,
-          // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
-          changed_files: a["changed-files"]
-            ? readFileSync(a["changed-files"], "utf8").split("\n").filter(Boolean)
-            : [],
-        }),
-    };
-
-  if (command === "compose")
-    return {
-      plain: (a, config) =>
-        composeRun({
-          dir: need(a.dir, "dir"),
-          config,
-          agent: need(a.agent, "agent") as AgentName,
-          repo: a.repo ?? ".",
-          central: need(a.central, "central"),
-          out: need(a.out, "out"),
-          // 決定記録の名前の prefix になる（契約 §5）
-          run_id: need(a["run-id"], "run-id"),
-          attempt: Number(a.attempt ?? 1),
-        }),
-    };
-
-  return undefined;
-}
-
-/**
  * コマンドを 1 つ実行する。**1 起動で dispatch する action は 1 つだけ**。
  * 知らないコマンドなら undefined を返す（CLI が使い方を出す）。
+ *
+ * 上から「store を使わない 2 つ」「読むだけの 3 つ」「スナップショットを書き直す 1 つ」
+ * 「状態を変える 6 つ」の順。語彙を足すときに書くのは分岐 1 つ。
  */
 export function runCommand(
   command: string,
@@ -277,9 +119,32 @@ export function runCommand(
   config: Config,
   configError: string | null = null,
 ): unknown {
-  const cmd = commandFor(command);
-  if (!cmd) return undefined;
-  if (isPlain(cmd)) return cmd.plain(args, config);
+  // store を使わない 2 つ。成果物と契約だけを見る
+  if (command === "validate")
+    return validateRun({
+      dir: need(args.dir, "dir"),
+      config,
+      agent: need(args.agent, "agent") as AgentName,
+      agent_failed: args["agent-failed"] ?? false,
+      execution_file: args["execution-file"] ?? null,
+      // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
+      changed_files: args["changed-files"]
+        ? readFileSync(args["changed-files"], "utf8").split("\n").filter(Boolean)
+        : [],
+    });
+
+  if (command === "compose")
+    return composeRun({
+      dir: need(args.dir, "dir"),
+      config,
+      agent: need(args.agent, "agent") as AgentName,
+      repo: args.repo ?? ".",
+      central: need(args.central, "central"),
+      out: need(args.out, "out"),
+      // 決定記録の名前の prefix になる（契約 §5）
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
+    });
 
   const dir = need(args.dir, "dir");
   const { store, outputs, state } = createStore({
@@ -288,10 +153,77 @@ export function runCommand(
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
-  if (isReading(cmd)) return cmd.read(state(), args, config, configError);
-  if (isWriting(cmd)) return cmd.write(state(), config, configError);
 
-  const result = store.dispatch(cmd.action(args, config, state()));
-  if (isRejection(result)) return result;
-  return cmd.output(state(), outputs, config);
+  // 読むだけの 3 つ。selector を読み、何も書かない
+  if (command === "route") return selectNextAction(state(), config, configError);
+  if (command === "label") return selectLabel(state(), config);
+  if (command === "explain") return explainRun(state(), dir, config, configError);
+
+  // 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
+  // なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）
+  if (command === "snapshot") {
+    writeStateFile(dir, selectSnapshot(state(), config, configError), new Date());
+    return transitionOutput(state(), config);
+  }
+
+  // run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する
+  if (command === "bootstrap") {
+    const action = bootstrap({
+      ...harness(),
+      issue: Number(need(args.issue, "issue")),
+      branch: need(args.branch, "branch"),
+      pipeline_version: config.pipeline_version,
+    });
+    const result = store.dispatch(action);
+    if (isRejection(result)) return result;
+    return transitionOutput(state(), config);
+  }
+
+  if (command === "start") {
+    const action = agentStarted({
+      ...harness(),
+      ...runOf(args),
+      agent: need(args.agent, "agent") as AgentName,
+      model: args.model ?? config.models.default,
+    });
+    const result = store.dispatch(action);
+    if (isRejection(result)) return result;
+    return { event_path: outputs.event_path };
+  }
+
+  // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
+  if (command === "finish") {
+    const action = mapValidationToAction(reportOf(args), state().app.phase, {
+      ...harness(),
+      ...runOf(args),
+      session_id: args["session-id"] ?? null,
+    });
+    const result = store.dispatch(action);
+    if (isRejection(result)) return result;
+    return transitionOutput(state(), config);
+  }
+
+  if (command === "approve") {
+    const action = humanApproval(human(args));
+    const result = store.dispatch(action);
+    if (isRejection(result)) return result;
+    return { ok: true, phase: selectStatus(state(), config).phase };
+  }
+
+  if (command === "request-changes") {
+    const action = humanRequestChanges({ ...human(args), body: need(args.body, "body") });
+    const result = store.dispatch(action);
+    if (isRejection(result)) return result;
+    return { ok: true, phase: state().app.phase, review_path: outputs.review_path };
+  }
+
+  if (command === "retry") {
+    const action = retry(human(args));
+    const result = store.dispatch(action);
+    if (isRejection(result)) return result;
+    const { phase } = selectStatus(state(), config);
+    return { ok: true, phase, agent: agentFor(phase) };
+  }
+
+  return undefined;
 }
