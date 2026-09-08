@@ -24,7 +24,7 @@ if [ -n "$SELF" ] && [ -f "$SELF" ]; then SRC=$(cd "$(dirname "$SELF")" && pwd);
 
 # 原本 | 置き場所 | 実行ビット
 FILES="
-agent.yml|.github/workflows/agent-pipeline.yml|
+agent-pipeline.yml|.github/workflows/agent-pipeline.yml|
 conventions.md|.agent/conventions.md|
 setup.sh|.agent/setup.sh|x
 issue-template.yml|.github/ISSUE_TEMPLATE/agent-task.yml|

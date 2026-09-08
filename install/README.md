@@ -71,6 +71,6 @@ AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # 版を指
 ```bash
 BASE=https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install
 mkdir -p .github/workflows .agent
-curl -fsSL "$BASE/agent.yml"   -o .github/workflows/agent-pipeline.yml
+curl -fsSL "$BASE/agent-pipeline.yml" -o .github/workflows/agent-pipeline.yml
 curl -fsSL "$BASE/config.json" -o .agent/config.json
 ```
