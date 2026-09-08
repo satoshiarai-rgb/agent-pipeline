@@ -1654,93 +1654,96 @@ var transitionOutput = (root, _outputs, config) => ({
   ...selectStatus(root, config),
   continue_chain: selectContinueChain(root, config)
 });
-var COMMANDS = {
-  bootstrap: {
-    action: (a, config) => bootstrap({
-      ...harness(),
-      issue: Number(need(a.issue, "issue")),
-      branch: need(a.branch, "branch"),
-      pipeline_version: config.pipeline_version
-    }),
-    output: transitionOutput
-  },
-  start: {
-    action: (a, config) => agentStarted({
-      ...harness(),
-      ...runOf(a),
-      agent: need(a.agent, "agent"),
-      model: a.model ?? config.models.default
-    }),
-    output: (_root, outputs) => ({ event_path: outputs.event_path })
-  },
-  finish: {
-    action: (a, _config, root) => mapValidationToAction(reportOf(a), root.app.phase, {
-      ...harness(),
-      ...runOf(a),
-      session_id: a["session-id"] ?? null
-    }),
-    output: transitionOutput
-  },
-  approve: {
-    action: (a) => humanApproval(human(a)),
-    output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase })
-  },
-  "request-changes": {
-    action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
-    output: (root, outputs) => ({
-      ok: true,
-      phase: root.app.phase,
-      review_path: outputs.review_path
-    })
-  },
-  retry: {
-    action: (a) => retry(human(a)),
-    output: (root, _outputs, config) => {
-      const { phase } = selectStatus(root, config);
-      return { ok: true, phase, agent: agentFor(phase) };
-    }
-  },
-  snapshot: {
-    write: (root, config, configError) => {
-      writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date);
-      return transitionOutput(root, null, config);
-    }
-  },
-  route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
-  label: { read: (root, _a, config) => selectLabel(root, config) },
-  explain: {
-    read: (root, a, config, configError) => explainRun(root, need(a.dir, "dir"), config, configError)
-  },
-  validate: {
-    plain: (a, config) => validateRun({
-      dir: need(a.dir, "dir"),
-      config,
-      agent: need(a.agent, "agent"),
-      agent_failed: a["agent-failed"] ?? false,
-      execution_file: a["execution-file"] ?? null,
-      changed_files: a["changed-files"] ? readFileSync10(a["changed-files"], "utf8").split(`
-`).filter(Boolean) : []
-    })
-  },
-  compose: {
-    plain: (a, config) => composeRun({
-      dir: need(a.dir, "dir"),
-      config,
-      agent: need(a.agent, "agent"),
-      repo: a.repo ?? ".",
-      central: need(a.central, "central"),
-      out: need(a.out, "out"),
-      run_id: need(a["run-id"], "run-id"),
-      attempt: Number(a.attempt ?? 1)
-    })
-  }
-};
+var isPlain = (command) => ("plain" in command);
+var isReading = (command) => ("read" in command);
+var isWriting = (command) => ("write" in command);
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
 function runCommand(command, args, config, configError = null) {
-  const cmd = COMMANDS[command];
+  const commands = {
+    bootstrap: {
+      action: (a, config2) => bootstrap({
+        ...harness(),
+        issue: Number(need(a.issue, "issue")),
+        branch: need(a.branch, "branch"),
+        pipeline_version: config2.pipeline_version
+      }),
+      output: transitionOutput
+    },
+    start: {
+      action: (a, config2) => agentStarted({
+        ...harness(),
+        ...runOf(a),
+        agent: need(a.agent, "agent"),
+        model: a.model ?? config2.models.default
+      }),
+      output: (_root, outputs2) => ({ event_path: outputs2.event_path })
+    },
+    finish: {
+      action: (a, _config, root) => mapValidationToAction(reportOf(a), root.app.phase, {
+        ...harness(),
+        ...runOf(a),
+        session_id: a["session-id"] ?? null
+      }),
+      output: transitionOutput
+    },
+    approve: {
+      action: (a) => humanApproval(human(a)),
+      output: (root, _outputs, config2) => ({ ok: true, phase: selectStatus(root, config2).phase })
+    },
+    "request-changes": {
+      action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
+      output: (root, outputs2) => ({
+        ok: true,
+        phase: root.app.phase,
+        review_path: outputs2.review_path
+      })
+    },
+    retry: {
+      action: (a) => retry(human(a)),
+      output: (root, _outputs, config2) => {
+        const { phase } = selectStatus(root, config2);
+        return { ok: true, phase, agent: agentFor(phase) };
+      }
+    },
+    snapshot: {
+      write: (root, config2, configError2) => {
+        writeStateFile(root.info.dir, selectSnapshot(root, config2, configError2), new Date);
+        return transitionOutput(root, null, config2);
+      }
+    },
+    route: { read: (root, _a, config2, configError2) => selectNextAction(root, config2, configError2) },
+    label: { read: (root, _a, config2) => selectLabel(root, config2) },
+    explain: {
+      read: (root, a, config2, configError2) => explainRun(root, need(a.dir, "dir"), config2, configError2)
+    },
+    validate: {
+      plain: (a, config2) => validateRun({
+        dir: need(a.dir, "dir"),
+        config: config2,
+        agent: need(a.agent, "agent"),
+        agent_failed: a["agent-failed"] ?? false,
+        execution_file: a["execution-file"] ?? null,
+        changed_files: a["changed-files"] ? readFileSync10(a["changed-files"], "utf8").split(`
+`).filter(Boolean) : []
+      })
+    },
+    compose: {
+      plain: (a, config2) => composeRun({
+        dir: need(a.dir, "dir"),
+        config: config2,
+        agent: need(a.agent, "agent"),
+        repo: a.repo ?? ".",
+        central: need(a.central, "central"),
+        out: need(a.out, "out"),
+        run_id: need(a["run-id"], "run-id"),
+        attempt: Number(a.attempt ?? 1)
+      })
+    }
+  };
+  const cmd = commands[command];
   if (!cmd)
     return;
-  if ("plain" in cmd)
+  if (isPlain(cmd))
     return cmd.plain(args, config);
   const dir = need(args.dir, "dir");
   const { store, outputs, state } = createStore2({
@@ -1749,9 +1752,9 @@ function runCommand(command, args, config, configError = null) {
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1)
   });
-  if ("read" in cmd)
+  if (isReading(cmd))
     return cmd.read(state(), args, config, configError);
-  if ("write" in cmd)
+  if (isWriting(cmd))
     return cmd.write(state(), config, configError);
   const result = store.dispatch(cmd.action(args, config, state()));
   if (isRejection(result))

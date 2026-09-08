@@ -1,5 +1,6 @@
 import { describe, expect, test } from "bun:test";
-import { COMMANDS } from "../redux/commands.ts";
+import { defaults } from "../defaults.ts";
+import { MissingArg, runCommand } from "../redux/commands.ts";
 
 describe("公開 IF（index.ts）", () => {
   test("ワークフローから呼ぶものを re-export している", async () => {
@@ -9,8 +10,10 @@ describe("公開 IF（index.ts）", () => {
     }
   });
 
+  // 語彙は runCommand の中の表にある。知っているコマンドは引数不足で MissingArg になり、
+  // 知らないコマンドだけが undefined を返す（CLI が使い方を出す分岐）
   test("CLI の語彙がそろっている（対応表の取りこぼしを防ぐ）", () => {
-    expect(Object.keys(COMMANDS).sort()).toEqual([
+    const vocabulary = [
       "approve",
       "bootstrap",
       "compose",
@@ -23,6 +26,10 @@ describe("公開 IF（index.ts）", () => {
       "snapshot",
       "start",
       "validate",
-    ]);
+    ];
+    for (const name of vocabulary) {
+      expect(() => runCommand(name, {}, defaults), name).toThrow(MissingArg);
+    }
+    expect(runCommand("nope", {}, defaults)).toBeUndefined();
   });
 });

@@ -20,11 +20,11 @@ import {
 } from "./store/global/selectors.ts";
 
 /**
- * CLI の語彙 → store 操作の対応表。**判断は 1 つも持たない。**
+ * CLI の語彙 → store 操作の対応表は `runCommand` の中にある。**判断は 1 つも持たない。**
  * コマンドは 4 つのケース（`Dispatching` / `Reading` / `Writing` / `Plain`）のいずれかで、
  * それぞれ必要な関数だけを持つ。
  *
- * action を 1 つ足すときに触るのはこの表の 1 行。移行前は 9 ファイルに分かれていたが、
+ * action を 1 つ足すときに触るのは表の 1 行。移行前は 9 ファイルに分かれていたが、
  * 中身が「action を作って dispatch する」だけになったので分ける意味が無くなった。
  */
 
@@ -129,106 +129,13 @@ interface Plain {
 
 /**
  * ケースごとの union。持つ関数が必須になるので、`output` を書き忘れた `Dispatching` の行は
- * 型が通らず、`runCommand` 側のキャストも要らなくなる（キーの有無で絞る）。
+ * 型が通らず、`runCommand` 側のキャストも要らなくなる。絞り込みは下の 3 つの type guard で行う。
  */
 type Command = Dispatching | Reading | Writing | Plain;
 
-export const COMMANDS: Record<string, Command> = {
-  /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
-  bootstrap: {
-    action: (a, config) =>
-      bootstrap({
-        ...harness(),
-        issue: Number(need(a.issue, "issue")),
-        branch: need(a.branch, "branch"),
-        pipeline_version: config.pipeline_version,
-      }),
-    output: transitionOutput,
-  },
-  start: {
-    action: (a, config) =>
-      agentStarted({
-        ...harness(),
-        ...runOf(a),
-        agent: need(a.agent, "agent") as AgentName,
-        model: a.model ?? config.models.default,
-      }),
-    output: (_root, outputs) => ({ event_path: outputs.event_path }),
-  },
-  finish: {
-    // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
-    action: (a, _config, root) =>
-      mapValidationToAction(reportOf(a), root.app.phase, {
-        ...harness(),
-        ...runOf(a),
-        session_id: a["session-id"] ?? null,
-      }),
-    output: transitionOutput,
-  },
-  approve: {
-    action: (a) => humanApproval(human(a)),
-    output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase }),
-  },
-  "request-changes": {
-    action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
-    output: (root, outputs) => ({
-      ok: true,
-      phase: root.app.phase,
-      review_path: outputs.review_path,
-    }),
-  },
-  retry: {
-    action: (a) => retry(human(a)),
-    output: (root, _outputs, config) => {
-      const { phase } = selectStatus(root, config);
-      return { ok: true, phase, agent: agentFor(phase) };
-    },
-  },
-  /**
-   * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
-   * なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）。
-   */
-  snapshot: {
-    write: (root, config, configError) => {
-      writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date());
-      return transitionOutput(root, null, config);
-    },
-  },
-  route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
-  label: { read: (root, _a, config) => selectLabel(root, config) },
-  explain: {
-    read: (root, a, config, configError) =>
-      explainRun(root, need(a.dir, "dir"), config, configError),
-  },
-  validate: {
-    plain: (a, config) =>
-      validateRun({
-        dir: need(a.dir, "dir"),
-        config,
-        agent: need(a.agent, "agent") as AgentName,
-        agent_failed: a["agent-failed"] ?? false,
-        execution_file: a["execution-file"] ?? null,
-        // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
-        changed_files: a["changed-files"]
-          ? readFileSync(a["changed-files"], "utf8").split("\n").filter(Boolean)
-          : [],
-      }),
-  },
-  compose: {
-    plain: (a, config) =>
-      composeRun({
-        dir: need(a.dir, "dir"),
-        config,
-        agent: need(a.agent, "agent") as AgentName,
-        repo: a.repo ?? ".",
-        central: need(a.central, "central"),
-        out: need(a.out, "out"),
-        // 決定記録の名前の prefix になる（契約 §5）
-        run_id: need(a["run-id"], "run-id"),
-        attempt: Number(a.attempt ?? 1),
-      }),
-  },
-};
+const isPlain = (command: Command): command is Plain => "plain" in command;
+const isReading = (command: Command): command is Reading => "read" in command;
+const isWriting = (command: Command): command is Writing => "write" in command;
 
 /** ガードが弾いたとき、dispatch はこの形を返す（middleware が戻り値を差し替える） */
 export const isRejection = (r: unknown): r is { ok: false; reason: string } =>
@@ -244,9 +151,106 @@ export function runCommand(
   config: Config,
   configError: string | null = null,
 ): unknown {
-  const cmd = COMMANDS[command];
+  const commands: Record<string, Command> = {
+    /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
+    bootstrap: {
+      action: (a, config) =>
+        bootstrap({
+          ...harness(),
+          issue: Number(need(a.issue, "issue")),
+          branch: need(a.branch, "branch"),
+          pipeline_version: config.pipeline_version,
+        }),
+      output: transitionOutput,
+    },
+    start: {
+      action: (a, config) =>
+        agentStarted({
+          ...harness(),
+          ...runOf(a),
+          agent: need(a.agent, "agent") as AgentName,
+          model: a.model ?? config.models.default,
+        }),
+      output: (_root, outputs) => ({ event_path: outputs.event_path }),
+    },
+    finish: {
+      // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
+      action: (a, _config, root) =>
+        mapValidationToAction(reportOf(a), root.app.phase, {
+          ...harness(),
+          ...runOf(a),
+          session_id: a["session-id"] ?? null,
+        }),
+      output: transitionOutput,
+    },
+    approve: {
+      action: (a) => humanApproval(human(a)),
+      output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase }),
+    },
+    "request-changes": {
+      action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
+      output: (root, outputs) => ({
+        ok: true,
+        phase: root.app.phase,
+        review_path: outputs.review_path,
+      }),
+    },
+    retry: {
+      action: (a) => retry(human(a)),
+      output: (root, _outputs, config) => {
+        const { phase } = selectStatus(root, config);
+        return { ok: true, phase, agent: agentFor(phase) };
+      },
+    },
+    /**
+     * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
+     * なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）。
+     */
+    snapshot: {
+      write: (root, config, configError) => {
+        writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date());
+        return transitionOutput(root, null, config);
+      },
+    },
+    route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
+    label: { read: (root, _a, config) => selectLabel(root, config) },
+    explain: {
+      read: (root, a, config, configError) =>
+        explainRun(root, need(a.dir, "dir"), config, configError),
+    },
+    validate: {
+      plain: (a, config) =>
+        validateRun({
+          dir: need(a.dir, "dir"),
+          config,
+          agent: need(a.agent, "agent") as AgentName,
+          agent_failed: a["agent-failed"] ?? false,
+          execution_file: a["execution-file"] ?? null,
+          // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
+          changed_files: a["changed-files"]
+            ? readFileSync(a["changed-files"], "utf8").split("\n").filter(Boolean)
+            : [],
+        }),
+    },
+    compose: {
+      plain: (a, config) =>
+        composeRun({
+          dir: need(a.dir, "dir"),
+          config,
+          agent: need(a.agent, "agent") as AgentName,
+          repo: a.repo ?? ".",
+          central: need(a.central, "central"),
+          out: need(a.out, "out"),
+          // 決定記録の名前の prefix になる（契約 §5）
+          run_id: need(a["run-id"], "run-id"),
+          attempt: Number(a.attempt ?? 1),
+        }),
+    },
+  };
+
+  const cmd = commands[command];
   if (!cmd) return undefined;
-  if ("plain" in cmd) return cmd.plain(args, config);
+  if (isPlain(cmd)) return cmd.plain(args, config);
 
   const dir = need(args.dir, "dir");
   const { store, outputs, state } = createStore({
@@ -255,8 +259,8 @@ export function runCommand(
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
-  if ("read" in cmd) return cmd.read(state(), args, config, configError);
-  if ("write" in cmd) return cmd.write(state(), config, configError);
+  if (isReading(cmd)) return cmd.read(state(), args, config, configError);
+  if (isWriting(cmd)) return cmd.write(state(), config, configError);
 
   const result = store.dispatch(cmd.action(args, config, state()));
   if (isRejection(result)) return result;
