@@ -1658,79 +1658,90 @@ var isPlain = (command) => ("plain" in command);
 var isReading = (command) => ("read" in command);
 var isWriting = (command) => ("write" in command);
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
-function runCommand(command, args, config, configError = null) {
-  const commands = {
-    bootstrap: {
-      action: (a, config2) => bootstrap({
+function commandFor(command) {
+  if (command === "bootstrap")
+    return {
+      action: (a, config) => bootstrap({
         ...harness(),
         issue: Number(need(a.issue, "issue")),
         branch: need(a.branch, "branch"),
-        pipeline_version: config2.pipeline_version
+        pipeline_version: config.pipeline_version
       }),
       output: transitionOutput
-    },
-    start: {
-      action: (a, config2) => agentStarted({
+    };
+  if (command === "start")
+    return {
+      action: (a, config) => agentStarted({
         ...harness(),
         ...runOf(a),
         agent: need(a.agent, "agent"),
-        model: a.model ?? config2.models.default
+        model: a.model ?? config.models.default
       }),
-      output: (_root, outputs2) => ({ event_path: outputs2.event_path })
-    },
-    finish: {
+      output: (_root, outputs) => ({ event_path: outputs.event_path })
+    };
+  if (command === "finish")
+    return {
       action: (a, _config, root) => mapValidationToAction(reportOf(a), root.app.phase, {
         ...harness(),
         ...runOf(a),
         session_id: a["session-id"] ?? null
       }),
       output: transitionOutput
-    },
-    approve: {
+    };
+  if (command === "approve")
+    return {
       action: (a) => humanApproval(human(a)),
-      output: (root, _outputs, config2) => ({ ok: true, phase: selectStatus(root, config2).phase })
-    },
-    "request-changes": {
+      output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase })
+    };
+  if (command === "request-changes")
+    return {
       action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
-      output: (root, outputs2) => ({
+      output: (root, outputs) => ({
         ok: true,
         phase: root.app.phase,
-        review_path: outputs2.review_path
+        review_path: outputs.review_path
       })
-    },
-    retry: {
+    };
+  if (command === "retry")
+    return {
       action: (a) => retry(human(a)),
-      output: (root, _outputs, config2) => {
-        const { phase } = selectStatus(root, config2);
+      output: (root, _outputs, config) => {
+        const { phase } = selectStatus(root, config);
         return { ok: true, phase, agent: agentFor(phase) };
       }
-    },
-    snapshot: {
-      write: (root, config2, configError2) => {
-        writeStateFile(root.info.dir, selectSnapshot(root, config2, configError2), new Date);
-        return transitionOutput(root, null, config2);
+    };
+  if (command === "snapshot")
+    return {
+      write: (root, config, configError) => {
+        writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date);
+        return transitionOutput(root, null, config);
       }
-    },
-    route: { read: (root, _a, config2, configError2) => selectNextAction(root, config2, configError2) },
-    label: { read: (root, _a, config2) => selectLabel(root, config2) },
-    explain: {
-      read: (root, a, config2, configError2) => explainRun(root, need(a.dir, "dir"), config2, configError2)
-    },
-    validate: {
-      plain: (a, config2) => validateRun({
+    };
+  if (command === "route")
+    return { read: (root, _a, config, configError) => selectNextAction(root, config, configError) };
+  if (command === "label")
+    return { read: (root, _a, config) => selectLabel(root, config) };
+  if (command === "explain")
+    return {
+      read: (root, a, config, configError) => explainRun(root, need(a.dir, "dir"), config, configError)
+    };
+  if (command === "validate")
+    return {
+      plain: (a, config) => validateRun({
         dir: need(a.dir, "dir"),
-        config: config2,
+        config,
         agent: need(a.agent, "agent"),
         agent_failed: a["agent-failed"] ?? false,
         execution_file: a["execution-file"] ?? null,
         changed_files: a["changed-files"] ? readFileSync10(a["changed-files"], "utf8").split(`
 `).filter(Boolean) : []
       })
-    },
-    compose: {
-      plain: (a, config2) => composeRun({
+    };
+  if (command === "compose")
+    return {
+      plain: (a, config) => composeRun({
         dir: need(a.dir, "dir"),
-        config: config2,
+        config,
         agent: need(a.agent, "agent"),
         repo: a.repo ?? ".",
         central: need(a.central, "central"),
@@ -1738,9 +1749,11 @@ function runCommand(command, args, config, configError = null) {
         run_id: need(a["run-id"], "run-id"),
         attempt: Number(a.attempt ?? 1)
       })
-    }
-  };
-  const cmd = commands[command];
+    };
+  return;
+}
+function runCommand(command, args, config, configError = null) {
+  const cmd = commandFor(command);
   if (!cmd)
     return;
   if (isPlain(cmd))

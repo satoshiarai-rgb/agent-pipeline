@@ -20,12 +20,12 @@ import {
 } from "./store/global/selectors.ts";
 
 /**
- * CLI の語彙 → store 操作の対応表は `runCommand` の中にある。**判断は 1 つも持たない。**
+ * CLI の語彙を store 操作に写す層。**判断は 1 つも持たない。**
  * コマンドは 4 つのケース（`Dispatching` / `Reading` / `Writing` / `Plain`）のいずれかで、
- * それぞれ必要な関数だけを持つ。
+ * それぞれ必要な関数だけを持ち、`commandFor` の分岐が返す。
  *
- * action を 1 つ足すときに触るのは表の 1 行。移行前は 9 ファイルに分かれていたが、
- * 中身が「action を作って dispatch する」だけになったので分ける意味が無くなった。
+ * 移行前は 9 ファイルに分かれていたが、中身が「action を作って dispatch する」だけに
+ * なったので分ける意味が無くなった。
  */
 
 /**
@@ -142,18 +142,14 @@ export const isRejection = (r: unknown): r is { ok: false; reason: string } =>
   typeof r === "object" && r !== null && (r as { ok?: unknown }).ok === false;
 
 /**
- * コマンドを 1 つ実行する。**1 起動で dispatch する action は 1 つだけ**。
- * 知らないコマンドなら undefined を返す（CLI が使い方を出す）。
+ * CLI の語彙 → store 操作。**判断は 1 つも持たない。**知らないコマンドなら undefined
+ * （`runCommand` がそのまま返し、CLI が使い方を出す）。
+ * action を 1 つ足すときに触るのはこの関数の分岐 1 つ。
  */
-export function runCommand(
-  command: string,
-  args: Args,
-  config: Config,
-  configError: string | null = null,
-): unknown {
-  const commands: Record<string, Command> = {
-    /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
-    bootstrap: {
+function commandFor(command: string): Command | undefined {
+  /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
+  if (command === "bootstrap")
+    return {
       action: (a, config) =>
         bootstrap({
           ...harness(),
@@ -162,8 +158,10 @@ export function runCommand(
           pipeline_version: config.pipeline_version,
         }),
       output: transitionOutput,
-    },
-    start: {
+    };
+
+  if (command === "start")
+    return {
       action: (a, config) =>
         agentStarted({
           ...harness(),
@@ -172,9 +170,11 @@ export function runCommand(
           model: a.model ?? config.models.default,
         }),
       output: (_root, outputs) => ({ event_path: outputs.event_path }),
-    },
-    finish: {
-      // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
+    };
+
+  // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
+  if (command === "finish")
+    return {
       action: (a, _config, root) =>
         mapValidationToAction(reportOf(a), root.app.phase, {
           ...harness(),
@@ -182,43 +182,58 @@ export function runCommand(
           session_id: a["session-id"] ?? null,
         }),
       output: transitionOutput,
-    },
-    approve: {
+    };
+
+  if (command === "approve")
+    return {
       action: (a) => humanApproval(human(a)),
       output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase }),
-    },
-    "request-changes": {
+    };
+
+  if (command === "request-changes")
+    return {
       action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
       output: (root, outputs) => ({
         ok: true,
         phase: root.app.phase,
         review_path: outputs.review_path,
       }),
-    },
-    retry: {
+    };
+
+  if (command === "retry")
+    return {
       action: (a) => retry(human(a)),
       output: (root, _outputs, config) => {
         const { phase } = selectStatus(root, config);
         return { ok: true, phase, agent: agentFor(phase) };
       },
-    },
-    /**
-     * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
-     * なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）。
-     */
-    snapshot: {
+    };
+
+  /**
+   * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
+   * なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）。
+   */
+  if (command === "snapshot")
+    return {
       write: (root, config, configError) => {
         writeStateFile(root.info.dir, selectSnapshot(root, config, configError), new Date());
         return transitionOutput(root, null, config);
       },
-    },
-    route: { read: (root, _a, config, configError) => selectNextAction(root, config, configError) },
-    label: { read: (root, _a, config) => selectLabel(root, config) },
-    explain: {
+    };
+
+  if (command === "route")
+    return { read: (root, _a, config, configError) => selectNextAction(root, config, configError) };
+
+  if (command === "label") return { read: (root, _a, config) => selectLabel(root, config) };
+
+  if (command === "explain")
+    return {
       read: (root, a, config, configError) =>
         explainRun(root, need(a.dir, "dir"), config, configError),
-    },
-    validate: {
+    };
+
+  if (command === "validate")
+    return {
       plain: (a, config) =>
         validateRun({
           dir: need(a.dir, "dir"),
@@ -231,8 +246,10 @@ export function runCommand(
             ? readFileSync(a["changed-files"], "utf8").split("\n").filter(Boolean)
             : [],
         }),
-    },
-    compose: {
+    };
+
+  if (command === "compose")
+    return {
       plain: (a, config) =>
         composeRun({
           dir: need(a.dir, "dir"),
@@ -245,10 +262,22 @@ export function runCommand(
           run_id: need(a["run-id"], "run-id"),
           attempt: Number(a.attempt ?? 1),
         }),
-    },
-  };
+    };
 
-  const cmd = commands[command];
+  return undefined;
+}
+
+/**
+ * コマンドを 1 つ実行する。**1 起動で dispatch する action は 1 つだけ**。
+ * 知らないコマンドなら undefined を返す（CLI が使い方を出す）。
+ */
+export function runCommand(
+  command: string,
+  args: Args,
+  config: Config,
+  configError: string | null = null,
+): unknown {
+  const cmd = commandFor(command);
   if (!cmd) return undefined;
   if (isPlain(cmd)) return cmd.plain(args, config);
 
