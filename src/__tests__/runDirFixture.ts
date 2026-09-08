@@ -1,9 +1,11 @@
-import { mkdtempSync, rmSync } from "node:fs";
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "../defaults.ts";
 import { defaults } from "../defaults.ts";
+import type { Criterion } from "../file/acceptanceFile.ts";
 import { appendEvent } from "../file/eventLog.ts";
+import { nextReviewNumber, reviewPath, saveReview } from "../file/reviewFile.ts";
 import { readStateFile } from "../file/stateFile.ts";
 import type { ValidationReport } from "../redux/mapValidationToAction.ts";
 import type { Args } from "../redux/runCommand.ts";
@@ -11,6 +13,7 @@ import { runCommand } from "../redux/runCommand.ts";
 import { agentFailed } from "../redux/store/app/actions.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
 import type { AgentName, Phase } from "../types.ts";
+import { stringifyJson } from "../utils/stringifyJson.ts";
 
 const dirs: string[] = [];
 let seq = 0;
@@ -48,25 +51,88 @@ export function runOnce(
 ): Transitioned {
   const run_id = nextRun();
   start(dir, agent, run_id, config);
-  return cli(
-    "finish",
-    {
-      dir,
-      "run-id": run_id,
-      attempt: "1",
-      result: report.result,
-      verdict: report.verdict ?? undefined,
-      detail: report.detail,
-      "api-error-status":
-        report.api_error_status === null || report.api_error_status === undefined
-          ? undefined
-          : String(report.api_error_status),
-      "acceptance-passed": report.acceptance_passed ?? false,
-      "session-id": `sess-${run_id}`,
-    },
-    config,
-  ) as Transitioned;
+
+  const args: Args = { dir, "run-id": run_id, attempt: "1", "session-id": `sess-${run_id}` };
+  if (report.result === "agent_failed") args["agent-failed"] = true;
+  if (report.result === "api_error") {
+    args["execution-file"] = writeExecutionLog(dir, report.api_error_status ?? 500);
+  }
+  if (report.result === "ok") {
+    ARTIFACTS[agent](dir, report);
+    args["changed-files"] = writeChangedList(dir);
+  }
+  // result: "invalid" は成果物を書かない（契約の最初の check が落ちる）
+  return cli("finish", args, config) as Transitioned;
 }
+
+// ------------------------------------------------- 成果物を作る（契約 §4 の裏返し）
+//
+// finish が自分で `validate` するので、**テストも本番と同じく「成果物を置いてから
+// finish を呼ぶ」**。契約の詳細に依存するテストコードはここだけに閉じる。
+// 契約に関係ないファイル（差分の一覧・実行ログ）は `.test/` に置く
+// （run ディレクトリ直下に置くと成果物の検査から見えてしまう）。
+
+const sideFile = (dir: string, name: string, body: string): string => {
+  const path = join(dir, ".test", name);
+  mkdirSync(join(dir, ".test"), { recursive: true });
+  writeFileSync(path, body);
+  return path;
+};
+
+/** developer の差分。1 行 1 ファイル（本番はワークフローが git status から作る） */
+const writeChangedList = (dir: string): string =>
+  sideFile(dir, `changed-${seq}.txt`, "src/index.ts\n");
+
+/** base-action の実行ログ。API エラーの分類に使う（A-31） */
+const writeExecutionLog = (dir: string, status: number): string =>
+  sideFile(
+    dir,
+    `execution-${seq}.json`,
+    stringifyJson([{ type: "result", subtype: "error", is_error: true, api_error_status: status }]),
+  );
+
+const writeAcceptance = (dir: string, passed: boolean): void => {
+  const criterion: Criterion = {
+    id: "AC-1",
+    description: "bun test が通る",
+    verification: "automated",
+    command: "bun test",
+    status: "pending",
+    evidence: null,
+  };
+  if (passed) {
+    criterion.status = "passed";
+    criterion.evidence = "bun test: 全件 pass";
+  }
+  writeFileSync(join(dir, "acceptance.json"), stringifyJson({ criteria: [criterion] }));
+};
+
+/** verdict が無い report は「frontmatter を書き忘れたレビュー」を置く（本番と同じ形で弾かれる） */
+const writeReview = (dir: string, kind: "plan" | "dev", report: ValidationReport): void => {
+  if (report.verdict) {
+    saveReview({ dir, kind, verdict: report.verdict, reviewer: `${kind}-reviewer`, body: "所見" });
+    return;
+  }
+  mkdirSync(join(dir, "reviews"), { recursive: true });
+  const round = nextReviewNumber(dir, kind);
+  writeFileSync(reviewPath(dir, kind, round), "---\nround: 1\n---\n\nverdict を書き忘れた\n");
+};
+
+const ARTIFACTS: Record<AgentName, (dir: string, report: ValidationReport) => void> = {
+  planner: (dir, report) => {
+    let scale = "上限内（3 ファイル）";
+    if (report.oversize) scale = "上限超過（12 ファイル）";
+    writeFileSync(join(dir, "plan.md"), `# 計画\n\n## 規模判定\n\n${scale}\n`);
+    writeAcceptance(dir, false);
+  },
+  "plan-reviewer": (dir, report) => writeReview(dir, "plan", report),
+  developer: (dir) => writeAcceptance(dir, true),
+  "dev-reviewer": (dir, report) => writeReview(dir, "dev", report),
+  completion: (dir, report) => {
+    writeFileSync(join(dir, "completion.md"), "# 完了報告\n\n実装した。\n");
+    writeAcceptance(dir, report.acceptance_passed ?? false);
+  },
+};
 
 export const approve = (dir: string, association = "OWNER", config = defaults) =>
   cli("approve", { dir, association, "run-id": nextRun() }, config) as Human;

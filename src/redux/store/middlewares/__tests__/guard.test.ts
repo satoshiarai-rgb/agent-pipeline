@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { existsSync } from "node:fs";
+import { readdirSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../../../../__tests__/helpers.ts";
 import {
@@ -141,16 +141,19 @@ describe("人間の action の認可（入口でのみ見る / 設計書 §7.3�
 
   test("done は終端なので差し戻せない（K-10: 作り直しは新しい issue で）", () => {
     const dir = makeRun("done");
+    const before = readdirSync(join(dir, "reviews")).length;
     const r = requestChanges(dir, "OWNER", "直して", c);
     expect(r.ok).toBe(false);
     expect(r.ok === false && r.reason).toContain("not_awaiting_approval: phase=done");
-    expect(existsSync(join(dir, "reviews"))).toBe(false);
+    // 弾かれた差し戻しはレビューを 1 件も足さない（reviews/ 自体はレビュアーの成果物で在る）
+    expect(readdirSync(join(dir, "reviews")).length).toBe(before);
   });
 
   test("認可されない差し戻しは何も書かない", () => {
     const dir = makeRun("awaiting_human");
+    const before = readdirSync(join(dir, "reviews")).length;
     expect(requestChanges(dir, "NONE", "x", c).ok).toBe(false);
-    expect(existsSync(join(dir, "reviews"))).toBe(false);
+    expect(readdirSync(join(dir, "reviews")).length).toBe(before);
     expect(phaseOf(dir).phase).toBe("awaiting_human");
   });
 });

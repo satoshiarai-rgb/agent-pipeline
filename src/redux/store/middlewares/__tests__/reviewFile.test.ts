@@ -21,7 +21,8 @@ describe("review-file middleware", () => {
     const r = requestChanges(dir, "OWNER", "期限を明記して", c);
     expect(r.ok).toBe(true);
     if (!r.ok || !r.review_path) throw new Error("review_path が返っていない");
-    expect(r.review_path).toContain("reviews/plan-01.md");
+    // plan-01.md は plan-reviewer の成果物。人間の差し戻しはその次の番号になる
+    expect(r.review_path).toContain("reviews/plan-02.md");
 
     const review = readFileSync(r.review_path, "utf8");
     expect(review).toContain("verdict: request_changes");
@@ -37,6 +38,7 @@ describe("review-file middleware", () => {
     runOnce(dir, "plan-reviewer", { result: "ok", verdict: "approve" }, c);
 
     const r = requestChanges(dir, "OWNER", "2 回目", c);
-    expect(r.ok && r.review_path).toContain("reviews/plan-02.md");
+    // plan-01/03 が plan-reviewer、plan-02 が 1 回目の差し戻し
+    expect(r.ok && r.review_path).toContain("reviews/plan-04.md");
   });
 });

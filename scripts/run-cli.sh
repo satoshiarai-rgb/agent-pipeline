@@ -13,13 +13,9 @@ add --agent "${CLI_AGENT:-}"
 add --run-id "${CLI_RUN_ID:-}"
 add --attempt "${CLI_ATTEMPT:-}"
 add --model "${CLI_MODEL:-}"
-add --result "${CLI_RESULT:-}"
-add --verdict "${CLI_VERDICT:-}"
-add --api-error-status "${CLI_API_ERROR_STATUS:-}"
 add --session-id "${CLI_SESSION_ID:-}"
 add --association "${CLI_ASSOCIATION:-}"
 add --body "${CLI_BODY:-}"
-add --detail "${CLI_DETAIL:-}"
 add --execution-file "${CLI_EXECUTION_FILE:-}"
 add --changed-files "${CLI_CHANGED_FILES:-}"
 add --repo "${CLI_REPO:-}"
@@ -27,7 +23,6 @@ add --repo "${CLI_REPO:-}"
 add --central "${CLI_CENTRAL:-$GITHUB_ACTION_PATH}"
 add --out "${CLI_OUT:-${RUNNER_TEMP:-/tmp}/agent-prompt.md}"
 [ "${CLI_AGENT_FAILED:-}" = "true" ] && args+=(--agent-failed)
-[ "${CLI_ACCEPTANCE_PASSED:-}" = "true" ] && args+=(--acceptance-passed)
 
 out=$(node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}")
 echo "$out"

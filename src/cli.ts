@@ -12,8 +12,9 @@ const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 状態を変える（action を 1 つ dispatch する）:
   bootstrap run の最初のイベントを書く              --issue --branch
   start    エージェント実行の開始を記録する   --agent --run-id --attempt [--model]
-  finish   実行の結末を書き次の phase を決める --run-id --result [--verdict] [--detail]
-                                              [--api-error-status] [--acceptance-passed] [--session-id]
+  finish   成果物を契約に照らし、結末を書いて次の phase を決める --run-id --attempt
+                                              [--agent-failed] [--execution-file <path>]
+                                              [--changed-files <path>] [--session-id]
   approve  /agent approve による遷移           --association
   request-changes  /agent request-changes による差し戻し  --association --body
   retry    blocked から直前のフェーズに戻す    --association
@@ -25,10 +26,10 @@ const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
   explain  blocked の理由と次の一手を markdown で返す（PR に貼る）
 
 store を使わない:
-  validate 成果物が契約を満たすか検証し、検証結果（ValidationReport）を返す
-             --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
                                               [--repo]
+
+finish が検査する相手（エージェント）は start が記録した in_flight から取るので渡さない
 
 --repo は配布先のチェックアウト（既定はカレント）。.agent/config.json があれば
 既定値に重ねる。書いたキーだけが上書きされ、null は継承、既定に無いキーはエラー

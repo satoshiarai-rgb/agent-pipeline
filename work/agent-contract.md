@@ -260,15 +260,22 @@ compose --dir <run dir> --agent <name> --central <中央のパス> --out <書き
 - `prompt_path` を base-action の `prompt_file` に渡す
 - `role_prompt` は実際に使ったプロンプト（配布先の上書きか中央の既定か）。実行の記録に残す
 
-`validate` コマンドが上の「検証」列を実装し、`finish` に渡す `Outcome` を組み立てる。
+上の「検証」列を実装するのは `src/commands/validate.ts`（`CONTRACT` の表）で、**呼ぶのは
+`finish` コマンド**。検査結果は CLI の引数を経由せず、そのまま action に写される
+（`mapValidationToAction`）。
 
 ```
-validate --dir <run dir> [--execution-file <path>] [--changed-files <path>]
+finish --dir <run dir> --run-id <id> --attempt <n>
+       [--agent-failed] [--execution-file <path>] [--changed-files <path>] [--session-id <id>]
   # 検査する相手（agent）は引数ではなく、start が記録した in_flight から取る
-  → { result, verdict?, oversize?, acceptance_passed?, api_error_status? }
+  → { phase, blocked_reason, continue_chain, result, detail, oversize }
 ```
 
-- `result`: `ok` | `invalid` | `agent_failed` | `api_error`
+検査そのものが例外を投げても `finish` は state を書いて `blocked` にする
+（`blocked_reason` は `invalid_artifacts: validate_crashed: …`）。**例外で止めると
+状態が git に載らず run が無音で終わる**ため、ここは必ず捕まえる。
+
+- `result`: `ok` | `invalid` | `agent_failed` | `api_error`（出力に残るのはログとサマリーのため）
 - エージェントの step が失敗していれば `agent_failed`。**ただし実行ログの最後の result が
   `subtype: "success"` かつ `is_error` でないなら、step の失敗を無視して成果物で判断する**（K-20）。
   base-action は `num_turns > max_turns` を step の失敗として返すが、そのとき成果物は完成している

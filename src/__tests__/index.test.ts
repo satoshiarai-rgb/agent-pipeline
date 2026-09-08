@@ -25,7 +25,6 @@ describe("公開 IF（index.ts）", () => {
       "route",
       "snapshot",
       "start",
-      "validate",
     ];
     for (const name of vocabulary) {
       expect(() => runCommand(name, {}, defaults), name).toThrow(MissingArg);

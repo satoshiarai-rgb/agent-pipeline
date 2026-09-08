@@ -280,21 +280,10 @@ jobs:
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
           echo "- outcome=\`$O\` 変更ファイル数=\`$(wc -l < "$CHANGED" | tr -d ' ')\`" >> "$GITHUB_STEP_SUMMARY"
 
-      # ---- 成果物が契約を満たすか検証する（契約 §6。ここを通れば状態機械は壊れない / K-16）
-      - id: validate
-        if: always() && needs.route.outputs.action == 'run'
-        uses: satoshiarai-rgb/agent-pipeline@main
-        with:
-          command: validate
-          dir: ${{ needs.route.outputs.dir }}
-          # agent は渡さない。検査する相手は start が記録した in_flight から取る
-          agent-failed: ${{ steps.outcome.outputs.agent_failed }}
-          execution-file: ${{ steps.agent.outputs.execution_file }}
-          changed-files: ${{ steps.outcome.outputs.changed }}
-
-      # ---- 遷移を決める
-      # result は validate が決める。|| の既定値は validate 自体が落ちたときの保険で、
-      # 「state 更新と push は必ず行い blocked にする」という不変条件を守るため
+      # ---- 成果物を契約に照らし（契約 §6 / K-16）、遷移を決める
+      # 検査も finish が行う。**検査する相手は start が記録した in_flight**なので
+      # agent は渡さない。検査が例外を投げても finish は state を書いて blocked にする
+      # （「state 更新と push は必ず行う」という不変条件は CLI 側で守られる）
       - id: finish
         if: always() && needs.route.outputs.action == 'run'
         uses: satoshiarai-rgb/agent-pipeline@main
@@ -303,11 +292,9 @@ jobs:
           dir: ${{ needs.route.outputs.dir }}
           run-id: ${{ github.run_id }}
           attempt: ${{ github.run_attempt }}
-          result: ${{ steps.validate.outputs.result || 'invalid' }}
-          detail: ${{ steps.validate.outputs.detail || 'validate が結果を返さなかった' }}
-          verdict: ${{ steps.validate.outputs.verdict }}
-          acceptance-passed: ${{ steps.validate.outputs.acceptance_passed }}
-          api-error-status: ${{ steps.validate.outputs.api_error_status }}
+          agent-failed: ${{ steps.outcome.outputs.agent_failed }}
+          execution-file: ${{ steps.agent.outputs.execution_file }}
+          changed-files: ${{ steps.outcome.outputs.changed }}
           session-id: ${{ steps.agent.outputs.session_id }}
 
       - name: 成果物と遷移を push
@@ -356,7 +343,7 @@ jobs:
       # 上限（1 PR あたり 5〜10 ファイル）は目安であって停止条件ではない。
       # 分割するかどうかは、この警告と plan.md を見た人間が決める
       - name: 規模超過を PR に警告する
-        if: always() && steps.validate.outputs.oversize == 'true'
+        if: always() && steps.finish.outputs.oversize == 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           RUN_DIR: ${{ needs.route.outputs.dir }}

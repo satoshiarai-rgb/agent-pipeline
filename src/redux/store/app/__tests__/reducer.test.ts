@@ -88,7 +88,9 @@ describe("reducer: 遷移", () => {
   test("verdict が無ければ blocked（frontmatter 欠落）", () => {
     const f = runOnce(makeRun("plan_review"), "plan-reviewer", { result: "ok" });
     expect(f.phase).toBe("blocked");
-    expect(f.blocked_reason).toBe("missing_verdict");
+    // 契約の検査が先に弾く。reducer 側の missing_verdict は二重の網
+    // （mapValidationToAction.test.ts で直接見る）
+    expect(f.blocked_reason).toContain("frontmatter に verdict が無い");
   });
 
   test("completing は acceptance 全 passed で done、そうでなければ blocked", () => {
@@ -125,7 +127,8 @@ describe("reducer: 停止条件", () => {
   test("実行失敗と成果物の検証失敗は blocked", () => {
     const cases: Array<[Parameters<typeof runOnce>[2], string]> = [
       [{ result: "agent_failed" }, "agent_failed"],
-      [{ result: "invalid" }, "invalid_artifacts"],
+      // detail は validate が成果物を見て付ける（planner なら plan.md が無い）
+      [{ result: "invalid" }, "invalid_artifacts: plan.md が無いか空"],
     ];
     for (const [outcome, reason] of cases) {
       const f = runOnce(makeRun(), "planner", outcome);
@@ -260,6 +263,6 @@ describe("遷移は reducer の中に書いてある（dispatch で確かめる 
 
   test("レビューのフェーズで verdict が無ければ blocked（frontmatter の欠落）", () => {
     const f = runOnce(makeRun("plan_review"), "plan-reviewer", { result: "ok" }, c);
-    expect(f.blocked_reason).toBe("missing_verdict");
+    expect(f.blocked_reason).toContain("frontmatter に verdict が無い");
   });
 });

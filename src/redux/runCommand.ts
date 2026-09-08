@@ -4,8 +4,8 @@ import { explainRun } from "../commands/explain.ts";
 import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
-import type { AgentName, RunResult, Verdict } from "../types.ts";
-import { mapValidationToAction } from "./mapValidationToAction.ts";
+import type { AgentName } from "../types.ts";
+import { mapValidationToAction, type ValidationReport } from "./mapValidationToAction.ts";
 import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
 import { createStore } from "./store/createStore.ts";
@@ -37,11 +37,6 @@ export const CLI_OPTIONS = {
   "run-id": { type: "string" },
   attempt: { type: "string", default: "1" },
   model: { type: "string" },
-  result: { type: "string" },
-  verdict: { type: "string" },
-  "api-error-status": { type: "string" },
-  detail: { type: "string" },
-  "acceptance-passed": { type: "boolean", default: false },
   "session-id": { type: "string" },
   association: { type: "string" },
   "agent-failed": { type: "boolean", default: false },
@@ -55,7 +50,8 @@ export const CLI_OPTIONS = {
 
 /** ワークフローから渡る引数（`parseArgs` の出力と同じ形） */
 export type Args = {
-  [K in keyof typeof CLI_OPTIONS]?: (typeof CLI_OPTIONS)[K]["type"] extends "boolean"
+  // CLI_OPTIONS は as const なので readonly を外す（parseArgs の出力は書き換えてよい袋）
+  -readonly [K in keyof typeof CLI_OPTIONS]?: (typeof CLI_OPTIONS)[K]["type"] extends "boolean"
     ? boolean
     : string;
 };
@@ -87,7 +83,7 @@ const isRejection = (r: unknown): r is { ok: false; reason: string } =>
  * コマンドを 1 つ実行する。**1 起動で dispatch する action は 1 つだけ**。
  * 知らないコマンドなら undefined を返す（CLI が使い方を出す）。
  *
- * 上から「store を使わない 1 つ」「読むだけの 4 つ」「スナップショットを書き直す 1 つ」
+ * 上から「store を使わない 1 つ」「読むだけの 3 つ」「スナップショットを書き直す 1 つ」
  * 「状態を変える 6 つ」の順。語彙を足すときに書くのは分岐 1 つ。
  */
 export function runCommand(
@@ -117,24 +113,6 @@ export function runCommand(
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
-
-  // 成果物を契約に照らす。**検査する相手は引数で受け取らない** — `start` が記録した
-  // in_flight を selector で読む（route が決めた agent を再度渡させない）
-  if (command === "validate") {
-    const agent = selectInFlightAgent(state());
-    if (!agent) return { result: "invalid", detail: "実行が記録されていない（start が無い）" };
-    return validateRun({
-      dir,
-      config,
-      agent,
-      agent_failed: args["agent-failed"] ?? false,
-      execution_file: args["execution-file"] ?? null,
-      // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
-      changed_files: args["changed-files"]
-        ? readFileSync(args["changed-files"], "utf8").split("\n").filter(Boolean)
-        : [],
-    });
-  }
 
   // 読むだけの 3 つ。selector を読み、何も書かない
   if (command === "route") return selectNextAction(state(), config, configError);
@@ -178,31 +156,54 @@ export function runCommand(
     return { event_path: outputs.event_path };
   }
 
-  // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
+  /**
+   * エージェント 1 回の実行の結末。**成果物を契約に照らすのもここ**で、
+   * どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）。
+   *
+   * 検査は必ず `try` の中で行う。契約チェッカが落ちても state は書いて `blocked` にする
+   * （例外を投げると状態が git に載らず run が無音で止まる / 設計書 §7）。
+   */
   if (command === "finish") {
-    const status = args["api-error-status"];
-    let apiErrorStatus: number | null = null;
-    if (status) apiErrorStatus = Number(status);
-    const action = mapValidationToAction(
-      {
-        result: need(args.result, "result") as RunResult,
-        verdict: (args.verdict as Verdict | undefined) ?? null,
-        acceptance_passed: args["acceptance-passed"] ?? false,
-        api_error_status: apiErrorStatus,
-        detail: args.detail,
-      },
-      state().app.phase,
-      {
-        timestamp: timestamp(),
-        by: "harness",
-        run_id: need(args["run-id"], "run-id"),
-        attempt: Number(args.attempt ?? 1),
-        session_id: args["session-id"] ?? null,
-      },
-    );
+    const agent = selectInFlightAgent(state());
+    let report: ValidationReport = {
+      result: "invalid",
+      detail: "実行が記録されていない（start が無い）",
+    };
+    if (agent) {
+      try {
+        // 1 行 1 ファイルのリスト（ワークフローが git status から作る）
+        const listPath = args["changed-files"];
+        let changed: string[] = [];
+        if (listPath) changed = readFileSync(listPath, "utf8").split("\n").filter(Boolean);
+        report = validateRun({
+          dir,
+          config,
+          agent,
+          agent_failed: args["agent-failed"] ?? false,
+          execution_file: args["execution-file"] ?? null,
+          changed_files: changed,
+        });
+      } catch (error) {
+        report = { result: "invalid", detail: `validate_crashed: ${String(error)}` };
+      }
+    }
+    const action = mapValidationToAction(report, state().app.phase, {
+      timestamp: timestamp(),
+      by: "harness",
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
+      session_id: args["session-id"] ?? null,
+    });
     store.dispatch(action);
     const root = state();
-    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
+    return {
+      ...selectStatus(root, config),
+      continue_chain: selectContinueChain(root, config),
+      result: report.result,
+      detail: report.detail ?? null,
+      // 規模超過は止めずに PR へ警告を出すための出力（K-21）
+      oversize: report.oversize ?? false,
+    };
   }
 
   // 人間起点の 3 つはガードが弾くことがある（`middlewares/guard.ts` の GUARDS）。
