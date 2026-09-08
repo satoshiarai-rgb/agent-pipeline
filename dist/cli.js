@@ -1114,14 +1114,6 @@ var FAILURE_REASON = {
   },
   agent_failed: () => "agent_failed"
 };
-var SUCCESS = {
-  planning: (_outcome, context) => planned(context),
-  developing: (_outcome, context) => implemented(context),
-  completing: (outcome, context) => completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false }),
-  plan_review: (outcome, context) => planReviewed({ ...context, verdict: outcome.verdict }),
-  dev_review: (outcome, context) => devReviewed({ ...context, verdict: outcome.verdict })
-};
-var NEEDS_VERDICT = { plan_review: true, dev_review: true };
 function fromOutcome(outcome, context, phase) {
   if (outcome.result !== "ok") {
     return agentFailed({
@@ -1130,14 +1122,24 @@ function fromOutcome(outcome, context, phase) {
       api_error_status: outcome.api_error_status ?? null
     });
   }
-  if (NEEDS_VERDICT[phase] && !outcome.verdict) {
-    return agentFailed({ ...context, reason: "missing_verdict" });
+  switch (phase) {
+    case "planning":
+      return planned(context);
+    case "developing":
+      return implemented(context);
+    case "completing":
+      return completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false });
+    case "plan_review":
+      if (!outcome.verdict)
+        return agentFailed({ ...context, reason: "missing_verdict" });
+      return planReviewed({ ...context, verdict: outcome.verdict });
+    case "dev_review":
+      if (!outcome.verdict)
+        return agentFailed({ ...context, reason: "missing_verdict" });
+      return devReviewed({ ...context, verdict: outcome.verdict });
+    default:
+      return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
   }
-  const success = SUCCESS[phase];
-  if (!success) {
-    return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
-  }
-  return success(outcome, context);
 }
 
 // node_modules/redux/dist/redux.mjs

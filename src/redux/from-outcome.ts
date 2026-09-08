@@ -56,22 +56,6 @@ const FAILURE_REASON: Record<Exclude<RunResult, "ok">, (outcome: Outcome) => str
   agent_failed: () => "agent_failed",
 };
 
-/** フェーズごとの「成功したときの action」 */
-const SUCCESS: Partial<Record<Phase, (outcome: Outcome, context: Context) => Action<AppPayload>>> =
-  {
-    planning: (_outcome, context) => planned(context),
-    developing: (_outcome, context) => implemented(context),
-    completing: (outcome, context) =>
-      completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false }),
-    plan_review: (outcome, context) =>
-      planReviewed({ ...context, verdict: outcome.verdict as Verdict }),
-    dev_review: (outcome, context) =>
-      devReviewed({ ...context, verdict: outcome.verdict as Verdict }),
-  };
-
-/** レビューのフェーズは verdict が無いと遷移を決められない（frontmatter の欠落） */
-const NEEDS_VERDICT: Partial<Record<Phase, true>> = { plan_review: true, dev_review: true };
-
 export function fromOutcome(outcome: Outcome, context: Context, phase: Phase): Action<AppPayload> {
   if (outcome.result !== "ok") {
     return agentFailed({
@@ -80,13 +64,23 @@ export function fromOutcome(outcome: Outcome, context: Context, phase: Phase): A
       api_error_status: outcome.api_error_status ?? null,
     });
   }
-  if (NEEDS_VERDICT[phase] && !outcome.verdict) {
-    return agentFailed({ ...context, reason: "missing_verdict" });
+
+  switch (phase) {
+    case "planning":
+      return planned(context);
+    case "developing":
+      return implemented(context);
+    case "completing":
+      return completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false });
+    // レビューのフェーズは verdict が無いと遷移を決められない（frontmatter の欠落）
+    case "plan_review":
+      if (!outcome.verdict) return agentFailed({ ...context, reason: "missing_verdict" });
+      return planReviewed({ ...context, verdict: outcome.verdict });
+    case "dev_review":
+      if (!outcome.verdict) return agentFailed({ ...context, reason: "missing_verdict" });
+      return devReviewed({ ...context, verdict: outcome.verdict });
+    // エージェントが走らないフェーズでの成功報告（ハーネスかワークフローの壊れ）
+    default:
+      return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
   }
-  const success = SUCCESS[phase];
-  if (!success) {
-    // エージェントが走らないフェーズでの成功報告（プロンプトや設定の壊れ）
-    return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
-  }
-  return success(outcome, context);
 }
