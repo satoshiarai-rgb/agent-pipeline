@@ -21,14 +21,14 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | `work/agent-pipeline-design.md` | 設計書 v1.0。仕様の正 |
 | `work/github-actions-architecture.md` | 設計書 §6 を GitHub Actions の実装レベルに落としたもの。設計書との食い違いは同文書 §9 に列挙 |
 | `work/worklist.md` | 残作業の台帳。確定した判断（§0）、文書修正、検証、実装、未決事項 |
-| `work/agent-contract.md` | **エージェントの入力と出力の契約。** プロンプトは配布先で差し替えられるが、この契約を満たさない出力は `blocked` になる |
 | `work/steps.md` | 段階的な実装手順。Actions の用語解説（§0）とフェーズ A〜E の 15 ステップ |
 | `work/verify/step-a1/check-wif.yml` | Step A-1 の検証ワークフロー原本。検証用リポジトリにコピーして使う |
 | `docs/overview.md` | 利用者向け: 何をするものか、フェーズと成果物、使い方 |
+| `docs/agent-contract.md` | 利用者向け（プロンプトを差し替える人が読む）: **エージェントの入力と出力の契約。** 満たさない出力は `blocked` になる。強制するのは `finish` |
 | `docs/installation.md` | 利用者向け: 導入手順（GitHub App、Secrets、ワークフロー、お試し実行） |
 | `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
 | `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
-| `install/` | 配布先に置くファイルの原本（`agent.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent-pipeline.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
+| `install/` | 配布先に置くファイルの原本（`agent-pipeline.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent-pipeline.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
 
 作業前に `work/worklist.md`（何を漏らさないか）と `work/steps.md`（どの順で手を動かすか）を読むこと。以下は全体像の要約であり、仕様の正は設計書側にある。
 
@@ -36,7 +36,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 
 `work/worklist.md` §0 が正。特に振る舞いに影響するもの:
 
-- **プロンプトは配布先で差し替えられる（`.agent/prompts/<agent>.md`）。中央は既定を提供する。** 契約（入力と出力）は `work/agent-contract.md` にあり、`finish` が成果物を照らして強制する（実装は `src/redux/validate.ts` の `CONTRACT`）
+- **プロンプトは配布先で差し替えられる（`.agent/prompts/<agent>.md`）。中央は既定を提供する。** 契約（入力と出力）は `docs/agent-contract.md` にあり、`finish` が成果物を照らして強制する（実装は `src/redux/effects/validate.ts` の `CONTRACT`）
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
 - **`.claude/**` も同じ扱い。** Claude Code が「センシティブファイル」として書き込みを拒否し、**許可ルール（`Edit(.claude/**)` を含む）では開けられない**。開ける手段は `--permission-mode bypassPermissions`（全権限チェックの無効化）だけなので採らない。必要な変更は run ディレクトリに成果物を置いて人間が設置する（K-19）
 - **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない

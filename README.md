@@ -13,6 +13,7 @@
 | [docs/overview.md](docs/overview.md) | **何をするものか。** 全体の流れ、フェーズと成果物、PR に何が残るか、使い方 |
 | [docs/installation.md](docs/installation.md) | **導入手順。** GitHub App、Secrets、ワークフロー、お試し実行での確認 |
 | [docs/customize-prompt.md](docs/customize-prompt.md) | **エージェントの振る舞いを変える。** 規約とプロンプトの差し替え、守らせる決まり |
+| [docs/agent-contract.md](docs/agent-contract.md) | **エージェントの入力と出力の契約。** プロンプトを差し替えるなら先に読む。満たさない出力は `blocked` になる |
 | [docs/troubleshooting.md](docs/troubleshooting.md) | **止まったとき。** `blocked` の理由と再開のしかた、症状別の見どころ |
 | [install/](install) | **配布先に置くファイルの原本。** ワークフロー 1 枚と、規約・準備スクリプト・issue フォームの雛形 |
 
@@ -39,7 +40,6 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | ファイル | 役割 |
 |---|---|
 | `work/agent-pipeline-design.md` | 設計書。仕様の正 |
-| `work/agent-contract.md` | エージェントの入力と出力の契約 |
 | `work/github-actions-architecture.md` | GitHub Actions の実装レベルに落としたもの |
 | `work/worklist.md` | 確定した判断・残作業・未決事項。**現在地はここ** |
 | `work/steps.md` | 段階的な実装手順と実機確認の手順 |

@@ -21,7 +21,7 @@
   **`src/commands/` は畳んで消した**（2026-09-08）
 - 中央のワークフロー: `agent-bootstrap.yml` / `agent-dispatch.yml` / `agent-comment.yml`（`approve.yml` は `agent-comment.yml` に畳んで削除済み）
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
-- 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `finish`
+- 契約: `docs/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `finish`
   （実装は `src/redux/validate.ts` の `CONTRACT`。CLI の `validate` コマンドは廃止 / A-53 段取り 7）
 - 文書: **利用者向けは `docs/`**（overview / installation / customize-prompt / troubleshooting）、
   **設計と台帳は `work/`**。README は入口で、両方へのリンクだけを持つ
@@ -149,7 +149,7 @@
 | K-12 | **人間のコマンドは PR 側のコメントでのみ受け付ける。issue 側は無視する** | 人間が見る対象（`plan.md` / `acceptance.json` / レビュー / コード）はすべて draft PR に集まるため。実装も素直で、**PR 番号から `headRefName`（`claude/issue-<n>`）を引けば run のディレクトリが導出できる**（`route` がブランチ名から決めるのと同じ規則）。issue 番号の逆引きは不要。**依存: bootstrap が draft PR を作る必要がある**（設計書 §6.2、現状のダミーは未実装） |
 | K-13 | **コマンドは名前空間付き。`/agent approve` / `/agent request-changes <理由>`** | `/approve` 単体は他の bot と衝突しやすい。名前空間があれば将来のコマンド（`/agent abort` 等）も同じ形に収まる。判定は先頭一致（`startsWith("/agent ")`）を維持する |
 | K-15 | **プロンプトは配布先で差し替えられる。中央は既定を提供する** | 解決順は `.agent/prompts/<agent>.md` → 中央 `prompts/<agent>.md`。一部だけ差し替えることもできる。技術スタック・レビュー観点・コミットの作法はプロダクトごとに違うため。設計書 §4.1 の「プロンプトは中央のみ、固有の調整は conventions.md」から変更 |
-| K-16 | **契約（入力と出力）は中央が持ち、`validate` が強制する** | プロンプトが何であれ、成果物の形が契約を満たさなければ `blocked` になる。契約は `work/agent-contract.md`。ハーネスは成果物の形だけを見て遷移を決めるので、この 1 箇所を通れば状態機械は壊れない |
+| K-16 | **契約（入力と出力）は中央が持ち、`validate` が強制する** | プロンプトが何であれ、成果物の形が契約を満たさなければ `blocked` になる。契約は `docs/agent-contract.md`。ハーネスは成果物の形だけを見て遷移を決めるので、この 1 箇所を通れば状態機械は壊れない |
 | K-14 | **同一 issue の 2 周目は行わない。作り直しが必要なら新しい issue を起票する** | bootstrap はブランチが存在すれば何もしない（冪等）ため、`done` 後にラベルを付け直しても再実行されない。この挙動をそのまま仕様とする（K-10 と同じ方針） |
 | K-11 | **ハーネスが読み書きするファイルは JSON、既定値はコード（`src/pipelineSettings.ts`）** | `state.json` / `runs/*.json` / `acceptance.json`。理由: ワークフローの shell から `jq` で直接読める（`yq` 不要）、書き戻しが厳密、キー順固定で差分が安定する。**npm 依存がゼロになり、コミットする `dist/cli.js` が 248KB → 16KB になった**（`dist/` は git 履歴に積まれるため効果が大きい）。既定値をコードにしたのはコメントと型チェックを保つため（YAML パーサを外すと JSON にはコメントが書けない）。`state.json` に書いていた復旧手順は `templates/README.md` と `blocked` 時の issue コメントへ移した。配布先の上書きは `.agent/config.json`（A-19 で実装。規則は `src/utils/mergeSettings.ts`） |
 | K-10 | **`done` は終端。PR を見た人間がコードに変更を求める経路は用意しない。作り直しが必要なら新しい issue を立てる** | 検討して却下したもの: `done → planning` の差し戻し辺と、人間の差し戻しごとにカウントを数え直す「サイクル」の仕組み（レコードのファイル名に世代を入れる案）。実装して動かしたうえで、**やり直すなら最初からやり直す方が単純**という判断で削除した。`awaiting_human` からの差し戻し（計画段階、`/request-changes`）は残す — 設計書 §1「マージまでが責務」と整合 |
@@ -220,6 +220,13 @@
 ---
 
 ## 3. 設計書・構成案の追いつき
+
+- [ ] **`work/` を捨てるときの後始末（2026-09-08 に契約だけ昇格した）。** `work/` は構築用の作業ディレクトリで完了後に消す前提なので、残す価値があるものは移す。
+  - [x] `work/agent-contract.md` → **`docs/agent-contract.md`**（利用者向け。プロンプトを差し替える人が読む）。参照元 7 ファイル（`README.md` / `CLAUDE.md` / `agent-dispatch.yml` / `effects/{validate,compose,explain}.ts` / `worklist.md`）を書き換え、`README.md` と `docs/customize-prompt.md` から辿れるようにした
+  - [ ] 昇格した契約の中に **「設計書 §x」の引用が 5 箇所**残っている（`§3.3` / `§5.4` / `§6.3` / `§7.1` など）。設計書を捨てる時点で、引用を本文に取り込むか落とす
+  - [ ] `work/worklist.md` §0（確定した判断 K-1〜K-27）の昇格先を決める（案: `docs/decisions.md`）。CLAUDE.md がここを参照している
+  - [ ] 捨てる判断: `work/steps.md`（構築手順）、`work/github-actions-architecture.md`（実装が正になった）、`work/agent-pipeline-design.md`（設計の意図だけ決定記録へ）
+
 
 **実装が先に進んだ結果、設計書と構成案が現状と食い違っている箇所。** ばらばらに直すより、
 まとめて 1 回読み合わせる方が早い。各項目は「どこを何に直すか」だけを書いている。
@@ -302,7 +309,7 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - dev-reviewer の入力にある「差分」はファイルではないので列挙しない（役割プロンプトが git から読ませる）
   - 併せて `run-cli.sh` が渡していなかった `--detail` / `--execution-file` / `--changed-files` / `--agent-failed`（I-9b で足りていなかった分）を渡すようにした
 - [x] I-9b: **`validate` コマンド**（K-16、2026-09-05）。契約を `Record<AgentName, Contract>` の表として持ち、`Check`（満たせば null、満たさなければ理由）を上から適用するだけの入り口にした。テスト 25 件。実行ログの解析は `src/file/executionLog.ts`（`readApiErrorStatus`）
-  - 旧: **`validate` コマンド**（K-16）。`work/agent-contract.md` §4 の検証列を実装し、`finish` に渡す `Outcome` を組み立てる。`--execution-file` から `api_error` を判定（A-31）、planner の規模判定から `oversize`、`acceptance.json` のスキーマと `evidence` の非空、差分の存在、`.github/workflows/**` の変更検出（A-7 / K-4）
+  - 旧: **`validate` コマンド**（K-16）。`docs/agent-contract.md` §4 の検証列を実装し、`finish` に渡す `Outcome` を組み立てる。`--execution-file` から `api_error` を判定（A-31）、planner の規模判定から `oversize`、`acceptance.json` のスキーマと `evidence` の非空、差分の存在、`.github/workflows/**` の変更検出（A-7 / K-4）
 - [x] I-9c: **中央の既定プロンプト 5 本**（2026-09-05）。`prompts/{planner,plan-reviewer,developer,dev-reviewer,completion}.md`。各プロンプトは 役割 / 読むもの / 手順 / 出力（形式つき）/ 禁止 / 検証 の順で、末尾の「検証」節は契約 §4 の検証列をそのまま書いて「何をすると `blocked` になるか」をエージェントに知らせる
   - `## 入力` と `## 出力` は `compose` が足すので、プロンプト側はパスを持たず「`## 入力` に列挙されたパスだけを読む」と書く
   - planner: 規模超過のときだけ `## 規模判定` に `上限超過` と書く。**上限以内のときはこの語を書かない**（`validate` はこの語の有無だけを見るので「上限超過ではない」のような否定形も不可）

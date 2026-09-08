@@ -56,7 +56,7 @@ const EVENTS: Input = { label: "実行の記録", find: eventPaths };
 
 // ------------------------------------------------------------------ 契約の表
 //
-// work/agent-contract.md §4 の「入力」列をそのまま写したもの。
+// docs/agent-contract.md §4 の「入力」列をそのまま写したもの。
 //
 // dev-reviewer の入力にある「差分」はファイルではないので列挙しない。
 // exec プロファイルに Bash があるので、役割プロンプト側で git から読ませる。

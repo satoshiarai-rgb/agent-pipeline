@@ -65,7 +65,7 @@ const ADVICE: Advice[] = [
     when: "invalid_artifacts",
     title: "成果物が契約を満たしていません",
     body: (dir) =>
-      `理由は上の \`blocked_reason\` に出ています（\`work/agent-contract.md\` §4 の検証列に対応します）。
+      `理由は上の \`blocked_reason\` に出ています（\`docs/agent-contract.md\` §4 の検証列に対応します）。
 
 1. 足りない成果物を確かめる（\`${dir}/\` の中身）
 2. プロンプトや設定に原因があれば直す

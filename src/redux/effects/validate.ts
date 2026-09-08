@@ -17,7 +17,7 @@ import type { AgentName, RunResult, Verdict } from "../../types.ts";
 
 /**
  * 「1 回の実行の検証結果」。成果物（`plan.md` / `acceptance.json` / `reviews/*.md` /
- * 実行ログ / 差分）を契約（`work/agent-contract.md` §4）に照らした結果で、
+ * 実行ログ / 差分）を契約（`docs/agent-contract.md` §4）に照らした結果で、
  * `finish` がこれを action に写す（`redux/mapValidationToAction.ts`）。
  */
 export interface ValidationReport {
@@ -99,7 +99,7 @@ const noWorkflowChanges: Check = ({ changed }) => {
 
 // ------------------------------------------------------------------ 契約の表
 //
-// work/agent-contract.md §4 をそのまま写したもの。
+// docs/agent-contract.md §4 をそのまま写したもの。
 
 interface Contract {
   /** 満たさなければ invalid。上から順に見て最初の違反を理由にする */
@@ -142,7 +142,7 @@ const CONTRACT: Record<AgentName, Contract> = {
 // -------------------------------------------------------------------- 入り口
 
 /**
- * 契約（work/agent-contract.md §4）を強制し、finish に渡す検証結果を組み立てる。
+ * 契約（docs/agent-contract.md §4）を強制し、finish に渡す検証結果を組み立てる。
  * プロンプトは配布先で差し替えられる（K-15）ので、成果物の形を見るのはここだけ（K-16）。
  *
  * 見る順序:

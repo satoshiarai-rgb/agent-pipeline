@@ -160,7 +160,7 @@ jobs:
           attempt: ${{ github.run_attempt }}
 
       # ---- ダミー実行（dry run）。トークンを使わずに配線だけを確認する（設計書 §9-9）
-      # 成果物は契約（work/agent-contract.md §4）を満たす形で書く。dry run でも validate を通す
+      # 成果物は契約（docs/agent-contract.md §4）を満たす形で書く。dry run でも validate を通す
       - id: dummy
         if: needs.route.outputs.action == 'run' && inputs.dry_run
         env:

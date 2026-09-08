@@ -18,6 +18,8 @@
 | 完了報告の宛先・書式を変える | `.agent/prompts/completion.md` |
 | レビューの往復回数・モデル・エージェントの上限・ツール・承認できる人を変える | `.agent/config.json`（→ [installation.md 手順 4](installation.md)） |
 
+プロンプトを差し替えるなら、**先に [agent-contract.md](agent-contract.md) を読んでください** — 中央が渡すもの（入力）と、満たさないと `blocked` になるもの（出力）が書いてあります。
+
 ## 手順
 
 1. [agent-pipeline 本体の `prompts/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/prompts)
