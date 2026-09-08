@@ -15,7 +15,7 @@
   （配布先はルートの `action.yml` から `uses:` で呼ぶ）
 - 層: `commands/`（サブコマンドの実装）/ `file/`（1 ファイル形式 = 1 モジュール、読み書きをまとめる）/
   `utils/`（純関数）/ `transitions.ts`（遷移表を引く）/ `defaults.ts`（既定値）/ `types.ts`
-- 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `approve.yml` / `comment.yml`
+- 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `comment.yml`（`approve.yml` は `comment.yml` に畳んで削除済み）
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
 - 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `validate` が担う
 - 文書: **利用者向けは `docs/`**（overview / installation / customize-prompt / troubleshooting）、
@@ -173,7 +173,10 @@
     - **消えたもの**: CLI の `validate` コマンド、上記 5 引数、`action.yml` の outputs 3 つ（`verdict` / `acceptance_passed` / `api_error_status`）、`dispatch.yml` の step 1 つ、イベントログの二重畳み込み。`oversize` は `finish` の出力になった
     - **テストは fixture が成果物を作る形に変えた**（`src/__tests__/runDirFixture.ts` の `ARTIFACTS` = 契約 §4 の裏返し）。41 箇所の `runOnce` 呼び出しは無変更。契約の詳細に依存するテストコードはこの 1 箇所だけ
     - 副作用 2 つ: (1) `missing_verdict` は CLI から到達しなくなった（`validate` が frontmatter の欠落で先に弾く）ので `src/redux/__tests__/mapValidationToAction.test.ts` で直接見る。(2) レビュアーの成果物が実ファイルになったため、人間の差し戻しのレビュー番号が 1 つ後ろにずれた（本番と同じ挙動）
-    - **未検証**: 実機（`compass-wiki`）での dry-run 一巡。**I-13（タグ v1）の前に通す**
+    - **実機で確認（2026-09-08。`compass-wiki` issue #15 / PR #16、dry run）**: `bootstrap` → planner → plan-reviewer → `/agent approve` → developer → dev-reviewer → completion → **`done`**（PR は ready for review、ラベルは `agent:done`）。イベントは 12 件で、`--result` を渡さずに `finish` が契約を検査して遷移することを確認した。`done` の push は `[skip ci]` が付き連鎖が止まることも確認
+    - **この dry run で実機バグ 2 件が出た**（どちらも修正・push 済み）:
+      1. **配布先のラッパーが無効化されていた。** 削除した `approve.yml` を検証用の `check-dispatch.yml` がまだ参照していて、**ワークフローファイル自体が invalid**（どのイベントでも 0 秒で失敗）。承認は `/agent approve` のコメント経路だけなので `approve-manual` ジョブを削除した。**`install/agent.yml`（配布の正）には参照が無いので配布先は無事**
+      2. **`bootstrap` に `--issue` が届いていなかった。** `bootstrap.yml` は `with: issue:` を渡していたが `action.yml` に入力の宣言が無く、**composite action は未宣言の `with:` を黙って捨てる**ため `--issue が必要です` で exit 2。入力（`issue` / `branch`）を宣言し `run-cli.sh` から転送した。あわせて `scripts/__tests__/workflows.test.ts` に **drift を捕まえるテスト 2 件**（`with:` のキーが `action.yml` にあるか / 宣言した入力が `run-cli.sh` を通るか）を足した — 段取り 2 で heredoc を CLI に置き換えたときの取りこぼしで、テストが無ければ次も同じ形で漏れる
   - [ ] 6: **A-32 を「不要になった」として閉じ、`stale.yml`（I-8 / A-14）を `in_flight` の判定に寄せる**（開始イベントに対応する終了イベントが無い状態）
 - [ ] A-54: **文書の食い違いを直す（2026-09-08 の精査。実装が正しく文書が古い）。** (1) **`CLAUDE.md` に消えたファイル名が 5 種**: `state.yml` → `state.json`、`run.yml` → `dispatch.yml`（書く主体の一覧に `comment.yml` を足す。`approve.yml` は削除済み）、`scripts/labels.py` → `scripts/project-labels.sh`、`acceptance.yml` → `acceptance.json`、`log.md`（未実装なので言及を落とす）。同じ文書の別行では正しい名前を使っており、次のセッションを誤らせるので優先度は高い (2) `docs/customize-prompt.md` と `docs/troubleshooting.md` の「**どのプロンプトで動かしたかが `runs/*.json` に残る**」— 実行レコードにそのフィールドは無い（`role_prompt` は `compose` の戻り値で記録していない）。記録したいなら実装側を直す判断 (3) `install/` の「原本 → 置き場所」の表が 3 箇所（`install.sh` が実物、`install/README.md` と `docs/installation.md` が写し）。README 自身が「対応表はここ」と宣言しているので docs 側を参照 1 行に (4) `docs/installation.md` の `id-token: write` が「使っている」と読める（WIF に切り替えるまで未使用）(5) `action.yml` のコマンド一覧が同一ファイル内で二重（`name` の description と `command` の description）。`run-id` / `attempt` の説明と `# validate` の見出しは A-53 段取り 7 で直した
 - [ ] A-55: **判断が要る 3 件（2026-09-08 の精査で挙がったが、方針を決めないと直せないもの）。** (1) **到達しない分岐を消すか**: `middlewares/reviewFile.ts` の `kind = "dev"`（ガードが `awaiting_human` 以外を弾くので届かない）と `store/selectors.ts` の `no_transition_for_phase`（非 idle の 5 フェーズは全部エージェントを持つ）。消すと「将来 dev_review でも人間が差し戻せるようにする」余地が明示的に消える (2) **公開 IF の barrel を 2 段から 1 段にするか**: 外から使われているのは `defaults` と `validateRun` の 2 つだけ（`scripts/__tests__/workflows.test.ts`）。`redux/index.ts` を消して `src/index.ts` を 2 つに絞る案 (3) **`install/config.json` の `labels.trigger`**: 上書きしても起動ラベルは `install/agent.yml` の `if: 'agent:go'` 直書きなので黙って効かない。キーを外すか、`docs/installation.md` 手順 4 に明記するか
