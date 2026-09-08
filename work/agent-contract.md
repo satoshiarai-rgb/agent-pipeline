@@ -253,7 +253,8 @@ refresh token に揃えて 24h にした。
 `src/commands/compose.ts` の表（契約 §4 の「入力」列の写し）が持つ。
 
 ```
-compose --dir <run dir> --agent <name> --central <中央のパス> --out <書き出し先> [--repo <配布先>]
+compose --dir <run dir> --central <中央のパス> --out <書き出し先> --run-id <id> --attempt <n> [--repo <配布先>]
+  # 組み立てる相手（agent）は引数ではなく、start が記録した in_flight から取る
   → { prompt_path, role_prompt, inputs, review_path }
 ```
 

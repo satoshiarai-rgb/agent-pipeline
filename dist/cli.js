@@ -139,13 +139,76 @@ function readConfig(repo) {
 // src/redux/runCommand.ts
 import { readFileSync as readFileSync10 } from "node:fs";
 
-// src/commands/compose.ts
+// src/file/stateFile.ts
+import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
+import { join as join2 } from "node:path";
+
+// src/utils/parseJson.ts
+function parseJson(text, source = "JSON") {
+  try {
+    return JSON.parse(text);
+  } catch (e) {
+    throw new Error(`${source} の解析に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
+  }
+}
+
+// src/utils/pick.ts
+function pick(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (source[key] !== undefined)
+      out[key] = source[key];
+  }
+  return out;
+}
+
+// src/utils/stringifyJson.ts
+function stringifyJson(value) {
+  return `${JSON.stringify(value, null, 2)}
+`;
+}
+
+// src/file/stateFile.ts
+var STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at"
+];
+function renderStateFile(snapshot, now) {
+  const shape = {
+    ...snapshot,
+    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
+  };
+  const ordered = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
+}
+function stateFilePath(dir) {
+  return join2(dir, "state.json");
+}
+function writeStateFile(dir, snapshot, now) {
+  writeFileSync(stateFilePath(dir), renderStateFile(snapshot, now));
+}
+
+// src/utils/timestamp.ts
+var formatTimestamp = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+function parseTimestamp(timestamp) {
+  const parts = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(timestamp);
+  if (!parts)
+    return null;
+  const [, year, month, day, hour, minute, second] = parts;
+  return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+}
+
+// src/redux/effects/compose.ts
 import { existsSync as existsSync6 } from "node:fs";
-import { join as join6 } from "node:path";
+import { join as join7 } from "node:path";
 
 // src/file/decisionRecords.ts
-import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync2 } from "node:fs";
-import { basename, join as join2 } from "node:path";
+import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync3 } from "node:fs";
+import { basename, join as join3 } from "node:path";
 
 // src/utils/frontmatter.ts
 var BLOCK = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/;
@@ -168,19 +231,19 @@ var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 var REVERSIBILITY = ["easy", "hard"];
 var TYPES = ["requirements", "design", "harness", "friction"];
 function decisionRecordsDir(dir) {
-  return join2(dir, DIR);
+  return join3(dir, DIR);
 }
 function decisionRecordPath(dir, run, slug) {
-  return join2(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
+  return join3(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
 }
 function decisionRecordPaths(dir) {
   const base = decisionRecordsDir(dir);
   if (!existsSync2(base))
     return [];
-  return readdirSync(base).sort(byExecution).map((name) => join2(base, name));
+  return readdirSync(base).sort(byExecution).map((name) => join3(base, name));
 }
 function decisionRecordProblems(dir) {
-  return decisionRecordPaths(dir).flatMap((path) => fileProblems(basename(path), readFileSync2(path, "utf8")));
+  return decisionRecordPaths(dir).flatMap((path) => fileProblems(basename(path), readFileSync3(path, "utf8")));
 }
 var CONTENT = [
   ({ fields }) => TYPES.includes(fields.type) ? null : `type は ${TYPES.join(" | ")}`,
@@ -204,26 +267,9 @@ function byExecution(a, b) {
 var execution = (name) => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);
 
 // src/file/eventLog.ts
-import { existsSync as existsSync3, mkdirSync, readdirSync as readdirSync2, readFileSync as readFileSync3, writeFileSync } from "node:fs";
-import { join as join3 } from "node:path";
-
-// src/utils/parseJson.ts
-function parseJson(text, source = "JSON") {
-  try {
-    return JSON.parse(text);
-  } catch (e) {
-    throw new Error(`${source} の解析に失敗しました: ${e instanceof Error ? e.message : String(e)}`);
-  }
-}
-
-// src/utils/stringifyJson.ts
-function stringifyJson(value) {
-  return `${JSON.stringify(value, null, 2)}
-`;
-}
-
-// src/file/eventLog.ts
-var eventsDir = (dir) => join3(dir, "events");
+import { existsSync as existsSync3, mkdirSync, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
+import { join as join4 } from "node:path";
+var eventsDir = (dir) => join4(dir, "events");
 function suffixOf(type) {
   const last = type.split("/").at(-1) ?? type;
   return last.toLowerCase();
@@ -236,23 +282,23 @@ function eventFileName(action, invocation, sequence) {
   return `${seq}-${timestamp}-${invocation.run_id ?? "0"}-${invocation.attempt}-${suffixOf(action.type)}.json`;
 }
 function appendEvent(dir, action, invocation) {
-  const path = join3(eventsDir(dir), eventFileName(action, invocation, eventPaths(dir).length + 1));
+  const path = join4(eventsDir(dir), eventFileName(action, invocation, eventPaths(dir).length + 1));
   mkdirSync(eventsDir(dir), { recursive: true });
   const event = { type: action.type, payload: action.payload };
   if (action.error)
     event.error = true;
-  writeFileSync(path, stringifyJson(event));
+  writeFileSync2(path, stringifyJson(event));
   return path;
 }
 function eventPaths(dir) {
   const base = eventsDir(dir);
   if (!existsSync3(base))
     return [];
-  return readdirSync2(base).filter((name) => name.endsWith(".json")).sort().map((name) => join3(base, name));
+  return readdirSync2(base).filter((name) => name.endsWith(".json")).sort().map((name) => join4(base, name));
 }
 function readEvents(dir) {
   return eventPaths(dir).map((path) => {
-    const event = parseJson(readFileSync3(path, "utf8"), "イベント");
+    const event = parseJson(readFileSync4(path, "utf8"), "イベント");
     if (typeof event?.type !== "string")
       throw new Error(`イベントに type がありません: ${path}`);
     return { type: event.type, payload: event.payload, error: event.error };
@@ -260,12 +306,12 @@ function readEvents(dir) {
 }
 
 // src/file/promptFile.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
-import { dirname, join as join4 } from "node:path";
+import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { dirname, join as join5 } from "node:path";
 function promptCandidates(agent, roots) {
   return [
-    join4(roots.repo, ".agent", "prompts", `${agent}.md`),
-    join4(roots.central, "prompts", `${agent}.md`)
+    join5(roots.repo, ".agent", "prompts", `${agent}.md`),
+    join5(roots.central, "prompts", `${agent}.md`)
   ];
 }
 function readPrompt(agent, roots) {
@@ -274,25 +320,25 @@ function readPrompt(agent, roots) {
   if (!path) {
     throw new Error(`${agent} のプロンプトがありません（探した順: ${candidates.join(" → ")}）`);
   }
-  return { path, text: readFileSync4(path, "utf8").trim() };
+  return { path, text: readFileSync5(path, "utf8").trim() };
 }
 function readConventions(repo) {
-  const path = join4(repo, ".agent", "conventions.md");
+  const path = join5(repo, ".agent", "conventions.md");
   if (!existsSync4(path))
     return null;
-  const text = readFileSync4(path, "utf8").trim();
+  const text = readFileSync5(path, "utf8").trim();
   return text === "" ? null : { path, text };
 }
 function writeComposedPrompt(path, text) {
   mkdirSync2(dirname(path), { recursive: true });
-  writeFileSync2(path, `${text.trimEnd()}
+  writeFileSync3(path, `${text.trimEnd()}
 `);
   return path;
 }
 
 // src/file/reviewFile.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
-import { join as join5 } from "node:path";
+import { existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { join as join6 } from "node:path";
 function renderReview(input) {
   const { verdict, round, reviewer, body } = input;
   return `---
@@ -305,41 +351,41 @@ ${body.trim()}
 `;
 }
 function nextReviewNumber(dir, kind) {
-  const reviews = join5(dir, "reviews");
+  const reviews = join6(dir, "reviews");
   if (!existsSync5(reviews))
     return 1;
   return readdirSync3(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).length + 1;
 }
 function reviewPath(dir, kind, round) {
-  return join5(dir, "reviews", `${kind}-${String(round).padStart(2, "0")}.md`);
+  return join6(dir, "reviews", `${kind}-${String(round).padStart(2, "0")}.md`);
 }
 function saveReview(input) {
   const { dir, kind, verdict, reviewer, body } = input;
   const round = nextReviewNumber(dir, kind);
   const path = reviewPath(dir, kind, round);
-  mkdirSync3(join5(dir, "reviews"), { recursive: true });
-  writeFileSync3(path, renderReview({ verdict, round, reviewer, body }));
+  mkdirSync3(join6(dir, "reviews"), { recursive: true });
+  writeFileSync4(path, renderReview({ verdict, round, reviewer, body }));
   return path;
 }
 function reviewPaths(dir, kind) {
-  const reviews = join5(dir, "reviews");
+  const reviews = join6(dir, "reviews");
   if (!existsSync5(reviews))
     return [];
   const prefix = kind ? `${kind}-` : "";
-  return readdirSync3(reviews).filter((n) => n.startsWith(prefix) && n.endsWith(".md")).sort().map((n) => join5(reviews, n));
+  return readdirSync3(reviews).filter((n) => n.startsWith(prefix) && n.endsWith(".md")).sort().map((n) => join6(reviews, n));
 }
 function latestReviewPath(dir, kind) {
   return reviewPaths(dir, kind).at(-1) ?? null;
 }
 function readVerdict(path) {
-  const value = parseFrontmatter(readFileSync5(path, "utf8"))?.fields.verdict;
+  const value = parseFrontmatter(readFileSync6(path, "utf8"))?.fields.verdict;
   return value === "approve" || value === "request_changes" ? value : null;
 }
 
-// src/commands/compose.ts
+// src/redux/effects/compose.ts
 var file = (label, rel) => ({
   label,
-  find: (dir) => existsSync6(join6(dir, rel)) ? [join6(dir, rel)] : []
+  find: (dir) => existsSync6(join7(dir, rel)) ? [join7(dir, rel)] : []
 });
 var latest = (label, kind) => ({
   label,
@@ -405,54 +451,6 @@ function composeRun(input) {
     inputs,
     review_path: review
   };
-}
-
-// src/file/stateFile.ts
-import { readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join7 } from "node:path";
-
-// src/utils/pick.ts
-function pick(source, keys) {
-  const out = {};
-  for (const key of keys) {
-    if (source[key] !== undefined)
-      out[key] = source[key];
-  }
-  return out;
-}
-
-// src/file/stateFile.ts
-var STATE_KEYS = [
-  "pipeline_version",
-  "issue",
-  "branch",
-  "phase",
-  "blocked_reason",
-  "updated_at"
-];
-function renderStateFile(snapshot, now) {
-  const shape = {
-    ...snapshot,
-    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
-  };
-  const ordered = pick(shape, STATE_KEYS);
-  return stringifyJson(ordered);
-}
-function stateFilePath(dir) {
-  return join7(dir, "state.json");
-}
-function writeStateFile(dir, snapshot, now) {
-  writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
-}
-
-// src/utils/timestamp.ts
-var formatTimestamp = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-function parseTimestamp(timestamp) {
-  const parts = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(timestamp);
-  if (!parts)
-    return null;
-  const [, year, month, day, hour, minute, second] = parts;
-  return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
 }
 
 // src/file/acceptanceFile.ts
@@ -848,7 +846,7 @@ function selectNextAction(root, config, config_error = null) {
   return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
 }
 
-// src/redux/explain.ts
+// src/redux/effects/explain.ts
 function pendingCriteria(dir) {
   if (!hasAcceptance(dir))
     return "";
@@ -970,6 +968,115 @@ blocked_reason: ${reason}
 
 ${advice.body(dir)}`
   };
+}
+
+// src/redux/effects/validate.ts
+import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
+import { join as join9 } from "node:path";
+
+// src/file/executionLog.ts
+import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
+function readResultEvent(path) {
+  if (!existsSync8(path))
+    return null;
+  const parsed = parseJson(readFileSync8(path, "utf8"), "execution_file");
+  const events = Array.isArray(parsed) ? parsed : [parsed];
+  const results = events.filter((e) => e?.type === "result");
+  return results.at(-1) ?? null;
+}
+function completedCleanly(path) {
+  if (!path)
+    return false;
+  const result = readResultEvent(path);
+  if (!result)
+    return false;
+  return result.subtype === "success" && result.is_error !== true;
+}
+function readApiErrorStatus(path) {
+  if (!path)
+    return null;
+  const result = readResultEvent(path);
+  if (!result)
+    return null;
+  const isApiError = result.terminal_reason === "api_error" || Boolean(result.api_error_status);
+  return isApiError ? result.api_error_status ?? 0 : null;
+}
+
+// src/redux/effects/validate.ts
+var nonEmpty = (rel) => ({ dir }) => {
+  const path = join9(dir, rel);
+  return existsSync9(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+};
+var contains = (rel, needle) => ({ dir }) => readFileSync9(join9(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var acceptanceSchema = ({ dir }) => {
+  if (!hasAcceptance(dir))
+    return "acceptance.json が無い";
+  try {
+    const problems = acceptanceProblems(readAcceptance(dir));
+    return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+};
+var reviewWithVerdict = (kind) => ({ dir }) => {
+  const path = latestReviewPath(dir, kind);
+  if (!path)
+    return `reviews/${kind}-NN.md が無い`;
+  return readVerdict(path) ? null : `${path} の frontmatter に verdict が無い`;
+};
+var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
+var decisionRecords = ({ dir }) => {
+  const problems = decisionRecordProblems(dir);
+  return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
+};
+var noWorkflowChanges = ({ changed }) => {
+  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
+  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
+};
+var CONTRACT2 = {
+  planner: {
+    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
+    postProcess: ({ dir }) => {
+      const text = readFileSync9(join9(dir, "plan.md"), "utf8");
+      const scale = text.slice(text.indexOf("## 規模判定"));
+      return scale.includes("上限超過") ? { oversize: true } : {};
+    }
+  },
+  "plan-reviewer": {
+    checks: [reviewWithVerdict("plan")],
+    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
+  },
+  developer: {
+    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords]
+  },
+  "dev-reviewer": {
+    checks: [reviewWithVerdict("dev")],
+    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
+  },
+  completion: {
+    checks: [nonEmpty("completion.md"), acceptanceSchema],
+    postProcess: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
+  }
+};
+function validateRun(input) {
+  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
+  const apiError = readApiErrorStatus(execution_file);
+  if (apiError !== null)
+    return { result: "api_error", api_error_status: apiError };
+  if (agent_failed && !completedCleanly(execution_file))
+    return { result: "agent_failed" };
+  const artifacts = { dir, changed: changed_files };
+  const contract = CONTRACT2[agent];
+  for (const check of contract.checks) {
+    const detail = check(artifacts);
+    if (detail)
+      return { result: "invalid", detail };
+  }
+  return { result: "ok", ...contract.postProcess?.(artifacts) };
+}
+function readLatestVerdict(dir, kind) {
+  const path = latestReviewPath(dir, kind);
+  return path ? readVerdict(path) : null;
 }
 
 // src/redux/mapValidationToAction.ts
@@ -1522,115 +1629,6 @@ function createStore2(input) {
   return { store, outputs, state: () => store.getState() };
 }
 
-// src/redux/validate.ts
-import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
-import { join as join9 } from "node:path";
-
-// src/file/executionLog.ts
-import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
-function readResultEvent(path) {
-  if (!existsSync8(path))
-    return null;
-  const parsed = parseJson(readFileSync8(path, "utf8"), "execution_file");
-  const events = Array.isArray(parsed) ? parsed : [parsed];
-  const results = events.filter((e) => e?.type === "result");
-  return results.at(-1) ?? null;
-}
-function completedCleanly(path) {
-  if (!path)
-    return false;
-  const result = readResultEvent(path);
-  if (!result)
-    return false;
-  return result.subtype === "success" && result.is_error !== true;
-}
-function readApiErrorStatus(path) {
-  if (!path)
-    return null;
-  const result = readResultEvent(path);
-  if (!result)
-    return null;
-  const isApiError = result.terminal_reason === "api_error" || Boolean(result.api_error_status);
-  return isApiError ? result.api_error_status ?? 0 : null;
-}
-
-// src/redux/validate.ts
-var nonEmpty = (rel) => ({ dir }) => {
-  const path = join9(dir, rel);
-  return existsSync9(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
-};
-var contains = (rel, needle) => ({ dir }) => readFileSync9(join9(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
-var acceptanceSchema = ({ dir }) => {
-  if (!hasAcceptance(dir))
-    return "acceptance.json が無い";
-  try {
-    const problems = acceptanceProblems(readAcceptance(dir));
-    return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
-  } catch (e) {
-    return e instanceof Error ? e.message : String(e);
-  }
-};
-var reviewWithVerdict = (kind) => ({ dir }) => {
-  const path = latestReviewPath(dir, kind);
-  if (!path)
-    return `reviews/${kind}-NN.md が無い`;
-  return readVerdict(path) ? null : `${path} の frontmatter に verdict が無い`;
-};
-var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
-var decisionRecords = ({ dir }) => {
-  const problems = decisionRecordProblems(dir);
-  return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
-};
-var noWorkflowChanges = ({ changed }) => {
-  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
-  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
-};
-var CONTRACT2 = {
-  planner: {
-    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
-    postProcess: ({ dir }) => {
-      const text = readFileSync9(join9(dir, "plan.md"), "utf8");
-      const scale = text.slice(text.indexOf("## 規模判定"));
-      return scale.includes("上限超過") ? { oversize: true } : {};
-    }
-  },
-  "plan-reviewer": {
-    checks: [reviewWithVerdict("plan")],
-    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
-  },
-  developer: {
-    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords]
-  },
-  "dev-reviewer": {
-    checks: [reviewWithVerdict("dev")],
-    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
-  },
-  completion: {
-    checks: [nonEmpty("completion.md"), acceptanceSchema],
-    postProcess: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
-  }
-};
-function validateRun(input) {
-  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
-  const apiError = readApiErrorStatus(execution_file);
-  if (apiError !== null)
-    return { result: "api_error", api_error_status: apiError };
-  if (agent_failed && !completedCleanly(execution_file))
-    return { result: "agent_failed" };
-  const artifacts = { dir, changed: changed_files };
-  const contract = CONTRACT2[agent];
-  for (const check of contract.checks) {
-    const detail = check(artifacts);
-    if (detail)
-      return { result: "invalid", detail };
-  }
-  return { result: "ok", ...contract.postProcess?.(artifacts) };
-}
-function readLatestVerdict(dir, kind) {
-  const path = latestReviewPath(dir, kind);
-  return path ? readVerdict(path) : null;
-}
-
 // src/redux/runCommand.ts
 var CLI_OPTIONS = {
   dir: { type: "string" },
@@ -1665,17 +1663,6 @@ var need = (v, name) => {
 };
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
 function runCommand(command, args, config, configError = null) {
-  if (command === "compose")
-    return composeRun({
-      dir: need(args.dir, "dir"),
-      config,
-      agent: need(args.agent, "agent"),
-      repo: args.repo ?? ".",
-      central: need(args.central, "central"),
-      out: need(args.out, "out"),
-      run_id: need(args["run-id"], "run-id"),
-      attempt: Number(args.attempt ?? 1)
-    });
   const dir = need(args.dir, "dir");
   const now = formatTimestamp(new Date);
   const { store, outputs, state } = createStore2({
@@ -1684,6 +1671,21 @@ function runCommand(command, args, config, configError = null) {
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1)
   });
+  if (command === "compose") {
+    const agent = selectInFlightAgent(state());
+    if (!agent)
+      throw new Error("実行が記録されていません（start が無い）");
+    return composeRun({
+      dir,
+      config,
+      agent,
+      repo: args.repo ?? ".",
+      central: need(args.central, "central"),
+      out: need(args.out, "out"),
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1)
+    });
+  }
   if (command === "route")
     return selectNextAction(state(), config, configError);
   if (command === "label")

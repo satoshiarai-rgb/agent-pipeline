@@ -1,10 +1,10 @@
 import { readFileSync } from "node:fs";
-import { composeRun } from "../commands/compose.ts";
 
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
 import type { AgentName } from "../types.ts";
 import { formatTimestamp } from "../utils/timestamp.ts";
+import { composeRun } from "./effects/compose.ts";
 import { explainRun } from "./effects/explain.ts";
 import { type ValidationReport, validateRun } from "./effects/validate.ts";
 import { mapValidationToAction } from "./mapValidationToAction.ts";
@@ -78,7 +78,7 @@ const isRejection = (r: unknown): r is { ok: false; reason: string } =>
  * コマンドを 1 つ実行する。**1 起動で dispatch する action は 1 つだけ**。
  * 知らないコマンドなら undefined を返す（CLI が使い方を出す）。
  *
- * 上から「store を使わない 1 つ」「読むだけの 3 つ」「スナップショットを書き直す 1 つ」
+ * 上から「プロンプトの組み立て」「読むだけの 3 つ」「スナップショットを書き直す 1 つ」
  * 「状態を変える 6 つ」の順。語彙を足すときに書くのは分岐 1 つ。
  */
 export function runCommand(
@@ -87,20 +87,6 @@ export function runCommand(
   config: Config,
   configError: string | null = null,
 ): unknown {
-  // store を使わない 1 つ。プロンプトを組み立てるだけ
-  if (command === "compose")
-    return composeRun({
-      dir: need(args.dir, "dir"),
-      config,
-      agent: need(args.agent, "agent") as AgentName,
-      repo: args.repo ?? ".",
-      central: need(args.central, "central"),
-      out: need(args.out, "out"),
-      // 決定記録の名前の prefix になる（契約 §5）
-      run_id: need(args["run-id"], "run-id"),
-      attempt: Number(args.attempt ?? 1),
-    });
-
   const dir = need(args.dir, "dir");
   // action に載る「いつ」。1 起動で dispatch する action は 1 つなので 1 回作れば足りる
   const now = formatTimestamp(new Date());
@@ -110,6 +96,24 @@ export function runCommand(
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
+
+  // エージェントに渡すプロンプトを組み立てる。**組み立てる相手も引数で受け取らない**
+  // — `start` が記録した in_flight から取る（agent という値の入口は start だけ）
+  if (command === "compose") {
+    const agent = selectInFlightAgent(state());
+    if (!agent) throw new Error("実行が記録されていません（start が無い）");
+    return composeRun({
+      dir,
+      config,
+      agent,
+      repo: args.repo ?? ".",
+      central: need(args.central, "central"),
+      out: need(args.out, "out"),
+      // 決定記録の名前の prefix になる（契約 §5）
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
+    });
+  }
 
   // 読むだけの 3 つ。selector を読み、何も書かない
   if (command === "route") return selectNextAction(state(), config, configError);

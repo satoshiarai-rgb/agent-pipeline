@@ -2,9 +2,9 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { config } from "../../__tests__/helpers.ts";
-import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
-import type { AgentName } from "../../types.ts";
+import { config } from "../../../__tests__/helpers.ts";
+import { cleanupRuns, makeRun } from "../../../__tests__/runDirFixture.ts";
+import type { AgentName } from "../../../types.ts";
 import { composeRun } from "../compose.ts";
 
 const c = config();
@@ -234,7 +234,7 @@ describe("使ったプロンプトを返す", () => {
 
   test("中央の既定プロンプトが 5 本揃っている（I-9c）", () => {
     // 実物の prompts/ を central として引く。1 本欠けると実機でそのフェーズが動かない
-    const central = join(import.meta.dir, "../../..");
+    const central = join(import.meta.dir, "../../../..");
     for (const agent of AGENTS) {
       const out = join(mkdtempSync(join(tmpdir(), "out-")), "agent-prompt.md");
       extra.push(dirname(out));

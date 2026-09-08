@@ -154,7 +154,7 @@ jobs:
         with:
           command: compose
           dir: ${{ needs.route.outputs.dir }}
-          agent: ${{ needs.route.outputs.agent }}
+          # agent は渡さない。組み立てる相手は start が記録した in_flight から取る
           # 決定記録の名前の prefix（<run_id>-<attempt>）になる。契約 §5
           run-id: ${{ github.run_id }}
           attempt: ${{ github.run_attempt }}

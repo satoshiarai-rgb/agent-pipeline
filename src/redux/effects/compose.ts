@@ -1,20 +1,25 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { Config } from "../defaults.ts";
+import type { Config } from "../../defaults.ts";
 import {
   decisionRecordPath,
   decisionRecordPaths,
   type Execution,
-} from "../file/decisionRecords.ts";
-import { eventPaths } from "../file/eventLog.ts";
+} from "../../file/decisionRecords.ts";
+import { eventPaths } from "../../file/eventLog.ts";
 import {
   type PromptRoots,
   readConventions,
   readPrompt,
   writeComposedPrompt,
-} from "../file/promptFile.ts";
-import { latestReviewPath, nextReviewNumber, reviewPath, reviewPaths } from "../file/reviewFile.ts";
-import type { AgentName } from "../types.ts";
+} from "../../file/promptFile.ts";
+import {
+  latestReviewPath,
+  nextReviewNumber,
+  reviewPath,
+  reviewPaths,
+} from "../../file/reviewFile.ts";
+import type { AgentName } from "../../types.ts";
 
 // ---------------------------------------------------------------- 入力の部品
 //

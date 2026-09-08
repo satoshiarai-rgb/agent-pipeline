@@ -3,10 +3,12 @@
  * `store/` 以下にあり、外から使うものだけをここに並べる。
  *
  * **store の値で実行を判断するものはこの層に置く。** うち **dispatch の外で走る I/O**
- * （`validate` は成果物を読み、`explain` は受け入れ条件を読む）は `effects/` にまとめる。
+ * （`validate` は成果物、`explain` は受け入れ条件、`compose` はプロンプトと成果物を読む）は `effects/` にまとめる。
  * dispatch の中で走るものは `store/middlewares/`（`hydrate` の読み取りも含む）。
  */
 
+export type { ComposeResult } from "./effects/compose.ts";
+export { composeRun } from "./effects/compose.ts";
 export { explainRun } from "./effects/explain.ts";
 export type { ValidationReport } from "./effects/validate.ts";
 export { validateRun } from "./effects/validate.ts";
