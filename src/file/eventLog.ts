@@ -7,6 +7,7 @@ import type { Action } from "../utils/typescriptFsa.ts";
 /**
  * `events/<連番>-<timestamp>-<run_id>-<attempt>-<type>.json` の形式。
  * **状態の正はこのログ**で、`state.json` はその畳み込みのスナップショットにすぎない（K-26）。
+ * base-action が書くセッションの記録（`executionLog.ts` の `execution_file`）とは別物。
  *
  * 名前の決め方には 3 つの理由がある。
  *

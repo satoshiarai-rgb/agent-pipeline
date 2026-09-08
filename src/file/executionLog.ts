@@ -2,8 +2,13 @@ import { existsSync, readFileSync } from "node:fs";
 import { parseJson } from "../utils/parseJson.ts";
 
 /**
- * base-action が書く実行ログ（execution_file）。
- * イベントの配列で、結末は最後の `type: "result"` イベントが持つ。
+ * base-action が書く実行ログ（execution_file）。**Claude Code のセッションの記録**で、
+ * 書くのは base-action、ハーネスは読むだけ。
+ *
+ * **`events/**` の状態イベント（`eventLog.ts`）とは別物** — あちらは状態の正で
+ * ハーネスが書き、こちらは 1 回の実行がどう終わったかを分類するためだけに読む。
+ *
+ * 中身はイベントの配列で、結末は最後の `type: "result"` イベントが持つ。
  * ハーネスが見るのは失敗の分類に必要な数フィールドだけ（A-31）。
  */
 export interface ResultEvent {

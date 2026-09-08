@@ -26,7 +26,7 @@ inputs:
   result: { description: "finish: ok | invalid | agent_failed | api_error（validate の出力を渡す）", required: false }
   # validate
   agent-failed: { description: "validate: エージェントの step が失敗したなら true", required: false }
-  execution-file: { description: "validate: base-action の実行ログ（api_error の判定 / A-31）", required: false }
+  execution-file: { description: "validate: base-action が書くセッションの記録（api_error の判定 / A-31）。ハーネスの events/ とは別物", required: false }
   changed-files: { description: "validate: 変更ファイルの一覧（1 行 1 ファイル）のパス", required: false }
   verdict: { description: "finish: approve | request_changes", required: false }
   api-error-status: { description: "finish: api_error のときの HTTP ステータス", required: false }
