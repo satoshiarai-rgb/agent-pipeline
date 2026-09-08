@@ -1,7 +1,7 @@
 import type { Config } from "../defaults.ts";
 import { hasAcceptance, readAcceptance } from "../file/acceptance-file.ts";
 import type { RootState } from "../redux/store/createStore.ts";
-import { selectBlocked } from "../redux/store/selectors.ts";
+import { selectStatus } from "../redux/store/selectors.ts";
 
 /**
  * 止まった理由と次の一手を markdown で返す（`blocked` になったとき PR に貼る）。
@@ -159,10 +159,10 @@ export function explainRun(
   config: Config,
   config_error: string | null = null,
 ): { markdown: string; reason: string } | null {
-  const blocked = selectBlocked(root, config, config_error);
-  if (!blocked.blocked || blocked.reason === null) return null;
+  const status = selectStatus(root, config, config_error);
+  if (status.blocked_reason === null) return null;
 
-  const reason = blocked.reason;
+  const reason = status.blocked_reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   const context: Context = { dir, reason };
 

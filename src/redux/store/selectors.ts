@@ -29,7 +29,7 @@ export const allLabels = (prefix: string, trigger: string): string[] => [
 /** いま issue に付いているべきラベル。どれを外すかはワークフローが prefix で決める */
 export function selectLabel(root: RootState, config: Config) {
   const { prefix, trigger } = config.labels;
-  const phase = selectPhase(root, config);
+  const { phase } = selectStatus(root, config);
   return {
     label: labelFor(phase, prefix),
     issue: root.info.issue ?? 0,
@@ -71,28 +71,27 @@ export function selectEnvStop(
   return null;
 }
 
-export function selectBlocked(
-  root: RootState,
-  config: Config,
-  config_error: string | null = null,
-): { blocked: boolean; reason: string | null } {
-  const { phase, failure_reason } = root.app;
-  if (failure_reason) return { blocked: true, reason: failure_reason };
-  const env = selectEnvStop(root, config, config_error);
-  if (env) return { blocked: true, reason: env };
-  // スナップショットが blocked のまま復元され、理由が残っていない場合
-  if (phase === "blocked") return { blocked: true, reason: "（理由が記録されていません）" };
-  return { blocked: false, reason: null };
+export interface Status {
+  /** 導出された phase。止まっていれば blocked、そうでなければ実行位置そのもの */
+  phase: Phase;
+  /** 止まっている理由。null なら止まっていない */
+  blocked_reason: string | null;
 }
 
-/** 導出された phase。止まっていれば blocked、そうでなければ実行位置そのもの */
-export function selectPhase(
+export function selectStatus(
   root: RootState,
   config: Config,
   config_error: string | null = null,
-): Phase {
-  if (selectBlocked(root, config, config_error).blocked) return "blocked";
-  return root.app.phase;
+): Status {
+  const { phase, failure_reason } = root.app;
+  if (failure_reason) return { phase: "blocked", blocked_reason: failure_reason };
+  const env = selectEnvStop(root, config, config_error);
+  if (env) return { phase: "blocked", blocked_reason: env };
+  // スナップショットが blocked のまま復元され、理由が残っていない場合
+  if (phase === "blocked") {
+    return { phase: "blocked", blocked_reason: "（理由が記録されていません）" };
+  }
+  return { phase, blocked_reason: null };
 }
 
 /**
@@ -101,7 +100,7 @@ export function selectPhase(
  * （人間のコメントを待つ間の push は route が none を返すだけの run を作る）
  */
 export const selectContinueChain = (root: RootState, config: Config): boolean =>
-  !isIdle(selectPhase(root, config));
+  !isIdle(selectStatus(root, config).phase);
 
 /** `state.json` に書き出す内容。状態の射影であって、状態の正ではない（K-26） */
 export const selectSnapshot = (
@@ -112,8 +111,7 @@ export const selectSnapshot = (
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
-  phase: selectPhase(root, config, config_error),
-  blocked_reason: selectBlocked(root, config, config_error).reason,
+  ...selectStatus(root, config, config_error),
 });
 
 export interface NextAction {
@@ -140,7 +138,7 @@ export function selectNextAction(
   config_error: string | null = null,
 ): NextAction {
   const { app } = root;
-  const phase = selectPhase(root, config, config_error);
+  const { phase } = selectStatus(root, config, config_error);
   const base = {
     phase,
     total_steps: app.total_steps,

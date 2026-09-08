@@ -53,7 +53,7 @@ describe("reducer: 遷移", () => {
     const dir = makeRun("plan_review");
     const f = runOnce(dir, "plan-reviewer", { result: "ok", verdict: "request_changes" });
     expect(f.phase).toBe("planning");
-    expect(f.reason).toContain(`1/${c.limits.plan_review_rounds}`);
+    expect(route(dir, c).rounds.plan_review).toBe(1);
   });
 
   test("ラウンド上限は今回の実行を含めて数え、上限回目の差し戻しで blocked", () => {

@@ -64,7 +64,6 @@ interface Transitioned {
   phase: Phase;
   blocked_reason: string | null;
   continue_chain: boolean;
-  reason: string;
 }
 type Human = { ok: true; phase: Phase; review_path?: string } | { ok: false; reason: string };
 

@@ -12,12 +12,11 @@ import type { RootState } from "./store/createStore.ts";
 import { createStore } from "./store/createStore.ts";
 import type { PipelineAction } from "./store/global/actions.ts";
 import {
-  selectBlocked,
   selectContinueChain,
   selectLabel,
   selectNextAction,
-  selectPhase,
   selectSnapshot,
+  selectStatus,
 } from "./store/selectors.ts";
 
 /**
@@ -31,29 +30,39 @@ import {
  * 中身が「action を作って dispatch する」だけになったので分ける意味が無くなった。
  */
 
-/** ワークフローから渡る引数（parseArgs の出力と同じ形） */
-export interface Args {
-  dir?: string;
-  agent?: string;
-  "run-id"?: string;
-  attempt?: string;
-  model?: string;
-  result?: string;
-  verdict?: string;
-  "api-error-status"?: string;
-  detail?: string;
-  oversize?: boolean;
-  "acceptance-passed"?: boolean;
-  "session-id"?: string;
-  association?: string;
-  "agent-failed"?: boolean;
-  "execution-file"?: string;
-  "changed-files"?: string;
-  body?: string;
-  repo?: string;
-  central?: string;
-  out?: string;
-}
+/**
+ * CLI の引数の定義。**`cli.ts` の `parseArgs` にそのまま渡し、`Args` の型もここから導く**
+ * （一覧を 2 箇所に書くと、フラグを足すときに片方だけ直る）。
+ */
+export const CLI_OPTIONS = {
+  dir: { type: "string" },
+  agent: { type: "string" },
+  "run-id": { type: "string" },
+  attempt: { type: "string", default: "1" },
+  model: { type: "string" },
+  result: { type: "string" },
+  verdict: { type: "string" },
+  "api-error-status": { type: "string" },
+  detail: { type: "string" },
+  oversize: { type: "boolean", default: false },
+  "acceptance-passed": { type: "boolean", default: false },
+  "session-id": { type: "string" },
+  association: { type: "string" },
+  "agent-failed": { type: "boolean", default: false },
+  "execution-file": { type: "string" },
+  "changed-files": { type: "string" },
+  body: { type: "string" },
+  repo: { type: "string" },
+  central: { type: "string" },
+  out: { type: "string" },
+} as const;
+
+/** ワークフローから渡る引数（`parseArgs` の出力と同じ形） */
+export type Args = {
+  [K in keyof typeof CLI_OPTIONS]?: (typeof CLI_OPTIONS)[K]["type"] extends "boolean"
+    ? boolean
+    : string;
+};
 
 /** 必須の引数が無いときに投げる。CLI が使い方を出して exit 2 にする */
 export class MissingArg extends Error {
@@ -94,10 +103,8 @@ const outcomeOf = (a: Args): Outcome => ({
 
 /** 遷移の結果を返すコマンドの出力（ワークフローが読む形） */
 const transitionOutput = (root: RootState, _outputs: unknown, config: Config) => ({
-  phase: selectPhase(root, config),
-  blocked_reason: selectBlocked(root, config).reason,
+  ...selectStatus(root, config),
   continue_chain: selectContinueChain(root, config),
-  reason: root.app.last_reason ?? "",
 });
 
 interface Command {
@@ -133,7 +140,7 @@ export const COMMANDS: Record<string, Command> = {
   },
   approve: {
     action: (a) => humanApproval(human(a)),
-    output: (root, _outputs, config) => ({ ok: true, phase: selectPhase(root, config) }),
+    output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase }),
   },
   "request-changes": {
     action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
@@ -145,11 +152,10 @@ export const COMMANDS: Record<string, Command> = {
   },
   retry: {
     action: (a) => retry(human(a)),
-    output: (root, _outputs, config) => ({
-      ok: true,
-      phase: selectPhase(root, config),
-      agent: agentFor(selectPhase(root, config)),
-    }),
+    output: (root, _outputs, config) => {
+      const { phase } = selectStatus(root, config);
+      return { ok: true, phase, agent: agentFor(phase) };
+    },
   },
   /**
    * 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**

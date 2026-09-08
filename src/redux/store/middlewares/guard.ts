@@ -3,7 +3,7 @@ import type { Action, AnyAction } from "../../../utils/typescript-fsa.ts";
 import type { AppPayload, Origin } from "../app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "../app/actions.ts";
 import type { RootState } from "../createStore.ts";
-import { selectBlocked } from "../selectors.ts";
+import { selectStatus } from "../selectors.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";
 
@@ -46,13 +46,13 @@ const awaitingHuman: Guard = ({ app }) => {
 
 /** 「止まっている」は導出された状態（`selectBlocked`）で判断する */
 const mustBeBlocked: Guard = (root, _action, config) => {
-  if (selectBlocked(root, config).blocked) return null;
+  if (selectStatus(root, config).blocked_reason) return null;
   return `not_blocked: phase=${root.app.phase}`;
 };
 
 /** 上限で止まったものはやり直しても同じ理由で止まる。issue を分けて立て直す方が正しい */
 const notLimitReached: Guard = (root, _action, config) => {
-  const reason = selectBlocked(root, config).reason;
+  const reason = selectStatus(root, config).blocked_reason;
   if (reason?.includes("_exceeded")) return `limit_reached: ${reason}`;
   return null;
 };

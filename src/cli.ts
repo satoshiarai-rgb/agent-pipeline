@@ -1,7 +1,7 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import { readConfig } from "./file/config-file.ts";
-import { type Args, MissingArg, runCommand } from "./redux/commands.ts";
+import { type Args, CLI_OPTIONS, MissingArg, runCommand } from "./redux/commands.ts";
 
 /**
  * ワークフローから store を叩くための薄い入口。**引数を解析して JSON を書くだけ。**
@@ -35,31 +35,7 @@ store を使わない:
 出力: 結果を JSON で標準出力に書く
 `;
 
-const { positionals, values } = parseArgs({
-  allowPositionals: true,
-  options: {
-    dir: { type: "string" },
-    agent: { type: "string" },
-    "run-id": { type: "string" },
-    attempt: { type: "string", default: "1" },
-    model: { type: "string" },
-    result: { type: "string" },
-    verdict: { type: "string" },
-    "api-error-status": { type: "string" },
-    detail: { type: "string" },
-    oversize: { type: "boolean", default: false },
-    "acceptance-passed": { type: "boolean", default: false },
-    "session-id": { type: "string" },
-    association: { type: "string" },
-    "agent-failed": { type: "boolean", default: false },
-    "execution-file": { type: "string" },
-    "changed-files": { type: "string" },
-    body: { type: "string" },
-    repo: { type: "string" },
-    central: { type: "string" },
-    out: { type: "string" },
-  },
-});
+const { positionals, values } = parseArgs({ allowPositionals: true, options: CLI_OPTIONS });
 
 const command = positionals[0] ?? "";
 const fail = (message: string): never => {

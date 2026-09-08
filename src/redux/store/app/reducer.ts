@@ -37,8 +37,6 @@ export interface AppState {
   /** 実行中のエージェント。終了系の action で null に戻る（二重起動の防止 / A-14） */
   in_flight_agent: AgentName | null;
   in_flight_run_id: string | null;
-  /** 直前の遷移の理由。ワークフローの output と Actions のサマリーに出す */
-  last_reason: string | null;
 }
 
 export const initialApp: AppState = {
@@ -49,32 +47,21 @@ export const initialApp: AppState = {
   dev_review_rounds: 0,
   in_flight_agent: null,
   in_flight_run_id: null,
-  last_reason: null,
 };
 
-// ------------------------------------------------------------ 停止の理由の文言
-//
-// **この文字列は `explain` の案内・`docs/troubleshooting.md` の表・プロンプトが
-// 依存している**（K-26 の受け入れ条件）。作る場所をここだけに閉じる。
-
-/** 遷移表に行き先が無い組み合わせ（設定やプロンプトの壊れを黙って通さない） */
-export const transitionIncomplete = (phase: Phase, event: string): string =>
-  `transition_incomplete: ${phase} (${event})`;
-
-/** レビューの往復が上限に達した */
-const roundsExceeded = (phase: "plan_review" | "dev_review", used: number, limit: number): string =>
-  `${phase}_rounds_exceeded: ${used}/${limit}`;
-
 /**
- * レビューの往復が上限に達していれば理由を返す。達していなければ null。
+ * レビューの往復が上限に達していれば停止の理由を返す。達していなければ null。
  * `used` は**今回の判定を含んだ数**（差し戻しの案内に出る `(n/limit)` と同じ数）。
+ *
+ * **この文字列は `explain` の案内・`docs/troubleshooting.md` の表・プロンプトが
+ * 依存している**（K-26 の受け入れ条件）。
  */
 function roundLimitReason(
   phase: "plan_review" | "dev_review",
   used: number,
   limit: number,
 ): string | null {
-  if (used >= limit) return roundsExceeded(phase, used, limit);
+  if (used >= limit) return `${phase}_rounds_exceeded: ${used}/${limit}`;
   return null;
 }
 
@@ -124,7 +111,6 @@ export const createAppReducer = (config: Config) =>
       total_steps: state.total_steps + 1,
       in_flight_agent: payload.agent,
       in_flight_run_id: payload.run_id,
-      last_reason: "started",
     }))
 
     // 実行そのものの失敗と契約違反。理由がそのまま停止の理由になる
@@ -132,7 +118,6 @@ export const createAppReducer = (config: Config) =>
       ...state,
       ...closed,
       failure_reason: payload.reason,
-      last_reason: payload.reason,
     }))
 
     // 計画ができた
@@ -141,7 +126,6 @@ export const createAppReducer = (config: Config) =>
       ...closed,
       phase: "plan_review",
       failure_reason: null,
-      last_reason: "ok",
     }))
 
     // 計画のレビュー。承認は人間に渡し、差し戻しは往復の上限を見る（設計書 §3.1）
@@ -154,7 +138,6 @@ export const createAppReducer = (config: Config) =>
           phase: "awaiting_human",
           plan_review_rounds: rounds,
           failure_reason: null,
-          last_reason: "approve",
         };
       }
       const exceeded = roundLimitReason("plan_review", rounds, config.limits.plan_review_rounds);
@@ -164,7 +147,6 @@ export const createAppReducer = (config: Config) =>
           ...closed,
           plan_review_rounds: rounds,
           failure_reason: exceeded,
-          last_reason: exceeded,
         };
       }
       return {
@@ -173,7 +155,6 @@ export const createAppReducer = (config: Config) =>
         phase: "planning",
         plan_review_rounds: rounds,
         failure_reason: null,
-        last_reason: `request_changes (${rounds}/${config.limits.plan_review_rounds})`,
       };
     })
 
@@ -183,7 +164,6 @@ export const createAppReducer = (config: Config) =>
       ...closed,
       phase: "dev_review",
       failure_reason: null,
-      last_reason: "ok",
     }))
 
     // 実装のレビュー
@@ -196,7 +176,6 @@ export const createAppReducer = (config: Config) =>
           phase: "completing",
           dev_review_rounds: rounds,
           failure_reason: null,
-          last_reason: "approve",
         };
       }
       const exceeded = roundLimitReason("dev_review", rounds, config.limits.dev_review_rounds);
@@ -206,7 +185,6 @@ export const createAppReducer = (config: Config) =>
           ...closed,
           dev_review_rounds: rounds,
           failure_reason: exceeded,
-          last_reason: exceeded,
         };
       }
       return {
@@ -215,7 +193,6 @@ export const createAppReducer = (config: Config) =>
         phase: "developing",
         dev_review_rounds: rounds,
         failure_reason: null,
-        last_reason: `request_changes (${rounds}/${config.limits.dev_review_rounds})`,
       };
     })
 
@@ -227,14 +204,12 @@ export const createAppReducer = (config: Config) =>
           ...closed,
           phase: "done",
           failure_reason: null,
-          last_reason: "acceptance_passed",
         };
       }
       return {
         ...state,
         ...closed,
         failure_reason: "acceptance_not_passed",
-        last_reason: "acceptance_not_passed",
       };
     })
 
@@ -243,7 +218,6 @@ export const createAppReducer = (config: Config) =>
       ...state,
       phase: "developing",
       failure_reason: null,
-      last_reason: "approval",
     }))
 
     // 人間の差し戻し。本文は middleware がレビューファイルに残す
@@ -251,7 +225,6 @@ export const createAppReducer = (config: Config) =>
       ...state,
       phase: "planning",
       failure_reason: null,
-      last_reason: "request_changes",
     }))
 
     /**
@@ -263,7 +236,6 @@ export const createAppReducer = (config: Config) =>
     .case(retry, (state) => ({
       ...state,
       failure_reason: null,
-      last_reason: `retry: ${state.phase}`,
     }))
 
     .build();

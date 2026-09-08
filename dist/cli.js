@@ -633,14 +633,11 @@ var initialApp = {
   plan_review_rounds: 0,
   dev_review_rounds: 0,
   in_flight_agent: null,
-  in_flight_run_id: null,
-  last_reason: null
+  in_flight_run_id: null
 };
-var transitionIncomplete = (phase, event) => `transition_incomplete: ${phase} (${event})`;
-var roundsExceeded = (phase, used, limit) => `${phase}_rounds_exceeded: ${used}/${limit}`;
 function roundLimitReason(phase, used, limit) {
   if (used >= limit)
-    return roundsExceeded(phase, used, limit);
+    return `${phase}_rounds_exceeded: ${used}/${limit}`;
   return null;
 }
 var IDLE = {
@@ -663,19 +660,16 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
   ...state,
   total_steps: state.total_steps + 1,
   in_flight_agent: payload.agent,
-  in_flight_run_id: payload.run_id,
-  last_reason: "started"
+  in_flight_run_id: payload.run_id
 })).case(agentFailed, (state, payload) => ({
   ...state,
   ...closed,
-  failure_reason: payload.reason,
-  last_reason: payload.reason
+  failure_reason: payload.reason
 })).case(planned, (state) => ({
   ...state,
   ...closed,
   phase: "plan_review",
-  failure_reason: null,
-  last_reason: "ok"
+  failure_reason: null
 })).case(planReviewed, (state, payload) => {
   const rounds = state.plan_review_rounds + 1;
   if (payload.verdict === "approve") {
@@ -684,8 +678,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
       ...closed,
       phase: "awaiting_human",
       plan_review_rounds: rounds,
-      failure_reason: null,
-      last_reason: "approve"
+      failure_reason: null
     };
   }
   const exceeded = roundLimitReason("plan_review", rounds, config.limits.plan_review_rounds);
@@ -694,8 +687,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
       ...state,
       ...closed,
       plan_review_rounds: rounds,
-      failure_reason: exceeded,
-      last_reason: exceeded
+      failure_reason: exceeded
     };
   }
   return {
@@ -703,15 +695,13 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
     ...closed,
     phase: "planning",
     plan_review_rounds: rounds,
-    failure_reason: null,
-    last_reason: `request_changes (${rounds}/${config.limits.plan_review_rounds})`
+    failure_reason: null
   };
 }).case(implemented, (state) => ({
   ...state,
   ...closed,
   phase: "dev_review",
-  failure_reason: null,
-  last_reason: "ok"
+  failure_reason: null
 })).case(devReviewed, (state, payload) => {
   const rounds = state.dev_review_rounds + 1;
   if (payload.verdict === "approve") {
@@ -720,8 +710,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
       ...closed,
       phase: "completing",
       dev_review_rounds: rounds,
-      failure_reason: null,
-      last_reason: "approve"
+      failure_reason: null
     };
   }
   const exceeded = roundLimitReason("dev_review", rounds, config.limits.dev_review_rounds);
@@ -730,8 +719,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
       ...state,
       ...closed,
       dev_review_rounds: rounds,
-      failure_reason: exceeded,
-      last_reason: exceeded
+      failure_reason: exceeded
     };
   }
   return {
@@ -739,8 +727,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
     ...closed,
     phase: "developing",
     dev_review_rounds: rounds,
-    failure_reason: null,
-    last_reason: `request_changes (${rounds}/${config.limits.dev_review_rounds})`
+    failure_reason: null
   };
 }).case(completed, (state, payload) => {
   if (payload.acceptance_passed) {
@@ -748,37 +735,32 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
       ...state,
       ...closed,
       phase: "done",
-      failure_reason: null,
-      last_reason: "acceptance_passed"
+      failure_reason: null
     };
   }
   return {
     ...state,
     ...closed,
-    failure_reason: "acceptance_not_passed",
-    last_reason: "acceptance_not_passed"
+    failure_reason: "acceptance_not_passed"
   };
 }).case(humanApproval, (state) => ({
   ...state,
   phase: "developing",
-  failure_reason: null,
-  last_reason: "approval"
+  failure_reason: null
 })).case(humanRequestChanges, (state) => ({
   ...state,
   phase: "planning",
-  failure_reason: null,
-  last_reason: "request_changes"
+  failure_reason: null
 })).case(retry, (state) => ({
   ...state,
-  failure_reason: null,
-  last_reason: `retry: ${state.phase}`
+  failure_reason: null
 })).build();
 
 // src/redux/store/selectors.ts
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
 function selectLabel(root, config) {
   const { prefix, trigger } = config.labels;
-  const phase = selectPhase(root, config);
+  const { phase } = selectStatus(root, config);
   return {
     label: labelFor(phase, prefix),
     issue: root.info.issue ?? 0,
@@ -800,33 +782,28 @@ function selectEnvStop(root, config, config_error = null) {
   }
   return null;
 }
-function selectBlocked(root, config, config_error = null) {
+function selectStatus(root, config, config_error = null) {
   const { phase, failure_reason } = root.app;
   if (failure_reason)
-    return { blocked: true, reason: failure_reason };
+    return { phase: "blocked", blocked_reason: failure_reason };
   const env = selectEnvStop(root, config, config_error);
   if (env)
-    return { blocked: true, reason: env };
-  if (phase === "blocked")
-    return { blocked: true, reason: "（理由が記録されていません）" };
-  return { blocked: false, reason: null };
+    return { phase: "blocked", blocked_reason: env };
+  if (phase === "blocked") {
+    return { phase: "blocked", blocked_reason: "（理由が記録されていません）" };
+  }
+  return { phase, blocked_reason: null };
 }
-function selectPhase(root, config, config_error = null) {
-  if (selectBlocked(root, config, config_error).blocked)
-    return "blocked";
-  return root.app.phase;
-}
-var selectContinueChain = (root, config) => !isIdle(selectPhase(root, config));
+var selectContinueChain = (root, config) => !isIdle(selectStatus(root, config).phase);
 var selectSnapshot = (root, config, config_error = null) => ({
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
-  phase: selectPhase(root, config, config_error),
-  blocked_reason: selectBlocked(root, config, config_error).reason
+  ...selectStatus(root, config, config_error)
 });
 function selectNextAction(root, config, config_error = null) {
   const { app } = root;
-  const phase = selectPhase(root, config, config_error);
+  const { phase } = selectStatus(root, config, config_error);
   const base = {
     phase,
     total_steps: app.total_steps,
@@ -958,10 +935,10 @@ var FALLBACK = {
 3. ${retryLine}`
 };
 function explainRun(root, dir, config, config_error = null) {
-  const blocked = selectBlocked(root, config, config_error);
-  if (!blocked.blocked || blocked.reason === null)
+  const status = selectStatus(root, config, config_error);
+  if (status.blocked_reason === null)
     return null;
-  const reason = blocked.reason;
+  const reason = status.blocked_reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   const context = { dir, reason };
   return {
@@ -1138,8 +1115,7 @@ var FAILURE_REASON = {
       return `invalid_artifacts: ${outcome.detail}`;
     return "invalid_artifacts";
   },
-  agent_failed: () => "agent_failed",
-  ok: () => "agent_failed"
+  agent_failed: () => "agent_failed"
 };
 var SUCCESS = {
   planning: (_outcome, context) => planned(context),
@@ -1162,7 +1138,7 @@ function fromOutcome(outcome, context, phase) {
   }
   const success = SUCCESS[phase];
   if (!success) {
-    return agentFailed({ ...context, reason: transitionIncomplete(phase, "ok") });
+    return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
   }
   return success(outcome, context);
 }
@@ -1538,12 +1514,12 @@ var awaitingHuman = ({ app }) => {
   return `not_awaiting_approval: phase=${app.phase}`;
 };
 var mustBeBlocked = (root, _action, config) => {
-  if (selectBlocked(root, config).blocked)
+  if (selectStatus(root, config).blocked_reason)
     return null;
   return `not_blocked: phase=${root.app.phase}`;
 };
 var notLimitReached = (root, _action, config) => {
-  const reason = selectBlocked(root, config).reason;
+  const reason = selectStatus(root, config).blocked_reason;
   if (reason?.includes("_exceeded"))
     return `limit_reached: ${reason}`;
   return null;
@@ -1730,6 +1706,29 @@ function createStore2(input) {
 }
 
 // src/redux/commands.ts
+var CLI_OPTIONS = {
+  dir: { type: "string" },
+  agent: { type: "string" },
+  "run-id": { type: "string" },
+  attempt: { type: "string", default: "1" },
+  model: { type: "string" },
+  result: { type: "string" },
+  verdict: { type: "string" },
+  "api-error-status": { type: "string" },
+  detail: { type: "string" },
+  oversize: { type: "boolean", default: false },
+  "acceptance-passed": { type: "boolean", default: false },
+  "session-id": { type: "string" },
+  association: { type: "string" },
+  "agent-failed": { type: "boolean", default: false },
+  "execution-file": { type: "string" },
+  "changed-files": { type: "string" },
+  body: { type: "string" },
+  repo: { type: "string" },
+  central: { type: "string" },
+  out: { type: "string" }
+};
+
 class MissingArg extends Error {
   arg;
   constructor(arg) {
@@ -1761,10 +1760,8 @@ var outcomeOf = (a) => ({
   detail: a.detail
 });
 var transitionOutput = (root, _outputs, config) => ({
-  phase: selectPhase(root, config),
-  blocked_reason: selectBlocked(root, config).reason,
-  continue_chain: selectContinueChain(root, config),
-  reason: root.app.last_reason ?? ""
+  ...selectStatus(root, config),
+  continue_chain: selectContinueChain(root, config)
 });
 var COMMANDS = {
   start: {
@@ -1782,7 +1779,7 @@ var COMMANDS = {
   },
   approve: {
     action: (a) => humanApproval(human(a)),
-    output: (root, _outputs, config) => ({ ok: true, phase: selectPhase(root, config) })
+    output: (root, _outputs, config) => ({ ok: true, phase: selectStatus(root, config).phase })
   },
   "request-changes": {
     action: (a) => humanRequestChanges({ ...human(a), body: need(a.body, "body") }),
@@ -1794,11 +1791,10 @@ var COMMANDS = {
   },
   retry: {
     action: (a) => retry(human(a)),
-    output: (root, _outputs, config) => ({
-      ok: true,
-      phase: selectPhase(root, config),
-      agent: agentFor(selectPhase(root, config))
-    })
+    output: (root, _outputs, config) => {
+      const { phase } = selectStatus(root, config);
+      return { ok: true, phase, agent: agentFor(phase) };
+    }
   },
   snapshot: {
     write: (root, config, configError) => {
@@ -1887,31 +1883,7 @@ store を使わない:
 
 出力: 結果を JSON で標準出力に書く
 `;
-var { positionals, values } = parseArgs({
-  allowPositionals: true,
-  options: {
-    dir: { type: "string" },
-    agent: { type: "string" },
-    "run-id": { type: "string" },
-    attempt: { type: "string", default: "1" },
-    model: { type: "string" },
-    result: { type: "string" },
-    verdict: { type: "string" },
-    "api-error-status": { type: "string" },
-    detail: { type: "string" },
-    oversize: { type: "boolean", default: false },
-    "acceptance-passed": { type: "boolean", default: false },
-    "session-id": { type: "string" },
-    association: { type: "string" },
-    "agent-failed": { type: "boolean", default: false },
-    "execution-file": { type: "string" },
-    "changed-files": { type: "string" },
-    body: { type: "string" },
-    repo: { type: "string" },
-    central: { type: "string" },
-    out: { type: "string" }
-  }
-});
+var { positionals, values } = parseArgs({ allowPositionals: true, options: CLI_OPTIONS });
 var command = positionals[0] ?? "";
 var fail = (message) => {
   console.error(`${message}

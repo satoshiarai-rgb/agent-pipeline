@@ -327,7 +327,7 @@ jobs:
           git push
           {
             echo "### finish: ${{ steps.finish.outputs.phase }}"
-            echo "- reason=\`${{ steps.finish.outputs.reason }}\`"
+            echo "- blocked_reason=\`${{ steps.finish.outputs.blocked_reason }}\`"
             echo "- continue_chain=\`${{ steps.finish.outputs.continue_chain }}\`"
           } >> "$GITHUB_STEP_SUMMARY"
 

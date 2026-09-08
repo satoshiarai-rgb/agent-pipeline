@@ -9,7 +9,6 @@ import {
   planned,
   planReviewed,
 } from "./store/app/actions.ts";
-import { transitionIncomplete } from "./store/app/reducer.ts";
 
 /**
  * エージェント実行 1 回の結果（`validate` の出力）を action に写す。
@@ -47,14 +46,13 @@ interface Context {
  * 失敗の理由の文字列。**移行前の `blocked_reason` と 1 文字も違わない**
  * （`explain` の案内・`docs/troubleshooting.md` の表・プロンプトが依存している）。
  */
-const FAILURE_REASON: Record<RunResult, (outcome: Outcome) => string> = {
+const FAILURE_REASON: Record<Exclude<RunResult, "ok">, (outcome: Outcome) => string> = {
   api_error: (outcome) => `api_error:${outcome.api_error_status ?? "unknown"}`,
   invalid: (outcome) => {
     if (outcome.detail) return `invalid_artifacts: ${outcome.detail}`;
     return "invalid_artifacts";
   },
   agent_failed: () => "agent_failed",
-  ok: () => "agent_failed",
 };
 
 /** フェーズごとの「成功したときの action」 */
@@ -86,7 +84,8 @@ export function fromOutcome(outcome: Outcome, context: Context, phase: Phase): A
   }
   const success = SUCCESS[phase];
   if (!success) {
-    return agentFailed({ ...context, reason: transitionIncomplete(phase, "ok") });
+    // エージェントが走らないフェーズでの成功報告（プロンプトや設定の壊れ）
+    return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
   }
   return success(outcome, context);
 }
