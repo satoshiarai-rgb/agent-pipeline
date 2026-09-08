@@ -470,16 +470,33 @@ describe("scripts/run-cli.sh（action の実体）", () => {
     // key=value 形式に混ぜると 2 行目以降が壊れる。実際に走らせて確かめる
     const dir = mkdtempSync(join(tmpdir(), "run-cli-"));
     const runDir = join(dir, "agent-work/issue-1");
-    spawnSync("mkdir", ["-p", runDir]);
+    spawnSync("mkdir", ["-p", join(runDir, "events")]);
+    // 状態の正はイベントログ。止まっている run は「失敗のイベント」で作る（K-26）
     writeFileSync(
-      join(runDir, "state.json"),
+      join(runDir, "events/0001-20260908T000000Z-1-1-bootstrap.json"),
       JSON.stringify({
-        pipeline_version: 1,
-        issue: 1,
-        branch: "claude/issue-1",
-        phase: "blocked",
-        blocked_reason: "acceptance_not_passed",
-        updated_at: null,
+        type: "agent-pipeline/BOOTSTRAP",
+        payload: {
+          timestamp: "20260908T000000Z",
+          by: "harness",
+          issue: 1,
+          branch: "claude/issue-1",
+          pipeline_version: 1,
+        },
+      }),
+    );
+    writeFileSync(
+      join(runDir, "events/0002-20260908T000001Z-1-1-agent_failed.json"),
+      JSON.stringify({
+        type: "agent-pipeline/app/AGENT_FAILED",
+        error: true,
+        payload: {
+          timestamp: "20260908T000001Z",
+          by: "harness",
+          run_id: "1",
+          attempt: 1,
+          reason: "acceptance_not_passed",
+        },
       }),
     );
     const out = join(dir, "output.txt");

@@ -6,6 +6,7 @@ import {
   decisionRecordPaths,
   type Execution,
 } from "../file/decisionRecords.ts";
+import { eventPaths } from "../file/eventLog.ts";
 import {
   type PromptRoots,
   readConventions,
@@ -13,7 +14,6 @@ import {
   writeComposedPrompt,
 } from "../file/promptFile.ts";
 import { latestReviewPath, nextReviewNumber, reviewPath, reviewPaths } from "../file/reviewFile.ts";
-import { recordPaths } from "../file/runRecord.ts";
 import type { AgentName } from "../types.ts";
 
 // ---------------------------------------------------------------- 入力の部品
@@ -47,7 +47,7 @@ const DECISIONS: Input = { label: "実装中の判断", find: decisionRecordPath
 const PLAN_REVIEW = latest("前回のレビュー", "plan");
 const DEV_REVIEW = latest("前回のレビュー", "dev");
 const ALL_REVIEWS: Input = { label: "レビュー", find: (dir) => reviewPaths(dir) };
-const RUN_RECORDS: Input = { label: "実行の記録", find: recordPaths };
+const EVENTS: Input = { label: "実行の記録", find: eventPaths };
 
 // ------------------------------------------------------------------ 契約の表
 //
@@ -69,7 +69,7 @@ const CONTRACT: Record<AgentName, Contract> = {
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE], review: "plan" },
   developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
   "dev-reviewer": { inputs: [PLAN, ACCEPTANCE, DECISIONS], review: "dev" },
-  completion: { inputs: [ACCEPTANCE, DECISIONS, ALL_REVIEWS, RUN_RECORDS] },
+  completion: { inputs: [ACCEPTANCE, DECISIONS, ALL_REVIEWS, EVENTS] },
 };
 
 // ------------------------------------------------------------ プロンプトの形

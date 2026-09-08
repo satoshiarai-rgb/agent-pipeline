@@ -123,6 +123,8 @@ jobs:
           command: approve
           dir: ${{ steps.parse.outputs.dir }}
           association: ${{ inputs.association }}
+          run-id: ${{ github.run_id }}
+          attempt: ${{ github.run_attempt }}
 
       # ---- /agent request-changes <理由>
       - id: request_changes
@@ -132,6 +134,8 @@ jobs:
           command: request-changes
           dir: ${{ steps.parse.outputs.dir }}
           association: ${{ inputs.association }}
+          run-id: ${{ github.run_id }}
+          attempt: ${{ github.run_attempt }}
           body: ${{ steps.parse.outputs.reason }}
 
       # ---- /agent retry（blocked からの復旧 / K-23）
@@ -142,6 +146,8 @@ jobs:
           command: retry
           dir: ${{ steps.parse.outputs.dir }}
           association: ${{ inputs.association }}
+          run-id: ${{ github.run_id }}
+          attempt: ${{ github.run_attempt }}
 
       - name: 遷移を push して PR に結果を返す
         if: steps.approve.outputs.ok == 'true' || steps.request_changes.outputs.ok == 'true' || steps.retry.outputs.ok == 'true'

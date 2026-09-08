@@ -10,6 +10,6 @@ export { mapValidationToAction } from "./mapValidationToAction.ts";
 export * from "./store/app/actions.ts";
 export type { RootState, Wiring } from "./store/createStore.ts";
 export { createStore } from "./store/createStore.ts";
-export type { PipelineAction, PipelineDispatch, RestorePayload } from "./store/global/actions.ts";
-export { init, restore } from "./store/global/actions.ts";
+export type { PipelineAction, PipelineDispatch } from "./store/global/actions.ts";
+export { init } from "./store/global/actions.ts";
 export * from "./store/global/selectors.ts";

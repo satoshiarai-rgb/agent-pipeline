@@ -70,7 +70,7 @@ reviewer: dev-reviewer
 
 - **コードを書き換えない。** 直してほしいことはレビュー本文に書く
 - `acceptance.json` を書き換えない（`status` を更新するのは developer）
-- `state.json` と `runs/` を書かない
+- `state.json` と `events/` を書かない
 - **git を操作しない。** コミット・push・ブランチ操作はハーネスが行う。読むだけに使う
 
 テストの実行はしてよい（受け入れ条件の照合に必要なため）。ただしテストコードを書き換えて

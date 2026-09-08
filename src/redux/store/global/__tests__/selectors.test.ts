@@ -1,6 +1,4 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { readFileSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
 import { config, rootOf } from "../../../../__tests__/helpers.ts";
 import { cleanupRuns, label, makeRun, route } from "../../../../__tests__/runDirFixture.ts";
 import { PHASES } from "../../../../types.ts";
@@ -83,9 +81,9 @@ describe("selectNextAction: 何を起動するか", () => {
   });
 
   test("pipeline_version が合わなければ block", () => {
-    const r = selectNextAction(rootOf({ phase: "planning" }, { pipeline_version: 2 }), c);
+    const r = selectNextAction(rootOf({ phase: "planning" }, { pipeline_version: 1 }), c);
     expect(r.action).toBe("block");
-    expect(r.reason).toContain("pipeline_version_mismatch: run=2 harness=1");
+    expect(r.reason).toContain("pipeline_version_mismatch: run=1 harness=2");
   });
 });
 
@@ -96,14 +94,11 @@ describe("selectNextAction: ファイルから読んだ状態でも同じ", () =
     expect(r.run?.agent).toBe("planner");
   });
 
-  test("state.json の pipeline_version 不一致を拾う", () => {
+  test("bootstrap イベントの版とハーネスの版が違えば止まる", () => {
     const dir = makeRun();
-    const p = join(dir, "state.json");
-    writeFileSync(
-      p,
-      JSON.stringify({ ...JSON.parse(readFileSync(p, "utf8")), pipeline_version: 2 }, null, 2),
-    );
-    expect(route(dir, c).reason).toContain("pipeline_version_mismatch");
+    const newer = { ...c, pipeline_version: c.pipeline_version + 1 };
+    expect(route(dir, newer).action).toBe("block");
+    expect(route(dir, newer).reason).toContain("pipeline_version_mismatch: run=2 harness=3");
   });
 });
 
@@ -154,7 +149,7 @@ describe("selectContinueChain / selectSnapshot", () => {
   test("スナップショットは識別子と phase だけを持つ（導出値は出さない）", () => {
     const s = selectSnapshot(rootOf({ phase: "developing", failure_reason: "agent_failed" }), c);
     expect(s).toEqual({
-      pipeline_version: 1,
+      pipeline_version: 2,
       issue: 123,
       branch: "claude/issue-123",
       phase: "blocked",

@@ -10,7 +10,7 @@ import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store
 import { agentFor } from "./store/app/reducer.ts";
 import type { RootState } from "./store/createStore.ts";
 import { createStore } from "./store/createStore.ts";
-import type { PipelineAction } from "./store/global/actions.ts";
+import { bootstrap, type PipelineAction } from "./store/global/actions.ts";
 import {
   selectContinueChain,
   selectLabel,
@@ -36,6 +36,8 @@ import {
  */
 export const CLI_OPTIONS = {
   dir: { type: "string" },
+  issue: { type: "string" },
+  branch: { type: "string" },
   agent: { type: "string" },
   "run-id": { type: "string" },
   attempt: { type: "string", default: "1" },
@@ -116,6 +118,17 @@ interface Command {
 }
 
 export const COMMANDS: Record<string, Command> = {
+  /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
+  bootstrap: {
+    action: (a, config) =>
+      bootstrap({
+        ...harness(),
+        issue: Number(need(a.issue, "issue")),
+        branch: need(a.branch, "branch"),
+        pipeline_version: config.pipeline_version,
+      }),
+    output: transitionOutput,
+  },
   start: {
     action: (a, config) =>
       agentStarted({

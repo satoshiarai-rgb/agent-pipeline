@@ -168,15 +168,16 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     ]);
   });
 
-  test("completion にはレビューと実行レコードを全部渡す", () => {
-    const dir = makeRun();
+  test("completion にはレビューとイベントログを全部渡す", () => {
+    const dir = makeRun(); // bootstrap のイベントが 1 件ある
     put(dir, "acceptance.json", "{}");
     const plan1 = review(dir, "plan", 1);
     const dev1 = review(dir, "dev", 1);
-    const record = put(dir, "runs/planner-1-1.json", "{}");
 
     const { inputs } = compose(dir, "completion");
-    expect(inputs).toEqual([join(dir, "acceptance.json"), dev1, plan1, record]);
+    const events = inputs.filter((path) => path.includes("/events/"));
+    expect(inputs).toEqual([join(dir, "acceptance.json"), dev1, plan1, ...events]);
+    expect(events.length).toBeGreaterThan(0);
   });
 });
 

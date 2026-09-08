@@ -10,6 +10,7 @@ import { type Args, CLI_OPTIONS, MissingArg, runCommand } from "./redux/commands
 const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 
 状態を変える（action を 1 つ dispatch する）:
+  bootstrap run の最初のイベントを書く              --issue --branch
   start    エージェント実行の開始を記録する   --agent --run-id --attempt [--model]
   finish   実行の結末を書き次の phase を決める --run-id --result [--verdict] [--detail]
                                               [--api-error-status] [--acceptance-passed] [--session-id]

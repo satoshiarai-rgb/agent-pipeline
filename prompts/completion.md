@@ -62,7 +62,7 @@ run ディレクトリに `completion.md` を書く（例: `agent-work/issue-12/
 - コードを書き換えない
 - `acceptance.json` を書き換えない。**通っていない項目を `passed` にして通過させてはいけない**
   （未達は未達として `blocked` になるのが正しい）
-- `state.json` と `runs/` を書かない
+- `state.json` と `events/` を書かない
 - PR や issue を操作しない（GitHub の操作はハーネスが行う。トークンも渡されていない）
 - **git を操作しない。** コミット・push はハーネスが行う
 

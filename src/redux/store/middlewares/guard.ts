@@ -57,12 +57,6 @@ const notLimitReached: Guard = (root, _action, config) => {
   return null;
 };
 
-/** 実行位置が失われている（スナップショットの phase が blocked のまま復元された場合） */
-const knowsWhereToResume: Guard = ({ app }) => {
-  if (app.phase === "blocked") return "no_records: 実行の記録が無いので戻る先が決まらない";
-  return null;
-};
-
 /** route は実行中のレコードを見て何もしないので、戻しても静かに止まったままになる */
 const notInFlight: Guard = ({ app }) => {
   if (app.in_flight_agent) {
@@ -75,7 +69,7 @@ const notInFlight: Guard = ({ app }) => {
 const GUARDS: Record<string, Guard[]> = {
   [humanApproval.type]: [authorized, awaitingHuman],
   [humanRequestChanges.type]: [authorized, awaitingHuman],
-  [retry.type]: [authorized, mustBeBlocked, notLimitReached, knowsWhereToResume, notInFlight],
+  [retry.type]: [authorized, mustBeBlocked, notLimitReached, notInFlight],
 };
 
 /** 受け付けない理由。null なら通す */

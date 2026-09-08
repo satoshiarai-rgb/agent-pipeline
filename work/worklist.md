@@ -69,6 +69,9 @@
   残っているときは、未達の項目を表にして手順まで案内する
 - K-23: **`/agent retry`**（`blocked` から直前のフェーズに戻して再実行）。手で `state.json` を
   書き換えていた操作をコマンドにした。戻る先は実行レコードの履歴が決める
+- **A-53 段取り 2〜4（2026-09-08）**: **状態の正を `state.json` からイベントログに移した。**
+  `events/` に 1 イベント 1 ファイルで追記し、`hydrate` が畳み込む。`runs/` と
+  `deriveRunStats` と `RESTORE` は消え、`pipeline_version` は 2 に上がった
 - **精査（2026-09-08）**: 死んだコード・導出値・二重定義を落とした（`approve.yml` は誰からも
   呼ばれていなかった、`oversize` の finish 経路と `hydrated` は読み手が無かった、ほか）。
   **`comment.yml` の実害あるバグを 1 件修正**（`/agent retry` の成功後に「受け付けませんでした」を
@@ -107,7 +110,8 @@
   Console 待ちが 11 件（§4）、展開が 2 件（§5）
 - 番号は CLAUDE.md や設計書から参照されているので消していない
 
-**次の一手**: **reducer/action への移行（A-53 の段取り 1〜4 / K-26 / K-27）** → タグ `v1`（I-13）
+**次の一手**: **A-53 の段取り 5（middleware と subscriber の分解）と 6（A-32 を閉じる / stale 検知）**
+→ タグ `v1`（I-13）
 → 2 つ目の配布先（R-2。ここで `install/` と `.agent/config.json` の過不足が実際に分かる）。
 移行を先に置くのは、`state.json` の役割とイベントのファイル形式が変わるため（配布後だと移行が要る）。プロンプトの直し（A-48）は独立して先に入れてもよい。
 `stale.yml`（I-8 / A-14）は発生条件が狭く手で直せるため後回しにした（§1 の末尾に判断を残した）。
@@ -156,12 +160,13 @@
 
 - [ ] A-53: **reducer/action への移行（K-26 / K-27）。段取りは 1 → 6。1〜4 はタグ `v1`（I-13）と 2 つ目の配布先（R-2）より前に置く**（`state.json` の役割とイベントのファイル形式が変わるため、配布後だと移行が要る）
   - [x] 1: **完了（2026-09-07）。** action の FSA 化とガード表、`combineReducers({ info, app })`、middleware（`hydrate` / `guard` / `snapshot` / `run-record` / `review-file`）、selector、`redux/commands.ts` の対応表。**振る舞いは変えていない**（`blocked_reason` の文字列・CLI の出力・`state.json` と `runs/*.json` の形式はそのまま。実機相当の CLI 実行で確認）。テストは 314 件（判断は reducer / guards / selectors のテストへ移り、コマンドの薄い表は `index.test.ts` が語彙の網羅を見る）。削除したのは 13 ファイル（`commands/{start,finish,approve,request-changes,retry,block,route,label,human-transition,input}.ts`、`transitions.ts` ほか）。あわせて `finish` に `--run-id` / `--attempt` を渡し、`--record-path` の受け渡しをやめた（閉じるレコードは `in_flight` から分かる）。`dist/cli.js` は 44.7KB → 67.9KB
-  - [ ] 2: **イベントログを追記専用にする。** `events/<timestamp>-<run_id>-<attempt>-<type の末尾小文字>.json`、1 実行 = 開始 + 終了の 2 イベント、`hydrate` middleware で 1 件ずつ再生。**`pipeline_version` を 2 に上げる**（進行中の run は `blocked` で止まる / K-13）
-    - **この段で一緒に落とすもの（2026-09-08 の精査で「いまは読み手が無い」と確認した分）**: `Origin.timestamp`（イベントのファイル名になって初めて読み手ができる）/ `file/runRecord.ts` と `middlewares/runRecord.ts`（実行の記録がイベントそのものになる）/ `utils/deriveRunStats.ts`（`in_flight` と `total_steps` も畳み込みから出る）/ `store/global/actions.ts` の `RESTORE` と `RestorePayload`（過去のイベントの再生に置き換わる）/ `bootstrap.yml` の heredoc（`templates/state.json` との二重定義。CLI の `bootstrap` コマンドに移す）
-    - **段取り 3（人間のイベントをログに載せる）はここでほぼ自動で済む** — 承認・差し戻し・retry も同じ `dispatch` を通るので、`event-log` middleware がそのまま書く。残るのは契約（§4 の completion の入力）と文書の更新だけ
-    - **段取り 4（`state.json` の降格）も大半が済む** — `blocked` の導出と `blocked_from` の廃止は済んでいるので、`hydrate` が `state.json` を読まなくなれば完了
-  - [ ] 3: **人間のイベント（承認・差し戻し・retry）を同じログに書く。** 契約 §4 の completion の入力、`prompts/completion.md`、`docs/troubleshooting.md` のファイル一覧を同時に直す。A-34（`log.md` を時刻順の連結として生成）はここで自然に埋まる
-  - [ ] 4: **`state.json` をスナップショットに降格**（K-26）。`selectors` 経由で `route` / `label` / `explain` は fold だけを見る。**利用者向けの復旧手順を書き換える**（`docs/troubleshooting.md` の「手で再開する」、`templates/README.md`、K-13）。`state.json` を編集しても効かないこと、手で直すならイベントを 1 つ足すことを明記する（`retry` の戻り先は K-27 のとおり `app/reducer.ts` の case に済んでいる）
+  - [x] 2: **完了（2026-09-08）。イベントログが状態の正になった。** `events/<連番>-<timestamp>-<run_id>-<attempt>-<type>.json`（`src/file/eventLog.ts`）。**先頭の連番が畳み込みの順序を決める** — 時計の分解能や `run_id` の桁数に依存しない（`9999999999` と `17301992044` を文字列で並べると桁数の少ない方が後になる。決定記録が踏んだのと同じ問題 / K-25）。書くのは `type` / `payload` / `error` だけで `meta` は落とす。`hydrate` middleware が `init` で全イベントを 1 件ずつ `meta.hydrate` 付きで再生し、`eventLog` middleware が追記する（`APPENDABLE` の表）。`BOOTSTRAP` は**スライスを跨ぐ action**（`info` が識別子、`app` が phase を `planning` に）なので `store/global/` に置いた
+    - **削除**: `file/runRecord.ts` / `middlewares/runRecord.ts` / `utils/deriveRunStats.ts` / `templates/run-record.json` / `RESTORE` と `RestorePayload`（+ それぞれのテスト）。`bootstrap.yml` の heredoc は CLI の `bootstrap` コマンドに置き換えた
+    - **`pipeline_version` を 2 に上げた**（版 1 の run は `events/` を持たないので、続けると状態を失う / K-13）
+    - **`no_records` の拒否が消えた**（K-27 の予告どおり）。畳み込みでは `phase` が `blocked` にならないので「戻り先が分からない」状態が起きない。ガードは 4 つ（`not_authorized` / `not_blocked` / `limit_reached` / `run_in_progress`）
+    - 実機相当の確認: `bootstrap` → planner → plan-reviewer(approve) → 人間の承認 → developer → dev-reviewer(approve) → completion で `done` まで、**12 イベントだけで**到達（`state.json` はスナップショットのみ）
+  - [x] 3: **完了（2026-09-08。段取り 2 に含めて済んだ）。** 承認・差し戻し・retry も同じ `dispatch` を通るので、`eventLog` middleware がそのまま書く（`HUMAN_APPROVAL` / `HUMAN_REQUEST_CHANGES` / `RETRY`）。`comment.yml` が `run-id` / `attempt` を渡すようにして、人間のイベントも名前が衝突しない形にした。契約 §4 の completion の入力とプロンプト・`docs/` の記述も `events/*.json` に直した
+  - [x] 4: **完了（2026-09-08。同上）。** `hydrate` が `state.json` を読まなくなり、`state.json` は `snapshot` middleware が書くだけの射影になった。`blocked` の導出と `blocked_from` の廃止はレビュー反映で済んでいたので、残りは読み取りをやめるだけだった。`docs/troubleshooting.md` の「手で再開する」は「イベントを 1 件足して push する」に書き換えた
   - [ ] 5: **middleware と subscriber の分解。** 1 副作用 1 ファイル。受け入れ条件は「ワークフローに渡す output の名前と値が今と 1 対 1 で変わらない」。middleware の並び順（`guard`, `snapshot`, `event-log`, `hydrate`）が「イベント追記 → スナップショット書き出し」を決めることをテストで固定する（逆順だと、落ちたときに正であるイベントが失われる）
   - [ ] 6: **A-32 を「不要になった」として閉じ、`stale.yml`（I-8 / A-14）を `in_flight` の判定に寄せる**（開始イベントに対応する終了イベントが無い状態）
 - [ ] A-54: **文書の食い違いを直す（2026-09-08 の精査。実装が正しく文書が古い）。** (1) **`CLAUDE.md` に消えたファイル名が 5 種**: `state.yml` → `state.json`、`run.yml` → `dispatch.yml`（書く主体の一覧に `comment.yml` を足す。`approve.yml` は削除済み）、`scripts/labels.py` → `scripts/project-labels.sh`、`acceptance.yml` → `acceptance.json`、`log.md`（未実装なので言及を落とす）。同じ文書の別行では正しい名前を使っており、次のセッションを誤らせるので優先度は高い (2) `docs/customize-prompt.md` と `docs/troubleshooting.md` の「**どのプロンプトで動かしたかが `runs/*.json` に残る**」— 実行レコードにそのフィールドは無い（`role_prompt` は `compose` の戻り値で記録していない）。記録したいなら実装側を直す判断 (3) `install/` の「原本 → 置き場所」の表が 3 箇所（`install.sh` が実物、`install/README.md` と `docs/installation.md` が写し）。README 自身が「対応表はここ」と宣言しているので docs 側を参照 1 行に (4) `docs/installation.md` の `id-token: write` が「使っている」と読める（WIF に切り替えるまで未使用）(5) `action.yml` の `run-id` / `attempt` の説明が「start / compose」のまま（`finish` も必須）、コマンド一覧が同一ファイル内で二重、`# validate` の見出し位置が実際の入力と食い違い

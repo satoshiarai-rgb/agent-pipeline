@@ -10,26 +10,28 @@ import {
   route,
   runOnce,
 } from "../../../../__tests__/runDirFixture.ts";
-import { type RunRecord, readRecords } from "../../../../file/runRecord.ts";
+import { readEvents } from "../../../../file/eventLog.ts";
 import { agentFor, isIdle } from "../reducer.ts";
 
 const c = config();
 afterEach(cleanupRuns);
 
-describe("reducer: 実行の記録の更新", () => {
-  test("レコードを閉じて state.json の phase を進める", () => {
+describe("reducer: イベントログと state.json", () => {
+  test("実行の開始と終了がイベントに残り、スナップショットの phase が進む", () => {
     const dir = makeRun();
     const f = runOnce(dir, "planner", { result: "ok" });
     expect(f.phase).toBe("plan_review");
     expect(f.continue_chain).toBe(true);
 
-    const rec = readRecords(dir)[0] as RunRecord;
-    expect(rec.finished_at).not.toBeNull();
-    expect(rec.result).toBe("ok");
-    // 実行番号はテスト全体で共有のカウンタから採るので、レコードの run_id と突き合わせる
-    expect(rec.session_id).toBe(`sess-${rec.run_id}`);
+    // ログは起きた順（bootstrap → 開始 → 計画ができた）
+    expect(readEvents(dir).map((event) => event.type)).toEqual([
+      "agent-pipeline/BOOTSTRAP",
+      "agent-pipeline/app/AGENT_STARTED",
+      "agent-pipeline/app/PLANNED",
+    ]);
 
-    // 識別子は書き換えずに保つ
+    // スナップショットは畳み込みの射影。識別子は bootstrap イベントから来る
+    expect(phaseOf(dir).phase).toBe("plan_review");
     expect(phaseOf(dir).meta.issue).toBe(123);
     expect(phaseOf(dir).meta.branch).toBe("claude/issue-123");
   });
@@ -210,8 +212,9 @@ describe("reducer: 人間の action による遷移", () => {
 
   test("人間の差し戻しは total_steps を増やさない（A-41 がカウント表に出ている）", () => {
     const dir = makeRun("awaiting_human");
+    const before = route(dir, c).total_steps;
     requestChanges(dir, "OWNER", "やり直し", c);
-    expect(route(dir, c).total_steps).toBe(0);
+    expect(route(dir, c).total_steps).toBe(before);
   });
 
   test("retry は停止の理由を消して同じフェーズをやり直す（RETRY_TO / K-27）", () => {

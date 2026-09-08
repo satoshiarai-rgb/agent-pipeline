@@ -1,7 +1,7 @@
 import type { Config } from "../../../defaults.ts";
 import type { AgentName, Phase } from "../../../types.ts";
 import { reducerWithInitialState } from "../../../utils/typescriptFsaReducers.ts";
-import { restore } from "../global/actions.ts";
+import { bootstrap } from "../global/actions.ts";
 import {
   agentFailed,
   agentStarted,
@@ -99,8 +99,8 @@ const closed = { in_flight_agent: null, in_flight_run_id: null } as const;
  */
 export const createAppReducer = (config: Config) =>
   reducerWithInitialState(initialApp)
-    // 既存のファイルからの復元（段取り 2 でイベントの再生に置き換わる）
-    .case(restore, (state, payload) => ({ ...state, ...payload.app }))
+    // run が始まった。ここから計画のフェーズ（識別子は info スライスが受ける）
+    .case(bootstrap, (state) => ({ ...state, phase: "planning" as const }))
 
     /**
      * 実行の開始。phase は動かさず、総数と「実行中」だけを記録する。

@@ -21,8 +21,12 @@ export interface Config {
  * `src/redux/app/reducer.ts` の `TRANSITIONS` が持つ（K-26）。
  */
 export const defaults: Config = {
-  /** 中央リポジトリのメジャー版。合わない run は blocked にする */
-  pipeline_version: 1,
+  /**
+   * 中央リポジトリのメジャー版。合わない run は blocked にする。
+   * 2 にしたのは状態の正を `state.json` からイベントログに移したため（K-26 / A-53 段取り 2）。
+   * 版 1 で始まった run は `events/` を持たないので、続けると状態を失う
+   */
+  pipeline_version: 2,
 
   models: {
     default: "claude-opus-5",

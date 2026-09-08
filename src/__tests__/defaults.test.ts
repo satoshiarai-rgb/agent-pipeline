@@ -3,7 +3,7 @@ import { defaults } from "../defaults.ts";
 
 describe("defaults", () => {
   test("確定した判断が値として入っている", () => {
-    expect(defaults.pipeline_version).toBe(1);
+    expect(defaults.pipeline_version).toBe(2);
     expect(defaults.models.default).toBe("claude-opus-5"); // K-3
     expect(defaults.models.reviewer).toBeNull();
     expect(defaults.limits.plan_review_rounds).toBe(5);

@@ -40,15 +40,14 @@ cat agent-work/issue-<n>/state.json
 | `not_authorized: <association>` | コメントした人にこの操作の権限がありません（承認と同じ権限が必要です） |
 | `not_blocked: phase=...` | 止まっていません。取り違えを黙って進めないための拒否です |
 | `limit_reached: ...` | 上限で止まったものです。やり直しても同じ理由で止まります |
-| `no_records: ...` | 実行の記録が無く、戻る先が決まりません |
 | `run_in_progress: <agent> run=<id>` | 直前の実行の記録が閉じていません（下記） |
 
 **`run_in_progress` が返る場合**、その実行の記録が `finished_at: null` のまま残っています。
 実行が job のタイムアウトやキャンセルで死んだときに起きます。まだ動いている可能性があるので、
 Actions でその run が終わっていることを確かめてから、次の 2 つを 1 コミットで push してください。
 
-1. `runs/<agent>-<run_id>-<attempt>.json` の `finished_at` に時刻を入れ、`result` を `agent_failed` にする
-2. `state.json` の `phase` をそのレコードの `phase` に戻し、`blocked_reason` を `null` にする
+1. `events/` に「その実行が失敗した」イベントを 1 件足す（直前の開始イベントと同じ `run_id` / `attempt` を書く）
+2. それを push する。次の run が畳み込み直して `blocked` になり、`/agent retry` で再開できます
 
 ### 手で再開する
 
@@ -97,18 +96,18 @@ PR を閉じて issue を分け直し、そのまま進めるなら何もしな�
 | ファイル | 書く主体 | 内容 |
 |---|---|---|
 | `state.json` | パイプライン | 現在の状態。人が触ってよいのは `phase` です |
-| `runs/<agent>-<run_id>-<attempt>.json` | パイプライン | 1 実行 1 ファイルの記録。往復回数はこの数から数えます |
+| `events/<連番>-<時刻>-<run_id>-<attempt>-<種類>.json` | パイプライン | **状態の正。** 起きたことを 1 イベント 1 ファイルで追記します（実行の開始と終了、人間の承認・差し戻し・retry）。往復回数もここから数えます |
 | `issue.md` | パイプライン | 起点になった issue 本文の写し |
 | `plan.md` / `acceptance.json` | planner | 計画と受け入れ条件 |
 | `reviews/plan-NN.md` / `reviews/dev-NN.md` | レビュアー、または差し戻したあなた | 先頭の `verdict` だけが進行の判断に使われ、本文は次のエージェントへの入力になります |
 | `decision-records/<run_id>-<attempt>-<slug>.md` | developer | 実装中の判断。判断 1 つにつき 1 ファイル |
 | `completion.md` | completion | 完了報告 |
 
-エージェントは `state.json` と `runs/` を書きません。状態を書くのはパイプラインだけで、
+エージェントは `events/` と `state.json` を書きません。状態を書くのはパイプラインだけで、
 だからこそエージェントが途中でクラッシュしても状態が食い違いません。
 
 ## それでも分からないとき
 
-`runs/` の各レコードに、どのエージェントを・どのモデルで・どのプロンプトで動かし、
+`events/` の各イベントに、どのエージェントを・どのモデルで動かし、
 どういう結果になったかが残っています。Actions の該当 run のログと合わせて読んでください。
 run のサマリーには、そのフェーズで何を判断したかが 1 行ずつ出ます。

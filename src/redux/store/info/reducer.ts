@@ -1,10 +1,10 @@
 import { reducerWithInitialState } from "../../../utils/typescriptFsaReducers.ts";
-import { restore } from "../global/actions.ts";
+import { bootstrap } from "../global/actions.ts";
 import { configure } from "./actions.ts";
 
 /** 設置と環境。ここは他のスライスを読まないので `combineReducers` に素直に載る */
 export interface InfoState {
-  /** ここから 3 つは run の識別子（イベントログから再現できる） */
+  /** ここから 3 つは `BOOTSTRAP` イベントが確定する run の識別子 */
   issue: number | null;
   branch: string | null;
   pipeline_version: number | null;
@@ -26,5 +26,10 @@ export const initialInfo: InfoState = {
 /** **どの action がどう状態を変えるかの表**（`switch` を書かない） */
 export const infoReducer = reducerWithInitialState(initialInfo)
   .case(configure, (state, payload) => ({ ...state, ...payload }))
-  .case(restore, (state, payload) => ({ ...state, ...payload.info }))
+  .case(bootstrap, (state, payload) => ({
+    ...state,
+    issue: payload.issue,
+    branch: payload.branch,
+    pipeline_version: payload.pipeline_version,
+  }))
   .build();

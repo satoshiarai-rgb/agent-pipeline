@@ -5,8 +5,8 @@ import { config } from "../../../../__tests__/helpers.ts";
 import {
   approve,
   cleanupRuns,
+  makeBlocked,
   makeRun,
-  markBlocked,
   phaseOf,
   requestChanges,
   retry as retryCmd,
@@ -93,22 +93,15 @@ describe("retry: 受け付けないもの", () => {
     expect(phaseOf(dir).phase).toBe("blocked");
   });
 
-  test("実行の記録が無ければ戻る先が決まらない", () => {
-    const dir = makeRun("blocked");
-    const r = retry(dir);
-    expect(r.ok === false && r.reason).toContain("no_records");
-  });
-
-  test("直前のレコードが閉じていなければ断る（戻しても route が動かさない）", () => {
+  test("実行中に止まったものは断る（戻しても route が動かさない）", () => {
+    // start だけして finish していない状態で、中央の版が上がって止まった場合
     const dir = makeRun("developing");
-    // start だけして finish していない状態（job タイムアウトや stale の途中）
-    start(dir, "developer", "1", c);
-    markBlocked(dir, "stale");
+    start(dir, "developer", "999", c);
+    const newer = { ...c, pipeline_version: c.pipeline_version + 1 };
 
-    const r = retry(dir);
+    const r = retryCmd(dir, "OWNER", newer);
     expect(r.ok).toBe(false);
-    expect(r.ok === false && r.reason).toContain("run_in_progress");
-    expect(phaseOf(dir).phase).toBe("blocked");
+    expect(r.ok === false && r.reason).toContain("run_in_progress: developer run=999");
   });
 
   test("approvers 以外は認可されない（入口でのみ見る / 設計書 §7.3）", () => {
@@ -134,13 +127,16 @@ describe("人間の action の認可（入口でのみ見る / 設計書 §7.3�
   });
 
   test("awaiting_human 以外での /agent approve は何もしない", () => {
-    for (const phase of ["planning", "dev_review", "done", "blocked"] as const) {
+    for (const phase of ["planning", "dev_review", "done"] as const) {
       const dir = makeRun(phase);
       const r = approve(dir, "OWNER", c);
       expect(r.ok).toBe(false);
       expect(r.ok === false && r.reason).toContain("not_awaiting_approval");
       expect(phaseOf(dir).phase).toBe(phase);
     }
+    // 止まっている run でも同じ（承認は計画の承認待ちだけ）
+    const blocked = makeBlocked("agent_failed", "dev_review");
+    expect(approve(blocked, "OWNER", c).ok).toBe(false);
   });
 
   test("done は終端なので差し戻せない（K-10: 作り直しは新しい issue で）", () => {

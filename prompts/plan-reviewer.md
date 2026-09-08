@@ -67,7 +67,7 @@ reviewer: plan-reviewer
 
 - `plan.md` と `acceptance.json` を書き換えない。直してほしいことはレビュー本文に書く
 - コードを書き換えない
-- `state.json` と `runs/` を書かない
+- `state.json` と `events/` を書かない
 
 ## 検証
 

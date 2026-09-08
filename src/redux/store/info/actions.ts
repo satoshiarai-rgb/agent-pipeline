@@ -20,5 +20,5 @@ export type InfoPayload = ConfigurePayload;
 
 const create = actionCreatorFactory("agent-pipeline/info");
 
-/** 起動時に環境を注入する */
+/** 起動時に環境を注入する（永続化しない） */
 export const configure = create<ConfigurePayload>("CONFIGURE");
