@@ -13,7 +13,7 @@ import { isReplay } from "./types.ts";
  * （route / label / explain）が状態を書かないことを、条件ではなく構造で保つため。
  */
 export const snapshot: AgentMiddleware =
-  ({ config }) =>
+  ({ settings }) =>
   (store) =>
   (next) =>
   (action) => {
@@ -22,7 +22,7 @@ export const snapshot: AgentMiddleware =
     const result = next(action);
     const after: RootState = store.getState();
     if (after.app !== before.app) {
-      writeStateFile(after.info.dir, selectSnapshot(after, config), new Date());
+      writeStateFile(after.info.dir, selectSnapshot(after, settings), new Date());
     }
     return result;
   };

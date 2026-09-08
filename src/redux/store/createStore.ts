@@ -1,5 +1,5 @@
 import { applyMiddleware, combineReducers, legacy_createStore } from "redux";
-import type { Config } from "../../defaults.ts";
+import type { Settings } from "../../settings.ts";
 import createAppReducer from "./app/index.ts";
 import type { AppState } from "./app/reducer.ts";
 import { init } from "./global/actions.ts";
@@ -29,16 +29,16 @@ export interface RootState {
 
 export interface Wiring {
   dir: string;
-  config: Config;
+  settings: Settings;
   run_id?: string | null;
   attempt?: number;
 }
 
 export function createStore(input: Wiring) {
   const outputs: Record<string, unknown> = {};
-  const wiring = { config: input.config, outputs };
+  const wiring = { settings: input.settings, outputs };
   const store = legacy_createStore(
-    combineReducers({ info: infoReducer, app: createAppReducer(input.config) }),
+    combineReducers({ info: infoReducer, app: createAppReducer(input.settings) }),
     applyMiddleware(...middlewares.map((m) => m(wiring))),
   );
   store.dispatch(

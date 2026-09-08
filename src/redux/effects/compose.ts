@@ -1,6 +1,5 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
-import type { Config } from "../../defaults.ts";
 import {
   decisionRecordPath,
   decisionRecordPaths,
@@ -19,6 +18,7 @@ import {
   reviewPath,
   reviewPaths,
 } from "../../file/reviewFile.ts";
+import type { Settings } from "../../settings.ts";
 import type { AgentName } from "../../types.ts";
 
 // ---------------------------------------------------------------- 入力の部品
@@ -141,7 +141,7 @@ export interface ComposeResult {
  */
 export function composeRun(input: {
   dir: string;
-  config: Config;
+  settings: Settings;
   agent: AgentName;
   /** 配布先のチェックアウト（既定はカレント） */
   repo?: string;

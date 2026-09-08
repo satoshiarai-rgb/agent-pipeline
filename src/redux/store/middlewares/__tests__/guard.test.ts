@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readdirSync } from "node:fs";
 import { join } from "node:path";
-import { config } from "../../../../__tests__/helpers.ts";
+import { settings } from "../../../../__tests__/helpers.ts";
 import {
   approve,
   cleanupRuns,
@@ -16,7 +16,7 @@ import {
   start,
 } from "../../../../__tests__/runDirFixture.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 const retry = (dir: string, association = "OWNER") => retryCmd(dir, association, c);

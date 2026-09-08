@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { config } from "../../../../__tests__/helpers.ts";
+import { settings } from "../../../../__tests__/helpers.ts";
 import {
   approve,
   cleanupRuns,
@@ -10,7 +10,7 @@ import {
 } from "../../../../__tests__/runDirFixture.ts";
 import { readEvents } from "../../../../file/eventLog.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 const types = (dir: string) => readEvents(dir).map((event) => event.type.split("/").at(-1));

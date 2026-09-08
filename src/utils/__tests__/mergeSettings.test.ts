@@ -1,23 +1,23 @@
 import { describe, expect, test } from "bun:test";
-import { config } from "../../__tests__/helpers.ts";
-import { defaults } from "../../defaults.ts";
-import { mergeConfig } from "../mergeConfig.ts";
+import { settings } from "../../__tests__/helpers.ts";
+import { defaultSettings } from "../../settings.ts";
+import { mergeSettings } from "../mergeSettings.ts";
 
-const base = config();
+const base = settings();
 /** 上書きを重ねる。エラーが無いことを前提にする呼び方 */
 const merged = (over: unknown) => {
-  const r = mergeConfig(base, over);
+  const r = mergeSettings(base, over);
   expect(r.errors).toEqual([]);
-  return r.config;
+  return r.settings;
 };
 /** エラーの 1 本目 */
 const error = (over: unknown) => {
-  const r = mergeConfig(base, over);
+  const r = mergeSettings(base, over);
   expect(r.errors.length).toBeGreaterThan(0);
   return r.errors[0] as string;
 };
 
-describe("mergeConfig（書いたキーだけを上書きする）", () => {
+describe("mergeSettings（書いたキーだけを上書きする）", () => {
   test("書いたキーだけが変わり、書かなかったキーは既定に追従する", () => {
     const c = merged({ limits: { dev_review_rounds: 3 } });
     expect(c.limits.dev_review_rounds).toBe(3);
@@ -50,7 +50,7 @@ describe("mergeConfig（書いたキーだけを上書きする）", () => {
 
   test("上書きしても既定値そのものは変わらない", () => {
     merged({ agents: { developer: { max_turns: 80 } } });
-    expect(defaults.agents.developer.max_turns).toBe(60);
+    expect(defaultSettings.agents.developer.max_turns).toBe(60);
     expect(base.agents.developer.max_turns).toBe(60);
   });
 
@@ -59,7 +59,7 @@ describe("mergeConfig（書いたキーだけを上書きする）", () => {
   });
 });
 
-describe("mergeConfig（受け付けないもの）", () => {
+describe("mergeSettings（受け付けないもの）", () => {
   test("既定に無いキーはエラー（誤字を黙って無視しない）", () => {
     expect(error({ limits: { plan_rounds: 3 } })).toContain("limits.plan_rounds");
     expect(error({ agents: { planer: { max_turns: 3 } } })).toContain("agents.planer");
@@ -101,13 +101,13 @@ describe("mergeConfig（受け付けないもの）", () => {
   });
 
   test("エラーがあるときは設定を一部だけ適用しない（既定のまま返す）", () => {
-    const r = mergeConfig(base, { limits: { dev_review_rounds: 3 }, pipeline_version: 2 });
+    const r = mergeSettings(base, { limits: { dev_review_rounds: 3 }, pipeline_version: 2 });
     expect(r.errors.length).toBe(1);
-    expect(r.config).toEqual(base);
+    expect(r.settings).toEqual(base);
   });
 
   test("エラーは全部集めて返す（1 つ直すたびに止まらない）", () => {
-    const r = mergeConfig(base, { limits: { total_steps: 0, plan_rounds: 3 } });
+    const r = mergeSettings(base, { limits: { total_steps: 0, plan_rounds: 3 } });
     expect(r.errors.length).toBe(2);
   });
 });

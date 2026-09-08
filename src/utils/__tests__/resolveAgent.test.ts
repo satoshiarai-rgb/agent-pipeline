@@ -1,11 +1,11 @@
 import { describe, expect, test } from "bun:test";
-import { config } from "../../__tests__/helpers.ts";
+import { settings } from "../../__tests__/helpers.ts";
 import { resolveAgent } from "../resolveAgent.ts";
 
 const AGENTS = ["planner", "plan-reviewer", "developer", "dev-reviewer", "completion"] as const;
 
 describe("resolveAgent", () => {
-  const c = config();
+  const c = settings();
 
   test("tool_profiles を実体に展開する", () => {
     expect(resolveAgent(c, "planner").tools).toBe("Read,Glob,Grep,Write");
@@ -17,7 +17,7 @@ describe("resolveAgent", () => {
   });
 
   test("reviewer を指定すればレビュアーだけモデルが変わる", () => {
-    const r = config().models;
+    const r = settings().models;
     const c2 = { ...c, models: { ...r, reviewer: "claude-sonnet-5" } };
     expect(resolveAgent(c2, "plan-reviewer").model).toBe("claude-sonnet-5");
     expect(resolveAgent(c2, "developer").model).toBe("claude-opus-5");
@@ -57,7 +57,7 @@ describe("resolveAgent", () => {
     }
   });
 
-  test("defaults は 5 エージェントと上限を定義している", () => {
+  test("defaultSettings は 5 エージェントと上限を定義している", () => {
     for (const n of [
       "planner",
       "plan-reviewer",

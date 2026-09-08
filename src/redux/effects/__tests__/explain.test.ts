@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { config } from "../../../__tests__/helpers.ts";
+import { settings } from "../../../__tests__/helpers.ts";
 import {
   cleanupRuns,
   cli,
@@ -10,7 +10,7 @@ import {
   runOnce,
 } from "../../../__tests__/runDirFixture.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 /** CLI と同じ経路で読む（store がスナップショットから状態を組み立てる） */

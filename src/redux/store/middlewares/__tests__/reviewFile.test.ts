@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync } from "node:fs";
-import { config } from "../../../../__tests__/helpers.ts";
+import { settings } from "../../../../__tests__/helpers.ts";
 import {
   cleanupRuns,
   makeRun,
@@ -8,7 +8,7 @@ import {
   runOnce,
 } from "../../../../__tests__/runDirFixture.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 /**

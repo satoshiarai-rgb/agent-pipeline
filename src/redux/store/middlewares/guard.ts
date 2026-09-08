@@ -1,4 +1,4 @@
-import type { Config } from "../../../defaults.ts";
+import type { Settings } from "../../../settings.ts";
 import type { Action, AnyAction } from "../../../utils/typescriptFsa.ts";
 import type { AppPayload, Origin } from "../app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "../app/actions.ts";
@@ -21,7 +21,11 @@ import { isReplay } from "./types.ts";
  * 遷移の規則（`app/reducer.ts`）が担う。
  */
 
-export type Guard = (root: RootState, action: Action<AppPayload>, config: Config) => string | null;
+export type Guard = (
+  root: RootState,
+  action: Action<AppPayload>,
+  settings: Settings,
+) => string | null;
 
 /** payload.by は "human:<author_association>"。認可は入口でのみ見る（設計書 §7.3） */
 function associationOf(action: Action<AppPayload>): string {
@@ -29,9 +33,9 @@ function associationOf(action: Action<AppPayload>): string {
   return by.replace(/^human:/, "");
 }
 
-const authorized: Guard = (_root, action, config) => {
+const authorized: Guard = (_root, action, settings) => {
   const association = associationOf(action);
-  if (config.approvers.includes(association)) return null;
+  if (settings.approvers.includes(association)) return null;
   return `not_authorized: ${association}`;
 };
 
@@ -49,16 +53,16 @@ const awaitingHuman: Guard = ({ app }) => {
  * **死んだ実行（stale）も「止まっている」に含める** — 記録の上では走っているが、
  * ジョブはもう居ないので誰も次を書かない（I-8）。
  */
-const mustBeBlocked: Guard = (root, action, config) => {
-  if (selectStatus(root, config).blocked_reason) return null;
+const mustBeBlocked: Guard = (root, action, settings) => {
+  if (selectStatus(root, settings).blocked_reason) return null;
   const now = (action.payload as Origin).timestamp;
-  if (selectStale(root, config, now)) return null;
+  if (selectStale(root, settings, now)) return null;
   return `not_blocked: phase=${root.app.phase}`;
 };
 
 /** 上限で止まったものはやり直しても同じ理由で止まる。issue を分けて立て直す方が正しい */
-const notLimitReached: Guard = (root, _action, config) => {
-  const reason = selectStatus(root, config).blocked_reason;
+const notLimitReached: Guard = (root, _action, settings) => {
+  const reason = selectStatus(root, settings).blocked_reason;
   if (reason?.includes("_exceeded")) return `limit_reached: ${reason}`;
   return null;
 };
@@ -67,11 +71,11 @@ const notLimitReached: Guard = (root, _action, config) => {
  * route は実行中のレコードを見て何もしないので、走っている最中に戻しても静かに
  * 止まったままになる。**ただし死んだ実行は戻してよい**（それが復旧手段 / I-8）。
  */
-const notInFlight: Guard = (root, action, config) => {
+const notInFlight: Guard = (root, action, settings) => {
   const { in_flight_agent, in_flight_run_id } = root.app;
   if (!in_flight_agent) return null;
   const now = (action.payload as Origin).timestamp;
-  if (selectStale(root, config, now)) return null;
+  if (selectStale(root, settings, now)) return null;
   return `run_in_progress: ${in_flight_agent} run=${in_flight_run_id}`;
 };
 
@@ -83,9 +87,9 @@ const GUARDS: Record<string, Guard[]> = {
 };
 
 /** 受け付けない理由。null なら通す */
-export function rejection(root: RootState, action: AnyAction, config: Config): string | null {
+export function rejection(root: RootState, action: AnyAction, settings: Settings): string | null {
   for (const guard of GUARDS[action.type] ?? []) {
-    const reason = guard(root, action as Action<AppPayload>, config);
+    const reason = guard(root, action as Action<AppPayload>, settings);
     if (reason) return reason;
   }
   return null;
@@ -96,14 +100,14 @@ const isAppAction = (action: AnyAction): boolean =>
   String(action.type).startsWith("agent-pipeline/app/");
 
 export const guard: AgentMiddleware =
-  ({ config }) =>
+  ({ settings }) =>
   (store) =>
   (next) =>
   (action) => {
     if (isReplay(action)) return next(action);
     if (!isAppAction(action as AnyAction)) return next(action);
 
-    const reason = rejection(store.getState(), action as AnyAction, config);
+    const reason = rejection(store.getState(), action as AnyAction, settings);
     if (reason) return { ok: false, reason };
     return next(action);
   };

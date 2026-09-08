@@ -6,6 +6,6 @@
  * 分からなくなるので、**実際に import されているものだけ**を置く（A-55）。
  */
 
-export type { Config } from "./defaults.ts";
-export { defaults } from "./defaults.ts";
 export { validateRun } from "./redux/effects/validate.ts";
+export type { Settings } from "./settings.ts";
+export { defaultSettings } from "./settings.ts";

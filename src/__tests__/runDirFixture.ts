@@ -1,8 +1,6 @@
 import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import type { Config } from "../defaults.ts";
-import { defaults } from "../defaults.ts";
 import type { Criterion } from "../file/acceptanceFile.ts";
 import { appendEvent } from "../file/eventLog.ts";
 import { nextReviewNumber, reviewPath, saveReview } from "../file/reviewFile.ts";
@@ -12,6 +10,8 @@ import type { Args } from "../redux/runCommand.ts";
 import { runCommand } from "../redux/runCommand.ts";
 import { agentFailed, agentStarted } from "../redux/store/app/actions.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
+import type { Settings } from "../settings.ts";
+import { defaultSettings } from "../settings.ts";
 import type { AgentName, Phase } from "../types.ts";
 import { stringifyJson } from "../utils/stringifyJson.ts";
 
@@ -23,8 +23,8 @@ const nextRun = () => String(++seq);
  * **CLI と同じ経路でコマンドを 1 つ走らせる**（`redux/runCommand.ts` の分岐を通す）。
  * 1 起動 = 1 store = 1 action なので、本番と同じく毎回イベントログを畳み直す。
  */
-export const cli = (command: string, args: Args, config: Config = defaults): unknown =>
-  runCommand(command, args, config);
+export const cli = (command: string, args: Args, settings: Settings = defaultSettings): unknown =>
+  runCommand(command, args, settings);
 
 interface Transitioned {
   phase: Phase;
@@ -34,8 +34,12 @@ interface Transitioned {
 type Human = { ok: true; phase: Phase; review_path?: string } | { ok: false; reason: string };
 
 /** 実行の開始だけを記録する */
-export const start = (dir: string, agent: AgentName, run_id: string, config = defaults) =>
-  cli("start", { dir, agent, "run-id": run_id, attempt: "1", model: "claude-opus-5" }, config) as {
+export const start = (dir: string, agent: AgentName, run_id: string, settings = defaultSettings) =>
+  cli(
+    "start",
+    { dir, agent, "run-id": run_id, attempt: "1", model: "claude-opus-5" },
+    settings,
+  ) as {
     record_path: string;
   };
 
@@ -47,10 +51,10 @@ export function runOnce(
   dir: string,
   agent: AgentName,
   report: ValidationReport,
-  config = defaults,
+  settings = defaultSettings,
 ): Transitioned {
   const run_id = nextRun();
-  start(dir, agent, run_id, config);
+  start(dir, agent, run_id, settings);
 
   const args: Args = { dir, "run-id": run_id, attempt: "1", "session-id": `sess-${run_id}` };
   if (report.result === "agent_failed") args["agent-failed"] = true;
@@ -62,7 +66,7 @@ export function runOnce(
     args["changed-files"] = writeChangedList(dir);
   }
   // result: "invalid" は成果物を書かない（契約の最初の check が落ちる）
-  return cli("finish", args, config) as Transitioned;
+  return cli("finish", args, settings) as Transitioned;
 }
 
 // ------------------------------------------------- 成果物を作る（契約 §4 の裏返し）
@@ -134,14 +138,18 @@ const ARTIFACTS: Record<AgentName, (dir: string, report: ValidationReport) => vo
   },
 };
 
-export const approve = (dir: string, association = "OWNER", config = defaults) =>
-  cli("approve", { dir, association, "run-id": nextRun() }, config) as Human;
+export const approve = (dir: string, association = "OWNER", settings = defaultSettings) =>
+  cli("approve", { dir, association, "run-id": nextRun() }, settings) as Human;
 
-export const requestChanges = (dir: string, association: string, body: string, config = defaults) =>
-  cli("request-changes", { dir, association, body, "run-id": nextRun() }, config) as Human;
+export const requestChanges = (
+  dir: string,
+  association: string,
+  body: string,
+  settings = defaultSettings,
+) => cli("request-changes", { dir, association, body, "run-id": nextRun() }, settings) as Human;
 
-export const retry = (dir: string, association = "OWNER", config = defaults) =>
-  cli("retry", { dir, association, "run-id": nextRun() }, config) as Human & {
+export const retry = (dir: string, association = "OWNER", settings = defaultSettings) =>
+  cli("retry", { dir, association, "run-id": nextRun() }, settings) as Human & {
     agent?: AgentName | null;
   };
 
@@ -228,14 +236,14 @@ export const phaseOf = (dir: string) => readStateFile(dir);
  * スナップショットを書き直す。**`blocked` は action ではなく導出される状態**なので、
  * 止まったことを記録するコマンドはこれだけ（K-26）
  */
-export const snapshot = (dir: string, config = defaults) =>
-  cli("snapshot", { dir }, config) as Transitioned;
+export const snapshot = (dir: string, settings = defaultSettings) =>
+  cli("snapshot", { dir }, settings) as Transitioned;
 
-export const route = (dir: string, config = defaults) =>
-  cli("route", { dir }, config) as NextAction;
+export const route = (dir: string, settings = defaultSettings) =>
+  cli("route", { dir }, settings) as NextAction;
 
-export const label = (dir: string, config = defaults) =>
-  cli("label", { dir }, config) as {
+export const label = (dir: string, settings = defaultSettings) =>
+  cli("label", { dir }, settings) as {
     label: string;
     issue: number;
     phase: Phase;

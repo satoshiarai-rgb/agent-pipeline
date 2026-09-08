@@ -1,7 +1,7 @@
-import type { Config } from "../defaults.ts";
+import type { Settings } from "../settings.ts";
 
 /**
- * 既定値（`src/defaults.ts`）に配布先の上書きを重ねる（A-19 / K-11）。
+ * 既定値（`src/settings.ts`）に配布先の上書きを重ねる（A-19 / K-11）。
  *
  * 規則は 4 つだけで、すべてこのファイルの中で表現している:
  *   - **書いたキーだけを上書きする**（深いマージ）。書かなかったキーは中央の既定に追従する
@@ -22,10 +22,10 @@ const OVERRIDABLE = [
   "tool_profiles",
   "agents",
   "approvers",
-] as const satisfies readonly (keyof Config)[];
+] as const satisfies readonly (keyof Settings)[];
 
 /** マージ後にだけ確かめられる整合性（1 つのキーだけを見ても決まらないもの） */
-const CONSISTENCY: ((c: Config) => string | null)[] = [
+const CONSISTENCY: ((c: Settings) => string | null)[] = [
   (c) => {
     const dangling = Object.entries(c.agents)
       .filter(([, a]) => !(a.tools in c.tool_profiles))
@@ -37,8 +37,8 @@ const CONSISTENCY: ((c: Config) => string | null)[] = [
 ];
 
 export interface MergeResult {
-  config: Config;
-  /** 空なら上書きは受け付けられた。1 つでもあれば config は既定のまま返る */
+  settings: Settings;
+  /** 空なら上書きは受け付けられた。1 つでもあれば settings は既定のまま返る */
   errors: string[];
 }
 
@@ -100,11 +100,11 @@ function mergeValue(path: string, base: unknown, over: unknown, errors: string[]
   return over;
 }
 
-/** 既定値に上書きを重ねる。errors が空でなければ config は base のまま */
-export function mergeConfig(base: Config, override: unknown): MergeResult {
+/** 既定値に上書きを重ねる。errors が空でなければ settings は base のまま */
+export function mergeSettings(base: Settings, override: unknown): MergeResult {
   const errors: string[] = [];
   if (!isRecord(override))
-    return { config: base, errors: ["最上位はオブジェクトで書いてください"] };
+    return { settings: base, errors: ["最上位はオブジェクトで書いてください"] };
 
   const merged: Record<string, unknown> = { ...base };
   for (const [key, value] of Object.entries(override)) {
@@ -117,7 +117,9 @@ export function mergeConfig(base: Config, override: unknown): MergeResult {
     merged[key] = mergeValue(key, merged[key], value, errors);
   }
 
-  const config = merged as unknown as Config;
-  errors.push(...CONSISTENCY.map((check) => check(config)).filter((e): e is string => e !== null));
-  return errors.length > 0 ? { config: base, errors } : { config, errors };
+  const settings = merged as unknown as Settings;
+  errors.push(
+    ...CONSISTENCY.map((check) => check(settings)).filter((e): e is string => e !== null),
+  );
+  return errors.length > 0 ? { settings: base, errors } : { settings, errors };
 }

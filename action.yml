@@ -5,7 +5,7 @@
 #
 # ランナーに同梱の node で dist/cli.js を実行する。npm 依存はゼロなので
 # setup-node も bun のインストールも不要。dist/ は生成物だがコミットする（bun run build）。
-# 既定値は src/defaults.ts としてバンドルに含まれる（データファイルではない）。
+# 既定値は src/settings.ts としてバンドルに含まれる（データファイルではない）。
 
 name: agent-pipeline
 description: エージェントパイプラインの状態機械を操作する（コマンドの一覧は command 入力の説明）
@@ -24,7 +24,7 @@ inputs:
   agent: { description: "start: 実行するエージェント（finish / compose は state から取るので不要）", required: false }
   run-id: { description: "start / finish / compose: GitHub Actions のラン ID", required: false }
   attempt: { description: "start / finish / compose: 再実行の回数", required: false }
-  model: { description: "start: モデル（既定は src/defaults.ts の models.default）", required: false }
+  model: { description: "start: モデル（既定は src/settings.ts の models.default）", required: false }
   # finish（成果物の検査に使う）
   agent-failed: { description: "finish: エージェントの step が失敗したなら true", required: false }
   execution-file: { description: "finish: base-action が書くセッションの記録（api_error の判定 / A-31）。ハーネスの events/ とは別物", required: false }

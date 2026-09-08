@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, readdirSync, rmSync } from "node:fs";
 import { join } from "node:path";
-import { config } from "../../../../__tests__/helpers.ts";
+import { settings } from "../../../../__tests__/helpers.ts";
 import { cleanupRuns, makeRun, runOnce } from "../../../../__tests__/runDirFixture.ts";
 import { middlewares } from "../index.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 /**

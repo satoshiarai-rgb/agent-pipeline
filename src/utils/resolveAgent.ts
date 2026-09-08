@@ -1,4 +1,4 @@
-import type { Config } from "../defaults.ts";
+import type { Settings } from "../settings.ts";
 import type { AgentName } from "../types.ts";
 
 /**
@@ -8,13 +8,13 @@ import type { AgentName } from "../types.ts";
  *   - レビュアーのモデルは models.reviewer が null なら default に落とす（設計書 §3.3）
  *   - Claude Code に渡すフラグはここで組み立てる（上限とツールはハーネスの責務 / 契約 §5）
  */
-export function resolveAgent(config: Config, agent: AgentName) {
-  const a = config.agents[agent];
+export function resolveAgent(settings: Settings, agent: AgentName) {
+  const a = settings.agents[agent];
   if (!a) throw new Error(`既定値に agents.${agent} がありません`);
-  const tools = config.tool_profiles[a.tools];
+  const tools = settings.tool_profiles[a.tools];
   if (!tools) throw new Error(`tool_profiles に ${a.tools} がありません`);
   const isReviewer = agent === "plan-reviewer" || agent === "dev-reviewer";
-  const model = (isReviewer ? config.models.reviewer : null) ?? config.models.default;
+  const model = (isReviewer ? settings.models.reviewer : null) ?? settings.models.default;
   return {
     agent,
     model,

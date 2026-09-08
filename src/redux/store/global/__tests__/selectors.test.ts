@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { config, rootOf } from "../../../../__tests__/helpers.ts";
+import { rootOf, settings } from "../../../../__tests__/helpers.ts";
 import { cleanupRuns, label, makeRun, route } from "../../../../__tests__/runDirFixture.ts";
 import { PHASES } from "../../../../types.ts";
 import {
@@ -11,7 +11,7 @@ import {
   selectStale,
 } from "../selectors.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 const next = (app: Parameters<typeof rootOf>[0], configError: string | null = null) =>

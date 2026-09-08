@@ -1,15 +1,15 @@
 import type { Middleware } from "redux";
-import type { Config } from "../../../defaults.ts";
+import type { Settings } from "../../../settings.ts";
 import type { RootState } from "../createStore.ts";
 import type { PipelineDispatch } from "../global/actions.ts";
 
 /**
- * middleware が受け取るもの。`config` はクロージャで畳み込む（state に入れない / K-26）。
+ * middleware が受け取るもの。`settings` はクロージャで畳み込む（state に入れない / K-26）。
  * `outputs` はワークフローに渡す値の受け皿で、1 起動 1 dispatch なのでこれで足りる
  * （store の enhancer は要らない）。
  */
 export interface Wiring {
-  config: Config;
+  settings: Settings;
   outputs: Record<string, unknown>;
 }
 

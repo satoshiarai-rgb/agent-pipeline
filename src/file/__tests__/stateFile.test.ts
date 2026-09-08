@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { config, rootOf } from "../../__tests__/helpers.ts";
+import { rootOf, settings } from "../../__tests__/helpers.ts";
 import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
 import { selectNextAction, selectSnapshot } from "../../redux/store/global/selectors.ts";
 import { readStateFile, stateFilePath, writeStateFile } from "../stateFile.ts";
@@ -40,7 +40,7 @@ describe("writeStateFile", () => {
     const dir = makeRun();
     writeStateFile(
       dir,
-      selectSnapshot(rootOf({ phase: "plan_review" }), config()),
+      selectSnapshot(rootOf({ phase: "plan_review" }), settings()),
       new Date("2026-09-04T10:22:00Z"),
     );
     const written = JSON.parse(readFileSync(stateFilePath(dir), "utf8"));
@@ -69,7 +69,7 @@ describe("writeStateFile", () => {
       dir,
       selectSnapshot(
         rootOf({ phase: "planning", failure_reason: "total_steps_exceeded: 12/12" }),
-        config(),
+        settings(),
       ),
       new Date(),
     );
@@ -78,17 +78,17 @@ describe("writeStateFile", () => {
 
   test("末尾に改行を付ける", () => {
     const dir = makeRun();
-    writeStateFile(dir, selectSnapshot(rootOf({ phase: "done" }), config()), new Date());
+    writeStateFile(dir, selectSnapshot(rootOf({ phase: "done" }), settings()), new Date());
     expect(readFileSync(stateFilePath(dir), "utf8").endsWith("}\n")).toBe(true);
   });
 });
 
 describe("版の一致（中央の破壊的変更から進行中の run を守る）", () => {
   const versionOf = (pipeline_version: number) =>
-    selectNextAction(rootOf({ phase: "planning" }, { pipeline_version }), config()).reason;
+    selectNextAction(rootOf({ phase: "planning" }, { pipeline_version }), settings()).reason;
 
   test("一致すれば止めない", () => {
-    expect(versionOf(config().pipeline_version)).toBe("dispatch");
+    expect(versionOf(settings().pipeline_version)).toBe("dispatch");
   });
 
   test("不一致なら理由を返す", () => {
@@ -108,6 +108,6 @@ describe("templates/state.json（bootstrap が使う雛形）", () => {
   });
 
   test("雛形の pipeline_version はハーネスと一致する", () => {
-    expect(JSON.parse(text).pipeline_version).toBe(config().pipeline_version);
+    expect(JSON.parse(text).pipeline_version).toBe(settings().pipeline_version);
   });
 });

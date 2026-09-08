@@ -1,5 +1,5 @@
-import type { Config } from "../../../defaults.ts";
 import type { Snapshot } from "../../../file/stateFile.ts";
+import type { Settings } from "../../../settings.ts";
 import type { AgentName, Phase, RoundKey } from "../../../types.ts";
 import { resolveAgent } from "../../../utils/resolveAgent.ts";
 import { parseTimestamp } from "../../../utils/timestamp.ts";
@@ -32,13 +32,13 @@ export const selectInFlightAgent = (root: RootState): AgentName | null => root.a
  * 人間の操作の `payload.timestamp`（ハーネスが打った時刻）を渡す — selector は
  * 時計を持たない（同じ state から同じ答えが出る状態を保つ）。
  */
-export function selectStale(root: RootState, config: Config, now: string): boolean {
+export function selectStale(root: RootState, settings: Settings, now: string): boolean {
   const { in_flight_agent, in_flight_since } = root.app;
   if (!in_flight_agent || !in_flight_since) return false;
   const started = parseTimestamp(in_flight_since);
   const at = parseTimestamp(now);
   if (started === null || at === null) return false;
-  const limit = resolveAgent(config, in_flight_agent).job_timeout_minutes;
+  const limit = resolveAgent(settings, in_flight_agent).job_timeout_minutes;
   return at - started > limit * 60_000;
 }
 
@@ -47,9 +47,9 @@ export const labelFor = (phase: Phase, prefix: string): string =>
   `${prefix}${phase.replace(/_/g, "-")}`;
 
 /** いま issue に付いているべきラベル。どれを外すかはワークフローが prefix で決める */
-export function selectLabel(root: RootState, config: Config) {
-  const { prefix, trigger } = config.labels;
-  const { phase } = selectStatus(root, config);
+export function selectLabel(root: RootState, settings: Settings) {
+  const { prefix, trigger } = settings.labels;
+  const { phase } = selectStatus(root, settings);
   return {
     label: labelFor(phase, prefix),
     issue: root.info.issue ?? 0,
@@ -76,17 +76,17 @@ export function selectLabel(root: RootState, config: Config) {
  */
 function selectEnvStop(
   root: RootState,
-  config: Config,
+  settings: Settings,
   config_error: string | null = null,
 ): string | null {
   const { total_steps } = root.app;
   const version = root.info.pipeline_version;
   if (config_error) return `config_invalid: ${config_error}`;
-  if (version !== config.pipeline_version) {
-    return `pipeline_version_mismatch: run=${version} harness=${config.pipeline_version}`;
+  if (version !== settings.pipeline_version) {
+    return `pipeline_version_mismatch: run=${version} harness=${settings.pipeline_version}`;
   }
-  if (total_steps >= config.limits.total_steps) {
-    return `total_steps_exceeded: ${total_steps}/${config.limits.total_steps}`;
+  if (total_steps >= settings.limits.total_steps) {
+    return `total_steps_exceeded: ${total_steps}/${settings.limits.total_steps}`;
   }
   return null;
 }
@@ -100,12 +100,12 @@ interface Status {
 
 export function selectStatus(
   root: RootState,
-  config: Config,
+  settings: Settings,
   config_error: string | null = null,
 ): Status {
   const { phase, failure_reason } = root.app;
   if (failure_reason) return { phase: "blocked", blocked_reason: failure_reason };
-  const env = selectEnvStop(root, config, config_error);
+  const env = selectEnvStop(root, settings, config_error);
   if (env) return { phase: "blocked", blocked_reason: env };
   // スナップショットが blocked のまま復元され、理由が残っていない場合
   if (phase === "blocked") {
@@ -119,19 +119,19 @@ export function selectStatus(
  * 判定は「次にエージェントを起動するか」。`awaiting_human` も止める
  * （人間のコメントを待つ間の push は route が none を返すだけの run を作る）
  */
-export const selectContinueChain = (root: RootState, config: Config): boolean =>
-  !isIdle(selectStatus(root, config).phase);
+export const selectContinueChain = (root: RootState, settings: Settings): boolean =>
+  !isIdle(selectStatus(root, settings).phase);
 
 /** `state.json` に書き出す内容。状態の射影であって、状態の正ではない（K-26） */
 export const selectSnapshot = (
   root: RootState,
-  config: Config,
+  settings: Settings,
   config_error: string | null = null,
 ): Snapshot => ({
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
-  ...selectStatus(root, config, config_error),
+  ...selectStatus(root, settings, config_error),
 });
 
 export interface NextAction {
@@ -154,11 +154,11 @@ export interface NextAction {
  */
 export function selectNextAction(
   root: RootState,
-  config: Config,
+  settings: Settings,
   config_error: string | null = null,
 ): NextAction {
   const { app } = root;
-  const { phase } = selectStatus(root, config, config_error);
+  const { phase } = selectStatus(root, settings, config_error);
   const base = {
     phase,
     total_steps: app.total_steps,
@@ -166,7 +166,7 @@ export function selectNextAction(
   };
 
   // 環境由来の停止だけは、まだスナップショットに記録されていないので書かせる
-  const env = selectEnvStop(root, config, config_error);
+  const env = selectEnvStop(root, settings, config_error);
   if (env) return { ...base, action: "block", reason: env };
   // 記録済みの停止（失敗・上限・契約違反）と人間待ちは何もしない
   if (app.failure_reason || isIdle(phase))
@@ -184,5 +184,5 @@ export function selectNextAction(
   // 非 idle の 5 フェーズはすべてエージェントを持つので、いまここには到達しない。
   // **フェーズを足したときに黙って進まない状態を作らないための番犬として残す**（A-55 の判断）
   if (!agent) return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
-  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
+  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(settings, agent) };
 }

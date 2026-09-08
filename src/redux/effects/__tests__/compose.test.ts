@@ -2,12 +2,12 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
-import { config } from "../../../__tests__/helpers.ts";
+import { settings } from "../../../__tests__/helpers.ts";
 import { cleanupRuns, makeRun } from "../../../__tests__/runDirFixture.ts";
 import type { AgentName } from "../../../types.ts";
 import { composeRun } from "../compose.ts";
 
-const c = config();
+const c = settings();
 const AGENTS = Object.keys(c.agents) as AgentName[];
 
 const extra: string[] = [];
@@ -45,7 +45,7 @@ const compose = (dir: string, agent: AgentName, over: { repo?: string } = {}) =>
   extra.push(dirname(out));
   const result = composeRun({
     dir,
-    config: c,
+    settings: c,
     agent,
     repo: over.repo ?? repo(),
     central: central(),
@@ -240,7 +240,7 @@ describe("使ったプロンプトを返す", () => {
       extra.push(dirname(out));
       const r = composeRun({
         dir: makeRun(),
-        config: c,
+        settings: c,
         agent,
         repo: repo(),
         central,

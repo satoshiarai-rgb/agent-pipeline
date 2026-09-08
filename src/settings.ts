@@ -1,6 +1,6 @@
 import type { AgentName } from "./types.ts";
 
-export interface Config {
+export interface Settings {
   pipeline_version: number;
   models: { default: string; reviewer: string | null };
   limits: Record<"plan_review_rounds" | "dev_review_rounds" | "total_steps", number>;
@@ -16,11 +16,11 @@ export interface Config {
  *   - 型チェックが効く（遷移表の phase 名の誤字を tsc が見つける）
  *   - YAML パーサが不要になり、バンドルが 248KB → 15KB になった
  * 配布先の `.agent/config.json` による上書きは `src/file/configFile.ts` が重ねる（A-19）。
- * 上書きできるキーと規則は `src/utils/mergeConfig.ts` の `OVERRIDABLE` が正。
+ * 上書きできるキーと規則は `src/utils/mergeSettings.ts` の `OVERRIDABLE` が正。
  * **フェーズの遷移はここに無い** — 状態機械は中央のもので配布先が変えられてはならないので、
  * `src/redux/store/app/reducer.ts` の各 case が直接持つ（K-26）。
  */
-export const defaults: Config = {
+export const defaultSettings: Settings = {
   /**
    * 中央リポジトリのメジャー版。合わない run は blocked にする。
    * 2 にしたのは状態の正を `state.json` からイベントログに移したため（K-26 / A-53 段取り 2）。

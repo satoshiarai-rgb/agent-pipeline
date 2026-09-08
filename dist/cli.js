@@ -7,8 +7,8 @@ import { parseArgs } from "node:util";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// src/defaults.ts
-var defaults = {
+// src/settings.ts
+var defaultSettings = {
   pipeline_version: 2,
   models: {
     default: "claude-opus-5",
@@ -37,7 +37,7 @@ var defaults = {
   }
 };
 
-// src/utils/mergeConfig.ts
+// src/utils/mergeSettings.ts
 var OVERRIDABLE = [
   "models",
   "limits",
@@ -94,10 +94,10 @@ function mergeValue(path, base, over, errors) {
   }
   return over;
 }
-function mergeConfig(base, override) {
+function mergeSettings(base, override) {
   const errors = [];
   if (!isRecord(override))
-    return { config: base, errors: ["最上位はオブジェクトで書いてください"] };
+    return { settings: base, errors: ["最上位はオブジェクトで書いてください"] };
   const merged = { ...base };
   for (const [key, value] of Object.entries(override)) {
     if (!OVERRIDABLE.includes(key)) {
@@ -106,9 +106,9 @@ function mergeConfig(base, override) {
     }
     merged[key] = mergeValue(key, merged[key], value, errors);
   }
-  const config = merged;
-  errors.push(...CONSISTENCY.map((check) => check(config)).filter((e) => e !== null));
-  return errors.length > 0 ? { config: base, errors } : { config, errors };
+  const settings = merged;
+  errors.push(...CONSISTENCY.map((check) => check(settings)).filter((e) => e !== null));
+  return errors.length > 0 ? { settings: base, errors } : { settings, errors };
 }
 
 // src/file/configFile.ts
@@ -116,23 +116,27 @@ var CONFIG_PATH = join(".agent", "config.json");
 function readConfig(repo) {
   const path = join(repo, CONFIG_PATH);
   if (!existsSync(path))
-    return { config: defaults, source: null, error: null };
+    return { settings: defaultSettings, source: null, error: null };
   let raw;
   try {
     raw = JSON.parse(readFileSync(path, "utf8"));
   } catch (e) {
     const detail = e instanceof Error ? e.message : String(e);
     return {
-      config: defaults,
+      settings: defaultSettings,
       source: path,
       error: `${CONFIG_PATH} が JSON として壊れています: ${detail}`
     };
   }
-  const { config, errors } = mergeConfig(defaults, raw);
+  const { settings, errors } = mergeSettings(defaultSettings, raw);
   if (errors.length > 0) {
-    return { config: defaults, source: path, error: `${CONFIG_PATH}: ${errors.join(" / ")}` };
+    return {
+      settings: defaultSettings,
+      source: path,
+      error: `${CONFIG_PATH}: ${errors.join(" / ")}`
+    };
   }
-  return { config, source: path, error: null };
+  return { settings, source: path, error: null };
 }
 
 // src/redux/runCommand.ts
@@ -502,15 +506,15 @@ function hasAcceptance(dir) {
 }
 
 // src/utils/resolveAgent.ts
-function resolveAgent(config, agent) {
-  const a = config.agents[agent];
+function resolveAgent(settings, agent) {
+  const a = settings.agents[agent];
   if (!a)
     throw new Error(`既定値に agents.${agent} がありません`);
-  const tools = config.tool_profiles[a.tools];
+  const tools = settings.tool_profiles[a.tools];
   if (!tools)
     throw new Error(`tool_profiles に ${a.tools} がありません`);
   const isReviewer = agent === "plan-reviewer" || agent === "dev-reviewer";
-  const model = (isReviewer ? config.models.reviewer : null) ?? config.models.default;
+  const model = (isReviewer ? settings.models.reviewer : null) ?? settings.models.default;
   return {
     agent,
     model,
@@ -660,7 +664,7 @@ var closed = {
   in_flight_run_id: null,
   in_flight_since: null
 };
-var createAppReducer = (config) => reducerWithInitialState(initialApp).case(bootstrap, (state) => ({ ...state, phase: "planning" })).case(agentStarted, (state, payload) => ({
+var createAppReducer = (settings) => reducerWithInitialState(initialApp).case(bootstrap, (state) => ({ ...state, phase: "planning" })).case(agentStarted, (state, payload) => ({
   ...state,
   total_steps: state.total_steps + 1,
   in_flight_agent: payload.agent,
@@ -686,7 +690,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(boot
       failure_reason: null
     };
   }
-  const exceeded = roundLimitReason("plan_review", rounds, config.limits.plan_review_rounds);
+  const exceeded = roundLimitReason("plan_review", rounds, settings.limits.plan_review_rounds);
   if (exceeded) {
     return {
       ...state,
@@ -718,7 +722,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(boot
       failure_reason: null
     };
   }
-  const exceeded = roundLimitReason("dev_review", rounds, config.limits.dev_review_rounds);
+  const exceeded = roundLimitReason("dev_review", rounds, settings.limits.dev_review_rounds);
   if (exceeded) {
     return {
       ...state,
@@ -764,7 +768,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(boot
 
 // src/redux/store/global/selectors.ts
 var selectInFlightAgent = (root) => root.app.in_flight_agent;
-function selectStale(root, config, now) {
+function selectStale(root, settings, now) {
   const { in_flight_agent, in_flight_since } = root.app;
   if (!in_flight_agent || !in_flight_since)
     return false;
@@ -772,13 +776,13 @@ function selectStale(root, config, now) {
   const at = parseTimestamp(now);
   if (started === null || at === null)
     return false;
-  const limit = resolveAgent(config, in_flight_agent).job_timeout_minutes;
+  const limit = resolveAgent(settings, in_flight_agent).job_timeout_minutes;
   return at - started > limit * 60000;
 }
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
-function selectLabel(root, config) {
-  const { prefix, trigger } = config.labels;
-  const { phase } = selectStatus(root, config);
+function selectLabel(root, settings) {
+  const { prefix, trigger } = settings.labels;
+  const { phase } = selectStatus(root, settings);
   return {
     label: labelFor(phase, prefix),
     issue: root.info.issue ?? 0,
@@ -787,24 +791,24 @@ function selectLabel(root, config) {
     trigger
   };
 }
-function selectEnvStop(root, config, config_error = null) {
+function selectEnvStop(root, settings, config_error = null) {
   const { total_steps } = root.app;
   const version = root.info.pipeline_version;
   if (config_error)
     return `config_invalid: ${config_error}`;
-  if (version !== config.pipeline_version) {
-    return `pipeline_version_mismatch: run=${version} harness=${config.pipeline_version}`;
+  if (version !== settings.pipeline_version) {
+    return `pipeline_version_mismatch: run=${version} harness=${settings.pipeline_version}`;
   }
-  if (total_steps >= config.limits.total_steps) {
-    return `total_steps_exceeded: ${total_steps}/${config.limits.total_steps}`;
+  if (total_steps >= settings.limits.total_steps) {
+    return `total_steps_exceeded: ${total_steps}/${settings.limits.total_steps}`;
   }
   return null;
 }
-function selectStatus(root, config, config_error = null) {
+function selectStatus(root, settings, config_error = null) {
   const { phase, failure_reason } = root.app;
   if (failure_reason)
     return { phase: "blocked", blocked_reason: failure_reason };
-  const env = selectEnvStop(root, config, config_error);
+  const env = selectEnvStop(root, settings, config_error);
   if (env)
     return { phase: "blocked", blocked_reason: env };
   if (phase === "blocked") {
@@ -812,22 +816,22 @@ function selectStatus(root, config, config_error = null) {
   }
   return { phase, blocked_reason: null };
 }
-var selectContinueChain = (root, config) => !isIdle(selectStatus(root, config).phase);
-var selectSnapshot = (root, config, config_error = null) => ({
+var selectContinueChain = (root, settings) => !isIdle(selectStatus(root, settings).phase);
+var selectSnapshot = (root, settings, config_error = null) => ({
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
-  ...selectStatus(root, config, config_error)
+  ...selectStatus(root, settings, config_error)
 });
-function selectNextAction(root, config, config_error = null) {
+function selectNextAction(root, settings, config_error = null) {
   const { app } = root;
-  const { phase } = selectStatus(root, config, config_error);
+  const { phase } = selectStatus(root, settings, config_error);
   const base = {
     phase,
     total_steps: app.total_steps,
     rounds: { plan_review: app.plan_review_rounds, dev_review: app.dev_review_rounds }
   };
-  const env = selectEnvStop(root, config, config_error);
+  const env = selectEnvStop(root, settings, config_error);
   if (env)
     return { ...base, action: "block", reason: env };
   if (app.failure_reason || isIdle(phase))
@@ -842,7 +846,7 @@ function selectNextAction(root, config, config_error = null) {
   const agent = agentFor(phase);
   if (!agent)
     return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
-  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
+  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(settings, agent) };
 }
 
 // src/redux/effects/explain.ts
@@ -920,7 +924,7 @@ var ADVICE = [
     body: () => `**\`/agent retry\` は受け付けません。** やり直しても同じ理由で止まるためです。
 
 - レビューが収束していないなら、**issue を分けて立て直す**のが正しい対処です（同一 issue の 2 周目は行いません）
-- 上限そのものを変えるなら、中央の \`src/defaults.ts\` の \`limits\` を直します`
+- 上限そのものを変えるなら、中央の \`src/settings.ts\` の \`limits\` を直します`
   },
   {
     when: "config_invalid",
@@ -951,8 +955,8 @@ var FALLBACK = {
 2. 原因を直す
 3. ${retryLine}`
 };
-function explainRun(root, dir, config, config_error = null) {
-  const status = selectStatus(root, config, config_error);
+function explainRun(root, dir, settings, config_error = null) {
+  const status = selectStatus(root, settings, config_error);
   if (status.blocked_reason === null)
     return null;
   const reason = status.blocked_reason;
@@ -1507,9 +1511,9 @@ function associationOf(action) {
   const by = action.payload.by ?? "";
   return by.replace(/^human:/, "");
 }
-var authorized = (_root, action, config) => {
+var authorized = (_root, action, settings) => {
   const association = associationOf(action);
-  if (config.approvers.includes(association))
+  if (settings.approvers.includes(association))
     return null;
   return `not_authorized: ${association}`;
 };
@@ -1518,26 +1522,26 @@ var awaitingHuman = ({ app }) => {
     return null;
   return `not_awaiting_approval: phase=${app.phase}`;
 };
-var mustBeBlocked = (root, action, config) => {
-  if (selectStatus(root, config).blocked_reason)
+var mustBeBlocked = (root, action, settings) => {
+  if (selectStatus(root, settings).blocked_reason)
     return null;
   const now = action.payload.timestamp;
-  if (selectStale(root, config, now))
+  if (selectStale(root, settings, now))
     return null;
   return `not_blocked: phase=${root.app.phase}`;
 };
-var notLimitReached = (root, _action, config) => {
-  const reason = selectStatus(root, config).blocked_reason;
+var notLimitReached = (root, _action, settings) => {
+  const reason = selectStatus(root, settings).blocked_reason;
   if (reason?.includes("_exceeded"))
     return `limit_reached: ${reason}`;
   return null;
 };
-var notInFlight = (root, action, config) => {
+var notInFlight = (root, action, settings) => {
   const { in_flight_agent, in_flight_run_id } = root.app;
   if (!in_flight_agent)
     return null;
   const now = action.payload.timestamp;
-  if (selectStale(root, config, now))
+  if (selectStale(root, settings, now))
     return null;
   return `run_in_progress: ${in_flight_agent} run=${in_flight_run_id}`;
 };
@@ -1546,21 +1550,21 @@ var GUARDS = {
   [humanRequestChanges.type]: [authorized, awaitingHuman],
   [retry.type]: [authorized, mustBeBlocked, notLimitReached, notInFlight]
 };
-function rejection(root, action, config) {
+function rejection(root, action, settings) {
   for (const guard of GUARDS[action.type] ?? []) {
-    const reason = guard(root, action, config);
+    const reason = guard(root, action, settings);
     if (reason)
       return reason;
   }
   return null;
 }
 var isAppAction = (action) => String(action.type).startsWith("agent-pipeline/app/");
-var guard = ({ config }) => (store) => (next) => (action) => {
+var guard = ({ settings }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
   if (!isAppAction(action))
     return next(action);
-  const reason = rejection(store.getState(), action, config);
+  const reason = rejection(store.getState(), action, settings);
   if (reason)
     return { ok: false, reason };
   return next(action);
@@ -1599,14 +1603,14 @@ var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
 };
 
 // src/redux/store/middlewares/snapshot.ts
-var snapshot = ({ config }) => (store) => (next) => (action) => {
+var snapshot = ({ settings }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
   const before = store.getState();
   const result = next(action);
   const after = store.getState();
   if (after.app !== before.app) {
-    writeStateFile(after.info.dir, selectSnapshot(after, config), new Date);
+    writeStateFile(after.info.dir, selectSnapshot(after, settings), new Date);
   }
   return result;
 };
@@ -1617,8 +1621,8 @@ var middlewares = [guard, snapshot, reviewFile, eventLog, hydrate];
 // src/redux/store/createStore.ts
 function createStore2(input) {
   const outputs = {};
-  const wiring = { config: input.config, outputs };
-  const store = legacy_createStore(combineReducers({ info: info_default, app: app_default(input.config) }), applyMiddleware(...middlewares.map((m) => m(wiring))));
+  const wiring = { settings: input.settings, outputs };
+  const store = legacy_createStore(combineReducers({ info: info_default, app: app_default(input.settings) }), applyMiddleware(...middlewares.map((m) => m(wiring))));
   store.dispatch(configure({
     dir: input.dir,
     run_id: input.run_id ?? null,
@@ -1661,12 +1665,12 @@ var need = (v, name) => {
   return v;
 };
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
-function runCommand(command, args, config, configError = null) {
+function runCommand(command, args, settings, configError = null) {
   const dir = need(args.dir, "dir");
   const now = formatTimestamp(new Date);
   const { store, outputs, state } = createStore2({
     dir,
-    config,
+    settings,
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1)
   });
@@ -1676,7 +1680,7 @@ function runCommand(command, args, config, configError = null) {
       throw new Error("実行が記録されていません（start が無い）");
     return composeRun({
       dir,
-      config,
+      settings,
       agent,
       repo: args.repo ?? ".",
       central: need(args.central, "central"),
@@ -1686,16 +1690,16 @@ function runCommand(command, args, config, configError = null) {
     });
   }
   if (command === "route")
-    return selectNextAction(state(), config, configError);
+    return selectNextAction(state(), settings, configError);
   if (command === "label")
-    return selectLabel(state(), config);
+    return selectLabel(state(), settings);
   if (command === "explain")
-    return explainRun(state(), dir, config, configError);
+    return explainRun(state(), dir, settings, configError);
   if (command === "snapshot") {
-    const snapshot2 = selectSnapshot(state(), config, configError);
+    const snapshot2 = selectSnapshot(state(), settings, configError);
     writeStateFile(dir, snapshot2, new Date);
     const root = state();
-    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
+    return { ...selectStatus(root, settings), continue_chain: selectContinueChain(root, settings) };
   }
   if (command === "bootstrap") {
     const issue = need(args.issue, "issue");
@@ -1704,11 +1708,11 @@ function runCommand(command, args, config, configError = null) {
       by: "harness",
       issue: Number(issue),
       branch: need(args.branch, "branch"),
-      pipeline_version: config.pipeline_version
+      pipeline_version: settings.pipeline_version
     });
     store.dispatch(action);
     const root = state();
-    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
+    return { ...selectStatus(root, settings), continue_chain: selectContinueChain(root, settings) };
   }
   if (command === "start") {
     const action = agentStarted({
@@ -1717,7 +1721,7 @@ function runCommand(command, args, config, configError = null) {
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
       agent: need(args.agent, "agent"),
-      model: args.model ?? config.models.default
+      model: args.model ?? settings.models.default
     });
     store.dispatch(action);
     return { event_path: outputs.event_path };
@@ -1737,7 +1741,7 @@ function runCommand(command, args, config, configError = null) {
 `).filter(Boolean);
         report = validateRun({
           dir,
-          config,
+          settings,
           agent,
           agent_failed: args["agent-failed"] ?? false,
           execution_file: args["execution-file"] ?? null,
@@ -1757,8 +1761,8 @@ function runCommand(command, args, config, configError = null) {
     store.dispatch(action);
     const root = state();
     return {
-      ...selectStatus(root, config),
-      continue_chain: selectContinueChain(root, config),
+      ...selectStatus(root, settings),
+      continue_chain: selectContinueChain(root, settings),
       result: report.result,
       detail: report.detail ?? null,
       oversize: report.oversize ?? false
@@ -1770,7 +1774,7 @@ function runCommand(command, args, config, configError = null) {
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    const { phase } = selectStatus(state(), config);
+    const { phase } = selectStatus(state(), settings);
     return { ok: true, phase };
   }
   if (command === "request-changes") {
@@ -1783,7 +1787,7 @@ function runCommand(command, args, config, configError = null) {
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    const { phase } = selectStatus(state(), config);
+    const { phase } = selectStatus(state(), settings);
     return { ok: true, phase, review_path: outputs.review_path };
   }
   if (command === "retry") {
@@ -1792,7 +1796,7 @@ function runCommand(command, args, config, configError = null) {
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    const { phase } = selectStatus(state(), config);
+    const { phase } = selectStatus(state(), settings);
     return { ok: true, phase, agent: agentFor(phase) };
   }
   return;
@@ -1840,7 +1844,7 @@ var loaded = readConfig(values.repo ?? ".");
 if (loaded.error && command !== "route")
   fail(loaded.error);
 try {
-  const result = runCommand(command, values, loaded.config, loaded.error);
+  const result = runCommand(command, values, loaded.settings, loaded.error);
   if (result === undefined)
     fail(`不明なコマンド: ${command || "(なし)"}`);
   console.log(JSON.stringify(result, null, 2));

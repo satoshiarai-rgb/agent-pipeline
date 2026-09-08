@@ -1,11 +1,11 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { config } from "../../../__tests__/helpers.ts";
+import { settings } from "../../../__tests__/helpers.ts";
 import { cleanupRuns, makeRun } from "../../../__tests__/runDirFixture.ts";
 import { validateRun } from "../validate.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 const write = (dir: string, rel: string, text: string) => {
@@ -33,7 +33,7 @@ const plan = "# 計画\n\n## 規模判定\n\n- 変更ファイル数見込み: 2
 
 describe("実行そのものの失敗", () => {
   test("step が失敗していれば agent_failed", () => {
-    const r = validateRun({ dir: makeRun(), config: c, agent: "planner", agent_failed: true });
+    const r = validateRun({ dir: makeRun(), settings: c, agent: "planner", agent_failed: true });
     expect(r.result).toBe("agent_failed");
   });
 
@@ -46,7 +46,7 @@ describe("実行そのものの失敗", () => {
     );
     const r = validateRun({
       dir,
-      config: c,
+      settings: c,
       agent: "planner",
       agent_failed: true,
       execution_file: log,
@@ -66,7 +66,7 @@ describe("実行そのものの失敗", () => {
     );
     const r = validateRun({
       dir,
-      config: c,
+      settings: c,
       agent: "planner",
       agent_failed: true,
       execution_file: log,
@@ -75,7 +75,7 @@ describe("実行そのものの失敗", () => {
   });
 
   test("実行ログが無ければ step の失敗をそのまま agent_failed にする", () => {
-    const r = validateRun({ dir: makeRun(), config: c, agent: "planner", agent_failed: true });
+    const r = validateRun({ dir: makeRun(), settings: c, agent: "planner", agent_failed: true });
     expect(r.result).toBe("agent_failed");
   });
 
@@ -88,7 +88,7 @@ describe("実行そのものの失敗", () => {
       "log.json",
       JSON.stringify([{ type: "result", terminal_reason: "completed" }]),
     );
-    expect(validateRun({ dir, config: c, agent: "planner", execution_file: log }).result).toBe(
+    expect(validateRun({ dir, settings: c, agent: "planner", execution_file: log }).result).toBe(
       "ok",
     );
   });
@@ -99,22 +99,22 @@ describe("planner", () => {
     const dir = makeRun();
     write(dir, "plan.md", plan);
     write(dir, "acceptance.json", acceptance());
-    expect(validateRun({ dir, config: c, agent: "planner" })).toEqual({ result: "ok" });
+    expect(validateRun({ dir, settings: c, agent: "planner" })).toEqual({ result: "ok" });
   });
 
   test("plan.md が無い / 空なら invalid", () => {
     const dir = makeRun();
     write(dir, "acceptance.json", acceptance());
-    expect(validateRun({ dir, config: c, agent: "planner" }).detail).toContain("plan.md");
+    expect(validateRun({ dir, settings: c, agent: "planner" }).detail).toContain("plan.md");
     write(dir, "plan.md", "   \n");
-    expect(validateRun({ dir, config: c, agent: "planner" }).detail).toContain("plan.md");
+    expect(validateRun({ dir, settings: c, agent: "planner" }).detail).toContain("plan.md");
   });
 
   test("規模判定の節が無ければ invalid（契約 §4）", () => {
     const dir = makeRun();
     write(dir, "plan.md", "# 計画\n\n中身だけ書いた\n");
     write(dir, "acceptance.json", acceptance());
-    expect(validateRun({ dir, config: c, agent: "planner" }).detail).toContain("規模判定");
+    expect(validateRun({ dir, settings: c, agent: "planner" }).detail).toContain("規模判定");
   });
 
   test("規模超過なら oversize（実装に進まず issue の分割を促す）", () => {
@@ -125,7 +125,7 @@ describe("planner", () => {
       "# 計画\n\n## 規模判定\n\n- 上限（10）以内: no（上限超過）\n\n分割案: …\n",
     );
     write(dir, "acceptance.json", acceptance());
-    expect(validateRun({ dir, config: c, agent: "planner" })).toEqual({
+    expect(validateRun({ dir, settings: c, agent: "planner" })).toEqual({
       result: "ok",
       oversize: true,
     });
@@ -134,7 +134,7 @@ describe("planner", () => {
   test("acceptance.json が無ければ invalid", () => {
     const dir = makeRun();
     write(dir, "plan.md", plan);
-    expect(validateRun({ dir, config: c, agent: "planner" }).detail).toContain("acceptance.json");
+    expect(validateRun({ dir, settings: c, agent: "planner" }).detail).toContain("acceptance.json");
   });
 });
 
@@ -143,7 +143,7 @@ describe("acceptance.json のスキーマ（契約 §4）", () => {
     const dir = makeRun();
     write(dir, "plan.md", plan);
     write(dir, "acceptance.json", acceptance(over));
-    return validateRun({ dir, config: c, agent: "planner" }).detail ?? "";
+    return validateRun({ dir, settings: c, agent: "planner" }).detail ?? "";
   };
 
   test("automated なら command が必要", () => {
@@ -167,7 +167,7 @@ describe("acceptance.json のスキーマ（契約 §4）", () => {
     const dir = makeRun();
     write(dir, "plan.md", plan);
     write(dir, "acceptance.json", "{ criteria: [] }");
-    expect(validateRun({ dir, config: c, agent: "planner" }).detail).toContain("解析に失敗");
+    expect(validateRun({ dir, settings: c, agent: "planner" }).detail).toContain("解析に失敗");
   });
 });
 
@@ -178,7 +178,7 @@ describe("レビュアー", () => {
   test("frontmatter の verdict を返す", () => {
     const dir = makeRun();
     write(dir, "reviews/plan-01.md", review("approve"));
-    expect(validateRun({ dir, config: c, agent: "plan-reviewer" })).toEqual({
+    expect(validateRun({ dir, settings: c, agent: "plan-reviewer" })).toEqual({
       result: "ok",
       verdict: "approve",
     });
@@ -188,18 +188,20 @@ describe("レビュアー", () => {
     const dir = makeRun();
     write(dir, "reviews/plan-01.md", review("request_changes"));
     write(dir, "reviews/plan-02.md", review("approve"));
-    expect(validateRun({ dir, config: c, agent: "plan-reviewer" }).verdict).toBe("approve");
+    expect(validateRun({ dir, settings: c, agent: "plan-reviewer" }).verdict).toBe("approve");
   });
 
   test("dev-reviewer は dev-NN.md を見る", () => {
     const dir = makeRun();
     write(dir, "reviews/plan-01.md", review("approve"));
     write(dir, "reviews/dev-01.md", review("request_changes"));
-    expect(validateRun({ dir, config: c, agent: "dev-reviewer" }).verdict).toBe("request_changes");
+    expect(validateRun({ dir, settings: c, agent: "dev-reviewer" }).verdict).toBe(
+      "request_changes",
+    );
   });
 
   test("レビューが無ければ invalid", () => {
-    expect(validateRun({ dir: makeRun(), config: c, agent: "plan-reviewer" }).detail).toContain(
+    expect(validateRun({ dir: makeRun(), settings: c, agent: "plan-reviewer" }).detail).toContain(
       "reviews/plan-NN.md",
     );
   });
@@ -207,9 +209,9 @@ describe("レビュアー", () => {
   test("verdict が無い / 不正なら invalid", () => {
     const dir = makeRun();
     write(dir, "reviews/plan-01.md", "本文だけ書いた\n");
-    expect(validateRun({ dir, config: c, agent: "plan-reviewer" }).detail).toContain("verdict");
+    expect(validateRun({ dir, settings: c, agent: "plan-reviewer" }).detail).toContain("verdict");
     write(dir, "reviews/plan-01.md", review("lgtm"));
-    expect(validateRun({ dir, config: c, agent: "plan-reviewer" }).detail).toContain("verdict");
+    expect(validateRun({ dir, settings: c, agent: "plan-reviewer" }).detail).toContain("verdict");
   });
 });
 
@@ -224,7 +226,7 @@ describe("developer", () => {
     expect(
       validateRun({
         dir: setup(),
-        config: c,
+        settings: c,
         agent: "developer",
         changed_files: ["src/auth.ts", "src/__tests__/auth.test.ts"],
       }),
@@ -233,14 +235,14 @@ describe("developer", () => {
 
   test("差分が無ければ invalid", () => {
     expect(
-      validateRun({ dir: setup(), config: c, agent: "developer", changed_files: [] }).detail,
+      validateRun({ dir: setup(), settings: c, agent: "developer", changed_files: [] }).detail,
     ).toContain("差分");
   });
 
   test(".github/workflows を触っていれば invalid（K-4）", () => {
     const r = validateRun({
       dir: setup(),
-      config: c,
+      settings: c,
       agent: "developer",
       changed_files: ["src/auth.ts", ".github/workflows/ci.yml"],
     });
@@ -251,14 +253,14 @@ describe("developer", () => {
     const dir = makeRun();
     write(dir, "acceptance.json", acceptance({ status: "passed" }));
     expect(
-      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
+      validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("evidence");
   });
 
   test("決定記録は任意。無くても ok", () => {
     const r = validateRun({
       dir: setup(),
-      config: c,
+      settings: c,
       agent: "developer",
       changed_files: ["src/a.ts"],
     });
@@ -282,7 +284,7 @@ describe("developer", () => {
     const dir = setup();
     write(dir, "decision-records/17293840112-1-session-ttl.md", record({ reversibility: "容易" }));
     expect(
-      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
+      validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("reversibility");
   });
 
@@ -290,7 +292,7 @@ describe("developer", () => {
     const dir = setup();
     write(dir, "decision-records/D-1.md", record());
     expect(
-      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
+      validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("名前が");
   });
 
@@ -298,7 +300,7 @@ describe("developer", () => {
     const dir = setup();
     write(dir, "decision-records/17293840112-1-session-ttl.md", record());
     expect(
-      validateRun({ dir, config: c, agent: "developer", changed_files: ["src/a.ts"] }).result,
+      validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).result,
     ).toBe("ok");
   });
 });
@@ -308,7 +310,7 @@ describe("completion", () => {
     const dir = makeRun();
     write(dir, "completion.md", "# 完了報告\n");
     write(dir, "acceptance.json", acceptance({ status: "passed", evidence: "確認した" }));
-    expect(validateRun({ dir, config: c, agent: "completion" })).toEqual({
+    expect(validateRun({ dir, settings: c, agent: "completion" })).toEqual({
       result: "ok",
       acceptance_passed: true,
     });
@@ -318,12 +320,14 @@ describe("completion", () => {
     const dir = makeRun();
     write(dir, "completion.md", "# 完了報告\n");
     write(dir, "acceptance.json", acceptance());
-    expect(validateRun({ dir, config: c, agent: "completion" }).acceptance_passed).toBe(false);
+    expect(validateRun({ dir, settings: c, agent: "completion" }).acceptance_passed).toBe(false);
   });
 
   test("completion.md が無ければ invalid", () => {
     const dir = makeRun();
     write(dir, "acceptance.json", acceptance({ status: "passed", evidence: "x" }));
-    expect(validateRun({ dir, config: c, agent: "completion" }).detail).toContain("completion.md");
+    expect(validateRun({ dir, settings: c, agent: "completion" }).detail).toContain(
+      "completion.md",
+    );
   });
 });

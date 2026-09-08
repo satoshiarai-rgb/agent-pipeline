@@ -12,7 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parse } from "yaml";
-import { defaults, validateRun } from "../../src/index.ts";
+import { defaultSettings, validateRun } from "../../src/index.ts";
 import type { AgentName } from "../../src/types.ts";
 
 /**
@@ -338,7 +338,7 @@ describe("dry run のダミーエージェント（実際に走らせる）", ()
     const dir = makeRun("happy");
     const runDir = join(dir, "agent-work/issue-1");
     const v = (agent: AgentName, changed: string[] = []) =>
-      validateRun({ dir: runDir, config: defaults, agent, changed_files: changed });
+      validateRun({ dir: runDir, settings: defaultSettings, agent, changed_files: changed });
 
     runPhase(dir, "planning", "planner");
     expect(v("planner")).toEqual({ result: "ok" });

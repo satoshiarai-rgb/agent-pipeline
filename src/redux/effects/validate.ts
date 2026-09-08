@@ -3,7 +3,6 @@
 // ここは finish が action を作る前に成果物を読む側。
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import type { Config } from "../../defaults.ts";
 import {
   acceptanceProblems,
   allPassed,
@@ -13,6 +12,7 @@ import {
 import { decisionRecordProblems } from "../../file/decisionRecords.ts";
 import { completedCleanly, readApiErrorStatus } from "../../file/executionLog.ts";
 import { latestReviewPath, readVerdict } from "../../file/reviewFile.ts";
+import type { Settings } from "../../settings.ts";
 import type { AgentName, RunResult, Verdict } from "../../types.ts";
 
 /**
@@ -154,7 +154,7 @@ const CONTRACT: Record<AgentName, Contract> = {
  */
 export function validateRun(input: {
   dir: string;
-  config: Config;
+  settings: Settings;
   agent: AgentName;
   /** エージェントの step が失敗したか */
   agent_failed?: boolean;

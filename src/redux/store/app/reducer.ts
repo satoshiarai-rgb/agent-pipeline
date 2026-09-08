@@ -1,4 +1,4 @@
-import type { Config } from "../../../defaults.ts";
+import type { Settings } from "../../../settings.ts";
 import type { AgentName, Phase } from "../../../types.ts";
 import { reducerWithInitialState } from "../../../utils/typescriptFsaReducers.ts";
 import { bootstrap } from "../global/actions.ts";
@@ -102,9 +102,9 @@ const closed = {
 
 /**
  * **どの action がどう状態を変えるかの表。** 1 action = 1 遷移で、遷移先は case の中に
- * 直接書く。`config` を畳み込むのはレビューの往復上限（`limits`）だけ。
+ * 直接書く。`settings` を畳み込むのはレビューの往復上限（`limits`）だけ。
  */
-export const createAppReducer = (config: Config) =>
+export const createAppReducer = (settings: Settings) =>
   reducerWithInitialState(initialApp)
     // run が始まった。ここから計画のフェーズ（識別子は info スライスが受ける）
     .case(bootstrap, (state) => ({ ...state, phase: "planning" as const }))
@@ -148,7 +148,7 @@ export const createAppReducer = (config: Config) =>
           failure_reason: null,
         };
       }
-      const exceeded = roundLimitReason("plan_review", rounds, config.limits.plan_review_rounds);
+      const exceeded = roundLimitReason("plan_review", rounds, settings.limits.plan_review_rounds);
       if (exceeded) {
         return {
           ...state,
@@ -186,7 +186,7 @@ export const createAppReducer = (config: Config) =>
           failure_reason: null,
         };
       }
-      const exceeded = roundLimitReason("dev_review", rounds, config.limits.dev_review_rounds);
+      const exceeded = roundLimitReason("dev_review", rounds, settings.limits.dev_review_rounds);
       if (exceeded) {
         return {
           ...state,

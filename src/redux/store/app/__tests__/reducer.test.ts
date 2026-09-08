@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, test } from "bun:test";
-import { config } from "../../../../__tests__/helpers.ts";
+import { settings } from "../../../../__tests__/helpers.ts";
 import {
   approve,
   cleanupRuns,
@@ -13,7 +13,7 @@ import {
 import { readEvents } from "../../../../file/eventLog.ts";
 import { agentFor, isIdle } from "../reducer.ts";
 
-const c = config();
+const c = settings();
 afterEach(cleanupRuns);
 
 describe("reducer: イベントログと state.json", () => {

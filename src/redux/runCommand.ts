@@ -1,7 +1,6 @@
 import { readFileSync } from "node:fs";
-
-import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
+import type { Settings } from "../settings.ts";
 import type { AgentName } from "../types.ts";
 import { formatTimestamp } from "../utils/timestamp.ts";
 import { composeRun } from "./effects/compose.ts";
@@ -84,7 +83,7 @@ const isRejection = (r: unknown): r is { ok: false; reason: string } =>
 export function runCommand(
   command: string,
   args: Args,
-  config: Config,
+  settings: Settings,
   configError: string | null = null,
 ): unknown {
   const dir = need(args.dir, "dir");
@@ -92,7 +91,7 @@ export function runCommand(
   const now = formatTimestamp(new Date());
   const { store, outputs, state } = createStore({
     dir,
-    config,
+    settings,
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
@@ -104,7 +103,7 @@ export function runCommand(
     if (!agent) throw new Error("実行が記録されていません（start が無い）");
     return composeRun({
       dir,
-      config,
+      settings,
       agent,
       repo: args.repo ?? ".",
       central: need(args.central, "central"),
@@ -116,17 +115,17 @@ export function runCommand(
   }
 
   // 読むだけの 3 つ。selector を読み、何も書かない
-  if (command === "route") return selectNextAction(state(), config, configError);
-  if (command === "label") return selectLabel(state(), config);
-  if (command === "explain") return explainRun(state(), dir, config, configError);
+  if (command === "route") return selectNextAction(state(), settings, configError);
+  if (command === "label") return selectLabel(state(), settings);
+  if (command === "explain") return explainRun(state(), dir, settings, configError);
 
   // 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
   // なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）
   if (command === "snapshot") {
-    const snapshot = selectSnapshot(state(), config, configError);
+    const snapshot = selectSnapshot(state(), settings, configError);
     writeStateFile(dir, snapshot, new Date());
     const root = state();
-    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
+    return { ...selectStatus(root, settings), continue_chain: selectContinueChain(root, settings) };
   }
 
   // run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する
@@ -137,11 +136,11 @@ export function runCommand(
       by: "harness",
       issue: Number(issue),
       branch: need(args.branch, "branch"),
-      pipeline_version: config.pipeline_version,
+      pipeline_version: settings.pipeline_version,
     });
     store.dispatch(action);
     const root = state();
-    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
+    return { ...selectStatus(root, settings), continue_chain: selectContinueChain(root, settings) };
   }
 
   if (command === "start") {
@@ -151,7 +150,7 @@ export function runCommand(
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
       agent: need(args.agent, "agent") as AgentName,
-      model: args.model ?? config.models.default,
+      model: args.model ?? settings.models.default,
     });
     store.dispatch(action);
     return { event_path: outputs.event_path };
@@ -178,7 +177,7 @@ export function runCommand(
         if (listPath) changed = readFileSync(listPath, "utf8").split("\n").filter(Boolean);
         report = validateRun({
           dir,
-          config,
+          settings,
           agent,
           agent_failed: args["agent-failed"] ?? false,
           execution_file: args["execution-file"] ?? null,
@@ -198,8 +197,8 @@ export function runCommand(
     store.dispatch(action);
     const root = state();
     return {
-      ...selectStatus(root, config),
-      continue_chain: selectContinueChain(root, config),
+      ...selectStatus(root, settings),
+      continue_chain: selectContinueChain(root, settings),
       result: report.result,
       detail: report.detail ?? null,
       // 規模超過は止めずに PR へ警告を出すための出力（K-21）
@@ -214,7 +213,7 @@ export function runCommand(
     const action = humanApproval({ timestamp: now, by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    const { phase } = selectStatus(state(), config);
+    const { phase } = selectStatus(state(), settings);
     return { ok: true, phase };
   }
 
@@ -227,7 +226,7 @@ export function runCommand(
     });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    const { phase } = selectStatus(state(), config);
+    const { phase } = selectStatus(state(), settings);
     return { ok: true, phase, review_path: outputs.review_path };
   }
 
@@ -236,7 +235,7 @@ export function runCommand(
     const action = retry({ timestamp: now, by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    const { phase } = selectStatus(state(), config);
+    const { phase } = selectStatus(state(), settings);
     return { ok: true, phase, agent: agentFor(phase) };
   }
 
