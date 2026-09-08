@@ -9,6 +9,8 @@ add() { # add <flag> <value>: 値が空なら渡さない
   [ -n "${2:-}" ] && args+=("$1" "$2")
   return 0
 }
+add --issue "${CLI_ISSUE:-}"
+add --branch "${CLI_BRANCH:-}"
 add --agent "${CLI_AGENT:-}"
 add --run-id "${CLI_RUN_ID:-}"
 add --attempt "${CLI_ATTEMPT:-}"

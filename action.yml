@@ -17,6 +17,9 @@ inputs:
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"
     required: true
+  # bootstrap
+  issue: { description: "bootstrap: issue 番号", required: false }
+  branch: { description: "bootstrap: 作業ブランチ（claude/issue-<n>）", required: false }
   # start
   agent: { description: "start / compose: 実行するエージェント（finish は state から取るので不要）", required: false }
   run-id: { description: "start / finish / compose: GitHub Actions のラン ID", required: false }
@@ -95,6 +98,8 @@ runs:
       env:
         CLI_COMMAND: ${{ inputs.command }}
         CLI_DIR: ${{ inputs.dir }}
+        CLI_ISSUE: ${{ inputs.issue }}
+        CLI_BRANCH: ${{ inputs.branch }}
         CLI_AGENT: ${{ inputs.agent }}
         CLI_RUN_ID: ${{ inputs.run-id }}
         CLI_ATTEMPT: ${{ inputs.attempt }}

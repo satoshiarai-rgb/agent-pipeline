@@ -35,6 +35,8 @@ interface Step {
   id?: string;
   name?: string;
   run?: string;
+  uses?: string;
+  with?: Record<string, unknown>;
 }
 interface Job {
   steps?: Step[];
@@ -78,6 +80,12 @@ function workflows(): Workflow[] {
 }
 
 const all = workflows();
+
+/** action の入力の宣言と、それを CLI に渡す実体 */
+const ACTION = parse(readFileSync(join(ROOT, "action.yml"), "utf8")) as {
+  inputs?: Record<string, unknown>;
+};
+const RUN_CLI = readFileSync(join(ROOT, "scripts/run-cli.sh"), "utf8");
 
 /** run: ブロックを (ワークフロー名, ステップ名, スクリプト) の組で列挙する */
 function runBlocks(): [string, string, string][] {
@@ -123,6 +131,33 @@ describe("ワークフローの YAML", () => {
       }
     }
     expect([...refs]).toEqual(["main"]);
+  });
+
+  /**
+   * composite action は**宣言していない `with:` を黙って捨てる**。
+   * 実際に踏んだ失敗: `bootstrap.yml` が `issue:` を渡していたが `action.yml` に
+   * 入力が無く、CLI に `--issue` が届かないまま exit 2（run 34196607818）。
+   */
+  test("action に渡す with: のキーはすべて action.yml が宣言している", () => {
+    const declared = Object.keys(ACTION.inputs ?? {});
+    for (const wf of all) {
+      for (const [job, cfg] of Object.entries(wf.doc.jobs ?? {})) {
+        for (const step of cfg.steps ?? []) {
+          if (!step.uses?.startsWith("satoshiarai-rgb/agent-pipeline@")) continue;
+          for (const key of Object.keys(step.with ?? {})) {
+            expect(declared, `${wf.name} ${job}: with.${key}`).toContain(key);
+          }
+        }
+      }
+    }
+  });
+
+  test("action.yml の入力はすべて run-cli.sh が CLI に渡す", () => {
+    for (const key of Object.keys(ACTION.inputs ?? {})) {
+      // command は位置引数、dir は必ず組み立てるので add を通らない
+      if (key === "command" || key === "dir") continue;
+      expect(RUN_CLI, `run-cli.sh に --${key} が無い`).toContain(`--${key}`);
+    }
   });
 
   test("blocked で失敗させるステップは push より後", () => {
