@@ -260,7 +260,7 @@ compose --dir <run dir> --agent <name> --central <中央のパス> --out <書き
 - `prompt_path` を base-action の `prompt_file` に渡す
 - `role_prompt` は実際に使ったプロンプト（配布先の上書きか中央の既定か）。実行の記録に残す
 
-上の「検証」列を実装するのは `src/commands/validate.ts`（`CONTRACT` の表）で、**呼ぶのは
+上の「検証」列を実装するのは `src/redux/validate.ts`（`CONTRACT` の表）で、**呼ぶのは
 `finish` コマンド**。検査結果は CLI の引数を経由せず、そのまま action に写される
 （`mapValidationToAction`）。
 

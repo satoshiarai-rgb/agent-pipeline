@@ -36,7 +36,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 
 `work/worklist.md` §0 が正。特に振る舞いに影響するもの:
 
-- **プロンプトは配布先で差し替えられる（`.agent/prompts/<agent>.md`）。中央は既定を提供する。** 契約（入力と出力）は `work/agent-contract.md` にあり、`finish` が成果物を照らして強制する（実装は `src/commands/validate.ts` の `CONTRACT`）
+- **プロンプトは配布先で差し替えられる（`.agent/prompts/<agent>.md`）。中央は既定を提供する。** 契約（入力と出力）は `work/agent-contract.md` にあり、`finish` が成果物を照らして強制する（実装は `src/redux/validate.ts` の `CONTRACT`）
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
 - **`.claude/**` も同じ扱い。** Claude Code が「センシティブファイル」として書き込みを拒否し、**許可ルール（`Edit(.claude/**)` を含む）では開けられない**。開ける手段は `--permission-mode bypassPermissions`（全権限チェックの無効化）だけなので採らない。必要な変更は run ディレクトリに成果物を置いて人間が設置する（K-19）
 - **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない

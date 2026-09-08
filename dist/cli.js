@@ -407,14 +407,62 @@ function composeRun(input) {
   };
 }
 
-// src/file/acceptanceFile.ts
-import { existsSync as existsSync7, readFileSync as readFileSync6 } from "node:fs";
+// src/file/stateFile.ts
+import { readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
 import { join as join7 } from "node:path";
+
+// src/utils/pick.ts
+function pick(source, keys) {
+  const out = {};
+  for (const key of keys) {
+    if (source[key] !== undefined)
+      out[key] = source[key];
+  }
+  return out;
+}
+
+// src/file/stateFile.ts
+var STATE_KEYS = [
+  "pipeline_version",
+  "issue",
+  "branch",
+  "phase",
+  "blocked_reason",
+  "updated_at"
+];
+function renderStateFile(snapshot, now) {
+  const shape = {
+    ...snapshot,
+    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
+  };
+  const ordered = pick(shape, STATE_KEYS);
+  return stringifyJson(ordered);
+}
+function stateFilePath(dir) {
+  return join7(dir, "state.json");
+}
+function writeStateFile(dir, snapshot, now) {
+  writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
+}
+
+// src/utils/timestamp.ts
+var formatTimestamp = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+function parseTimestamp(timestamp) {
+  const parts = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(timestamp);
+  if (!parts)
+    return null;
+  const [, year, month, day, hour, minute, second] = parts;
+  return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
+}
+
+// src/file/acceptanceFile.ts
+import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
+import { join as join8 } from "node:path";
 function acceptancePath(dir) {
-  return join7(dir, "acceptance.json");
+  return join8(dir, "acceptance.json");
 }
 function readAcceptance(dir) {
-  const raw = parseJson(readFileSync6(acceptancePath(dir), "utf8"), "acceptance.json");
+  const raw = parseJson(readFileSync7(acceptancePath(dir), "utf8"), "acceptance.json");
   if (!Array.isArray(raw?.criteria))
     throw new Error("acceptance.json に criteria がありません");
   return raw;
@@ -485,16 +533,6 @@ function claudeArgs(a) {
     `--allowed-tools ${a.tools}`,
     ...denied.map((d) => `--disallowed-tools ${d}`)
   ].join(" ");
-}
-
-// src/utils/timestamp.ts
-var formatTimestamp = (date) => date.toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-function parseTimestamp(timestamp) {
-  const parts = /^(\d{4})(\d{2})(\d{2})T(\d{2})(\d{2})(\d{2})Z$/.exec(timestamp);
-  if (!parts)
-    return null;
-  const [, year, month, day, hour, minute, second] = parts;
-  return Date.UTC(Number(year), Number(month) - 1, Number(day), Number(hour), Number(minute), Number(second));
 }
 
 // src/utils/typescriptFsaReducers.ts
@@ -810,7 +848,7 @@ function selectNextAction(root, config, config_error = null) {
   return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
 }
 
-// src/commands/explain.ts
+// src/redux/explain.ts
 function pendingCriteria(dir) {
   if (!hasAcceptance(dir))
     return "";
@@ -932,153 +970,6 @@ blocked_reason: ${reason}
 
 ${advice.body(dir)}`
   };
-}
-
-// src/commands/validate.ts
-import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
-import { join as join8 } from "node:path";
-
-// src/file/executionLog.ts
-import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
-function readResultEvent(path) {
-  if (!existsSync8(path))
-    return null;
-  const parsed = parseJson(readFileSync7(path, "utf8"), "execution_file");
-  const events = Array.isArray(parsed) ? parsed : [parsed];
-  const results = events.filter((e) => e?.type === "result");
-  return results.at(-1) ?? null;
-}
-function completedCleanly(path) {
-  if (!path)
-    return false;
-  const result = readResultEvent(path);
-  if (!result)
-    return false;
-  return result.subtype === "success" && result.is_error !== true;
-}
-function readApiErrorStatus(path) {
-  if (!path)
-    return null;
-  const result = readResultEvent(path);
-  if (!result)
-    return null;
-  const isApiError = result.terminal_reason === "api_error" || Boolean(result.api_error_status);
-  return isApiError ? result.api_error_status ?? 0 : null;
-}
-
-// src/commands/validate.ts
-var nonEmpty = (rel) => ({ dir }) => {
-  const path = join8(dir, rel);
-  return existsSync9(path) && readFileSync8(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
-};
-var contains = (rel, needle) => ({ dir }) => readFileSync8(join8(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
-var acceptanceSchema = ({ dir }) => {
-  if (!hasAcceptance(dir))
-    return "acceptance.json が無い";
-  try {
-    const problems = acceptanceProblems(readAcceptance(dir));
-    return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
-  } catch (e) {
-    return e instanceof Error ? e.message : String(e);
-  }
-};
-var reviewWithVerdict = (kind) => ({ dir }) => {
-  const path = latestReviewPath(dir, kind);
-  if (!path)
-    return `reviews/${kind}-NN.md が無い`;
-  return readVerdict(path) ? null : `${path} の frontmatter に verdict が無い`;
-};
-var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
-var decisionRecords = ({ dir }) => {
-  const problems = decisionRecordProblems(dir);
-  return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
-};
-var noWorkflowChanges = ({ changed }) => {
-  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
-  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
-};
-var CONTRACT2 = {
-  planner: {
-    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
-    postProcess: ({ dir }) => {
-      const text = readFileSync8(join8(dir, "plan.md"), "utf8");
-      const scale = text.slice(text.indexOf("## 規模判定"));
-      return scale.includes("上限超過") ? { oversize: true } : {};
-    }
-  },
-  "plan-reviewer": {
-    checks: [reviewWithVerdict("plan")],
-    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
-  },
-  developer: {
-    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords]
-  },
-  "dev-reviewer": {
-    checks: [reviewWithVerdict("dev")],
-    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
-  },
-  completion: {
-    checks: [nonEmpty("completion.md"), acceptanceSchema],
-    postProcess: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
-  }
-};
-function validateRun(input) {
-  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
-  const apiError = readApiErrorStatus(execution_file);
-  if (apiError !== null)
-    return { result: "api_error", api_error_status: apiError };
-  if (agent_failed && !completedCleanly(execution_file))
-    return { result: "agent_failed" };
-  const artifacts = { dir, changed: changed_files };
-  const contract = CONTRACT2[agent];
-  for (const check of contract.checks) {
-    const detail = check(artifacts);
-    if (detail)
-      return { result: "invalid", detail };
-  }
-  return { result: "ok", ...contract.postProcess?.(artifacts) };
-}
-function readLatestVerdict(dir, kind) {
-  const path = latestReviewPath(dir, kind);
-  return path ? readVerdict(path) : null;
-}
-
-// src/file/stateFile.ts
-import { readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join9 } from "node:path";
-
-// src/utils/pick.ts
-function pick(source, keys) {
-  const out = {};
-  for (const key of keys) {
-    if (source[key] !== undefined)
-      out[key] = source[key];
-  }
-  return out;
-}
-
-// src/file/stateFile.ts
-var STATE_KEYS = [
-  "pipeline_version",
-  "issue",
-  "branch",
-  "phase",
-  "blocked_reason",
-  "updated_at"
-];
-function renderStateFile(snapshot, now) {
-  const shape = {
-    ...snapshot,
-    updated_at: now.toISOString().replace(/\.\d{3}Z$/, "Z")
-  };
-  const ordered = pick(shape, STATE_KEYS);
-  return stringifyJson(ordered);
-}
-function stateFilePath(dir) {
-  return join9(dir, "state.json");
-}
-function writeStateFile(dir, snapshot, now) {
-  writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
 }
 
 // src/redux/mapValidationToAction.ts
@@ -1629,6 +1520,115 @@ function createStore2(input) {
   }));
   store.dispatch(init(undefined));
   return { store, outputs, state: () => store.getState() };
+}
+
+// src/redux/validate.ts
+import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
+import { join as join9 } from "node:path";
+
+// src/file/executionLog.ts
+import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
+function readResultEvent(path) {
+  if (!existsSync8(path))
+    return null;
+  const parsed = parseJson(readFileSync8(path, "utf8"), "execution_file");
+  const events = Array.isArray(parsed) ? parsed : [parsed];
+  const results = events.filter((e) => e?.type === "result");
+  return results.at(-1) ?? null;
+}
+function completedCleanly(path) {
+  if (!path)
+    return false;
+  const result = readResultEvent(path);
+  if (!result)
+    return false;
+  return result.subtype === "success" && result.is_error !== true;
+}
+function readApiErrorStatus(path) {
+  if (!path)
+    return null;
+  const result = readResultEvent(path);
+  if (!result)
+    return null;
+  const isApiError = result.terminal_reason === "api_error" || Boolean(result.api_error_status);
+  return isApiError ? result.api_error_status ?? 0 : null;
+}
+
+// src/redux/validate.ts
+var nonEmpty = (rel) => ({ dir }) => {
+  const path = join9(dir, rel);
+  return existsSync9(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+};
+var contains = (rel, needle) => ({ dir }) => readFileSync9(join9(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var acceptanceSchema = ({ dir }) => {
+  if (!hasAcceptance(dir))
+    return "acceptance.json が無い";
+  try {
+    const problems = acceptanceProblems(readAcceptance(dir));
+    return problems.length > 0 ? `acceptance.json: ${problems.join(" / ")}` : null;
+  } catch (e) {
+    return e instanceof Error ? e.message : String(e);
+  }
+};
+var reviewWithVerdict = (kind) => ({ dir }) => {
+  const path = latestReviewPath(dir, kind);
+  if (!path)
+    return `reviews/${kind}-NN.md が無い`;
+  return readVerdict(path) ? null : `${path} の frontmatter に verdict が無い`;
+};
+var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
+var decisionRecords = ({ dir }) => {
+  const problems = decisionRecordProblems(dir);
+  return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
+};
+var noWorkflowChanges = ({ changed }) => {
+  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
+  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
+};
+var CONTRACT2 = {
+  planner: {
+    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
+    postProcess: ({ dir }) => {
+      const text = readFileSync9(join9(dir, "plan.md"), "utf8");
+      const scale = text.slice(text.indexOf("## 規模判定"));
+      return scale.includes("上限超過") ? { oversize: true } : {};
+    }
+  },
+  "plan-reviewer": {
+    checks: [reviewWithVerdict("plan")],
+    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
+  },
+  developer: {
+    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords]
+  },
+  "dev-reviewer": {
+    checks: [reviewWithVerdict("dev")],
+    postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "dev") })
+  },
+  completion: {
+    checks: [nonEmpty("completion.md"), acceptanceSchema],
+    postProcess: ({ dir }) => ({ acceptance_passed: allPassed(readAcceptance(dir)) })
+  }
+};
+function validateRun(input) {
+  const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
+  const apiError = readApiErrorStatus(execution_file);
+  if (apiError !== null)
+    return { result: "api_error", api_error_status: apiError };
+  if (agent_failed && !completedCleanly(execution_file))
+    return { result: "agent_failed" };
+  const artifacts = { dir, changed: changed_files };
+  const contract = CONTRACT2[agent];
+  for (const check of contract.checks) {
+    const detail = check(artifacts);
+    if (detail)
+      return { result: "invalid", detail };
+  }
+  return { result: "ok", ...contract.postProcess?.(artifacts) };
+}
+function readLatestVerdict(dir, kind) {
+  const path = latestReviewPath(dir, kind);
+  return path ? readVerdict(path) : null;
 }
 
 // src/redux/runCommand.ts

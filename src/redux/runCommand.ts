@@ -1,12 +1,12 @@
 import { readFileSync } from "node:fs";
 import { composeRun } from "../commands/compose.ts";
-import { explainRun } from "../commands/explain.ts";
-import { validateRun } from "../commands/validate.ts";
+
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
 import type { AgentName } from "../types.ts";
 import { formatTimestamp } from "../utils/timestamp.ts";
-import { mapValidationToAction, type ValidationReport } from "./mapValidationToAction.ts";
+import { explainRun } from "./explain.ts";
+import { mapValidationToAction } from "./mapValidationToAction.ts";
 import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
 import { createStore } from "./store/createStore.ts";
@@ -19,6 +19,7 @@ import {
   selectSnapshot,
   selectStatus,
 } from "./store/global/selectors.ts";
+import { type ValidationReport, validateRun } from "./validate.ts";
 
 /**
  * CLI の語彙を store 操作に写す層。**判断は 1 つも持たない。**
