@@ -79,7 +79,7 @@ const timestamp = () =>
     .replace(/\.\d{3}Z$/, "Z");
 
 /** ガードが弾いたとき、dispatch はこの形を返す（middleware が戻り値を差し替える） */
-export const isRejection = (r: unknown): r is { ok: false; reason: string } =>
+const isRejection = (r: unknown): r is { ok: false; reason: string } =>
   typeof r === "object" && r !== null && (r as { ok?: unknown }).ok === false;
 
 /**

@@ -136,7 +136,7 @@ function readConfig(repo) {
   return { config, source: path, error: null };
 }
 
-// src/redux/commands.ts
+// src/redux/runCommand.ts
 import { readFileSync as readFileSync10 } from "node:fs";
 
 // src/commands/compose.ts
@@ -1596,7 +1596,7 @@ function createStore2(input) {
   return { store, outputs, state: () => store.getState() };
 }
 
-// src/redux/commands.ts
+// src/redux/runCommand.ts
 var CLI_OPTIONS = {
   dir: { type: "string" },
   issue: { type: "string" },

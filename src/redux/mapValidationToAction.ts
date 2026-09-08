@@ -56,7 +56,7 @@ const FAILURE_REASON: Record<Exclude<RunResult, "ok">, (report: ValidationReport
 /**
  * 検証結果を action に写す。**決めるのに使うのは検証結果と、そのとき走っていた phase**
  * の 2 つ。成功はフェーズごとに別の action になり（K-26）、失敗は phase を問わず
- * `agentFailed` になる。phase は状態が持っているので呼び出し側（`redux/commands.ts`）が渡す。
+ * `agentFailed` になる。phase は状態が持っているので呼び出し側（`redux/runCommand.ts`）が渡す。
  */
 export function mapValidationToAction(
   report: ValidationReport,

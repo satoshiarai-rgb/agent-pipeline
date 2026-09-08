@@ -1,11 +1,11 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
 import { readConfig } from "./file/configFile.ts";
-import { type Args, CLI_OPTIONS, MissingArg, runCommand } from "./redux/commands.ts";
+import { type Args, CLI_OPTIONS, MissingArg, runCommand } from "./redux/runCommand.ts";
 
 /**
  * ワークフローから store を叩くための薄い入口。**引数を解析して JSON を書くだけ。**
- * どのコマンドが何をするかは `src/store/commands.ts` の対応表にある。
+ * どのコマンドが何をするかは `src/redux/runCommand.ts` の分岐にある。
  */
 const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 

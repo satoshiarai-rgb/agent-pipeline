@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { defaults } from "../defaults.ts";
-import { MissingArg, runCommand } from "../redux/commands.ts";
+import { MissingArg, runCommand } from "../redux/runCommand.ts";
 
 describe("公開 IF（index.ts）", () => {
   test("ワークフローから呼ぶものを re-export している", async () => {
