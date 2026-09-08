@@ -3,7 +3,7 @@ import type { Action, AnyAction } from "../../../utils/typescript-fsa.ts";
 import type { AppPayload, Origin } from "../app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "../app/actions.ts";
 import type { RootState } from "../createStore.ts";
-import { selectStatus } from "../selectors.ts";
+import { selectStatus } from "../global/selectors.ts";
 import type { AgentMiddleware } from "./types.ts";
 import { isReplay } from "./types.ts";
 

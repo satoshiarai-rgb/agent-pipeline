@@ -1,9 +1,9 @@
-import type { Config } from "../../defaults.ts";
-import type { Snapshot } from "../../file/state-file.ts";
-import type { Phase, RoundKey } from "../../types.ts";
-import { resolveAgent } from "../../utils/resolve-agent.ts";
-import { agentFor, isIdle } from "./app/reducer.ts";
-import type { RootState } from "./createStore.ts";
+import type { Config } from "../../../defaults.ts";
+import type { Snapshot } from "../../../file/state-file.ts";
+import type { Phase, RoundKey } from "../../../types.ts";
+import { resolveAgent } from "../../../utils/resolve-agent.ts";
+import { agentFor, isIdle } from "../app/reducer.ts";
+import type { RootState } from "../createStore.ts";
 
 /**
  * selector。**引数は root state**（ducks の慣習）で、スライスを跨いで読んでよい

@@ -12,4 +12,4 @@ export type { RootState, Wiring } from "./store/createStore.ts";
 export { createStore } from "./store/createStore.ts";
 export type { PipelineAction, PipelineDispatch, RestorePayload } from "./store/global/actions.ts";
 export { init, restore } from "./store/global/actions.ts";
-export * from "./store/selectors.ts";
+export * from "./store/global/selectors.ts";

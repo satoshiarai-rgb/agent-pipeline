@@ -7,7 +7,7 @@ import { readStateFile } from "../file/state-file.ts";
 import type { Args } from "../redux/commands.ts";
 import { runCommand } from "../redux/commands.ts";
 import type { Outcome } from "../redux/from-outcome.ts";
-import type { NextAction } from "../redux/store/selectors.ts";
+import type { NextAction } from "../redux/store/global/selectors.ts";
 import type { AgentName, Phase } from "../types.ts";
 
 const dirs: string[] = [];

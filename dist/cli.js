@@ -756,7 +756,7 @@ var createAppReducer = (config) => reducerWithInitialState(initialApp).case(rest
   failure_reason: null
 })).build();
 
-// src/redux/store/selectors.ts
+// src/redux/store/global/selectors.ts
 var labelFor = (phase, prefix) => `${prefix}${phase.replace(/_/g, "-")}`;
 function selectLabel(root, config) {
   const { prefix, trigger } = config.labels;
@@ -1690,7 +1690,11 @@ function createStore2(input) {
   const outputs = {};
   const wiring = { config: input.config, outputs };
   const store = legacy_createStore(combineReducers({ info: info_default, app: app_default(input.config) }), applyMiddleware(...middlewares.map((m) => m(wiring))));
-  store.dispatch(configure({ dir: input.dir, run_id: input.run_id ?? null, attempt: input.attempt ?? 1 }));
+  store.dispatch(configure({
+    dir: input.dir,
+    run_id: input.run_id ?? null,
+    attempt: input.attempt ?? 1
+  }));
   store.dispatch(init(undefined));
   return { store, outputs, state: () => store.getState() };
 }

@@ -3,7 +3,7 @@ import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config, rootOf } from "../../__tests__/helpers.ts";
 import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
-import { selectNextAction, selectSnapshot } from "../../redux/store/selectors.ts";
+import { selectNextAction, selectSnapshot } from "../../redux/store/global/selectors.ts";
 import { readStateFile, stateFilePath, writeStateFile } from "../state-file.ts";
 
 afterEach(cleanupRuns);

@@ -42,7 +42,11 @@ export function createStore(input: Wiring) {
     applyMiddleware(...middlewares.map((m) => m(wiring))),
   );
   store.dispatch(
-    configure({ dir: input.dir, run_id: input.run_id ?? null, attempt: input.attempt ?? 1 }),
+    configure({
+      dir: input.dir,
+      run_id: input.run_id ?? null,
+      attempt: input.attempt ?? 1,
+    }),
   );
   store.dispatch(init(undefined));
   return { store, outputs, state: () => store.getState() as RootState };

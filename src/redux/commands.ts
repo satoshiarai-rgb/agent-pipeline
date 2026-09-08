@@ -17,7 +17,7 @@ import {
   selectNextAction,
   selectSnapshot,
   selectStatus,
-} from "./store/selectors.ts";
+} from "./store/global/selectors.ts";
 
 /**
  * CLI の語彙 → store 操作の対応表。**判断は 1 つも持たない。**
