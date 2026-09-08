@@ -14,9 +14,11 @@
 - ハーネス: `src/` に TypeScript（依存は `redux` 1 本）。`bun test` 321 件 / 28 ファイル、
   `bunx tsc --noEmit`、`bun run lint`（biome）がすべて通る。`bun run build` で `dist/cli.js` を作り
   **コミットする**（配布先はルートの `action.yml` から `uses:` で呼ぶ）
-- 層: `cli.ts`（引数の解析だけ）/ `redux/`（`runCommand.ts` の分岐 + `store/`: ducks 2 スライス・
-  middleware・selector）/ `commands/`（store を使わない `compose` の中身）/ `file/`
-  （1 ファイル形式 = 1 モジュール）/ `utils/`（純関数と vendoring）/ `defaults.ts` / `types.ts`
+- 層: `cli.ts`（引数の解析だけ）/ `redux/`（`runCommand.ts` の分岐、`mapValidationToAction.ts`、
+  `effects/`（**dispatch の外で走る I/O**: `validate` / `explain` / `compose`）、`store/`（ducks 2 スライス・
+  middleware・selector。middleware は **dispatch の中で走る**もので `hydrate` の読み取りも含む））/
+  `file/`（1 ファイル形式 = 1 モジュール）/ `utils/`（純関数と vendoring）/ `defaults.ts` / `types.ts`。
+  **`src/commands/` は畳んで消した**（2026-09-08）
 - 中央のワークフロー: `bootstrap.yml` / `dispatch.yml` / `comment.yml`（`approve.yml` は `comment.yml` に畳んで削除済み）
 - 既定プロンプト: `prompts/<agent>.md` 5 本。配布先は `.agent/prompts/<agent>.md` で上書きできる（K-15）
 - 契約: `work/agent-contract.md`。入力の組み立ては `compose`、出力の検証は `finish`
@@ -185,8 +187,17 @@
     - **stale の判定は selector 1 つ**（`selectStale(root, config, now)`）。`agent_started` の時刻を `in_flight_since` として state に持ち、**開始からジョブの上限（そのエージェントの `timeout_minutes` + 10 分）を過ぎていれば死んだ実行**と見る。`now` は人間の操作の `payload.timestamp` を渡す（selector に時計を持たせない）。時刻の形式の読み書きは `src/utils/timestamp.ts` に閉じた
     - **`stale.yml` は作らない。** ガード 2 つ（`mustBeBlocked` / `notInFlight`）が stale を通すようにし、`retry` の case で実行中の記録を落とすだけ。cron も専用ジョブも増えていない
     - `docs/troubleshooting.md` に「実行が死んで止まったとき」を追加（`/agent retry` が上限経過後に受け付ける。それより早く戻したいときは失敗イベントを 1 件足す）
-- [ ] A-54: **文書の食い違いを直す（2026-09-08 の精査。実装が正しく文書が古い）。** (1) **`CLAUDE.md` に消えたファイル名が 5 種**: `state.yml` → `state.json`、`run.yml` → `dispatch.yml`（書く主体の一覧に `comment.yml` を足す。`approve.yml` は削除済み）、`scripts/labels.py` → `scripts/project-labels.sh`、`acceptance.yml` → `acceptance.json`、`log.md`（未実装なので言及を落とす）。同じ文書の別行では正しい名前を使っており、次のセッションを誤らせるので優先度は高い (2) `docs/customize-prompt.md` と `docs/troubleshooting.md` の「**どのプロンプトで動かしたかが `runs/*.json` に残る**」— 実行レコードにそのフィールドは無い（`role_prompt` は `compose` の戻り値で記録していない）。記録したいなら実装側を直す判断 (3) `install/` の「原本 → 置き場所」の表が 3 箇所（`install.sh` が実物、`install/README.md` と `docs/installation.md` が写し）。README 自身が「対応表はここ」と宣言しているので docs 側を参照 1 行に (4) `docs/installation.md` の `id-token: write` が「使っている」と読める（WIF に切り替えるまで未使用）(5) `action.yml` のコマンド一覧が同一ファイル内で二重（`name` の description と `command` の description）。`run-id` / `attempt` の説明と `# validate` の見出しは A-53 段取り 7 で直した
-- [ ] A-55: **判断が要る 3 件（2026-09-08 の精査で挙がったが、方針を決めないと直せないもの）。** (1) **到達しない分岐を消すか**: `middlewares/reviewFile.ts` の `kind = "dev"`（ガードが `awaiting_human` 以外を弾くので届かない）と `store/selectors.ts` の `no_transition_for_phase`（非 idle の 5 フェーズは全部エージェントを持つ）。消すと「将来 dev_review でも人間が差し戻せるようにする」余地が明示的に消える (2) **公開 IF の barrel を 2 段から 1 段にするか**: 外から使われているのは `defaults` と `validateRun` の 2 つだけ（`scripts/__tests__/workflows.test.ts`）。`redux/index.ts` を消して `src/index.ts` を 2 つに絞る案 (3) **`install/config.json` の `labels.trigger`**: 上書きしても起動ラベルは `install/agent.yml` の `if: 'agent:go'` 直書きなので黙って効かない。キーを外すか、`docs/installation.md` 手順 4 に明記するか
+- [x] A-54: **完了（2026-09-08）。文書の食い違いを直した。** サブエージェントで `docs/` 4 本・`install/` 全ファイル・`README.md` を実装に突き合わせ、**利用者が実際に踏むもの**から順に直した。
+  - **効かない手順**（最重要）: `docs/troubleshooting.md` の「`state.json` の `phase` を書き換えて push すれば再開する」— 状態の正がイベントログになった時点で無効（`state.json` は書き出し専用で、実装のどこも読んでいない）。`events/` に 1 件足す手順に差し替え、「人が触ってよいのは `phase`」も撤回した
+  - **止まった run は push だけでは動かない**（`route` は `failure_reason` がある間 `action: none`）。`missing_verdict` の対処を「直して push **してから** `/agent retry`」に、`pipeline_version_mismatch` を「揃えてから retry か push」に、`config_invalid` を「直して push で動く（記録されない停止なので）」に直した
+  - **起動ラベル `agent:go` は自動で作られない。** `scripts/project-labels.sh` が作るのは射影先の phase ラベルだけ。`docs/installation.md` / `install/README.md` / `install/install.sh` の 3 箇所に `gh label create agent:go` を足した
+  - **`install/setup.sh` の雛形は `npm ci` を実行する。** dry run でもガード無しで走り、失敗すると `agent_failed` で止まるので、お試し実行の前に直す旨を書いた
+  - **`curl | bash` に `--force` は渡せない**（`bash -s -- --force`）。2 箇所を修正
+  - **組織リポジトリでは `/agent approve` が弾かれる**（既定の `approvers` は `OWNER` / `COLLABORATOR` で、組織のメンバーは `MEMBER`）。`.agent/config.json` で足す例を `docs/installation.md` に、拒否理由の表（`not_authorized` / `not_awaiting_approval`）を `docs/troubleshooting.md` に足した
+  - **レビュアーに渡るもの**の記述を正確に（issue 本文が渡るのは plan-reviewer だけ。dev-reviewer は計画・受け入れ条件・判断の記録と git の差分）。`docs/overview.md` と `docs/customize-prompt.md` の 2 箇所
+  - その他: 存在しない `transitions` キーへの言及、`npm 依存はゼロ`（`redux` 1 本をバンドルしている）、`id-token: write` の用途（現時点では未使用）、`bootstrap.yml` の draft PR 本文の `runs/`、`action.yml` のコマンド一覧に `bootstrap`、`install/README.md` の `mkdir -p` 欠け、`/agent retry` の説明（「直前のフェーズ」→「同じフェーズ」）
+
+- [ ] A-55: **判断が要る 3 件（2026-09-08 の精査で挙がったが、方針を決めないと直せないもの）。** (1) **到達しない分岐を消すか**: `middlewares/reviewFile.ts` の `kind = "dev"`（ガードが `awaiting_human` 以外を弾くので届かない）と `store/selectors.ts` の `no_transition_for_phase`（非 idle の 5 フェーズは全部エージェントを持つ）。消すと「将来 dev_review でも人間が差し戻せるようにする」余地が明示的に消える (2) **公開 IF の barrel を 2 段から 1 段にするか**: `src/index.ts` → `src/redux/index.ts` の 2 段だが、外から実際に import されているのは `defaults` と `validateRun` の 2 つだけ（`scripts/__tests__/workflows.test.ts`）。残りは**どこからも import されない re-export**。`redux/index.ts` を消して `src/index.ts` をその 2 つに絞る案 (3) **`install/config.json` の `labels` は半分しか効かない**: `labels.trigger` を上書きしても起動ラベルは `install/agent.yml` の `if: 'agent:go'` 直書きなので黙って無視される。さらに `labels.prefix` を変えると、**phase ラベルは新しい prefix に従うが `agent:go` は prefix 外になるため bootstrap 後に外れず残る**（`project-labels.sh` は同じ prefix の古いラベルだけを外す）。案は 3 つ: (a) `labels` を上書き不可にして `config.json` の雛形からも落とす (b) `trigger` を配布先のラッパーが読めるようにする（reusable workflow の入力を増やす） (c) 効く範囲を `docs/installation.md` に明記するだけ。**最小は (a)**
 - [ ] I-13: タグ `v1` / `v1.0.0` を打つ
 - [ ] A-48: **`.claude/**` の扱いをプロンプトで 2 点直す（実機 3 本目 / issue #11 の plan-reviewer の指摘）。** (1) **理由を計画に書かせる**。planner プロンプトは「書き込めない」という事実だけを渡しているため、planner が根拠なしに前提へ写し、レビュアーが「このリポジトリには `.claude/skills/**` など追跡済みファイルがあるのに、書けないというのは自明でない」と差し戻した。**レビュアーには成果物しか渡らない**（設計書 §3.3）ので、理由（Claude Code が sensitive file として拒否する / K-19）を前提に明示させないと同じ差し戻しが構造的に起き続ける。(2) **設置用の完成品を `agent-work/issue-<n>/` に置かせない**。現在の developer プロンプトは `staged/` に置くよう指示しているが、run ディレクトリは issue ごとに閉じるハーネスのスクラッチで、`state.json` / `runs/` / `reviews/` が同居する。**恒久的に参照される設置元は issue 番号に依存しない場所**（例: リポジトリ直下の `settings.example.json`）に置き、README に設置手順を書かせる — K-19、実機 3 本目
 - [ ] A-50: **App トークンの権限を実行単位で絞る（A-35 の残り）。** `create-github-app-token@v3` の `permission-*` 入力で、ジョブごとに必要な権限だけを取る（bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents、comment は contents / pull-requests）。App 自体の権限に加えて実行単位でも落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1
