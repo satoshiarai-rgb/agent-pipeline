@@ -63,9 +63,10 @@ describe("追記と読み出し", () => {
     appendEvent(dir, planReviewed({ ...origin, ...run, verdict: "request_changes" }), run);
     const events = readEvents(dir);
 
+    const last = events.at(-1);
     expect(events[0]?.type).toBe("agent-pipeline/BOOTSTRAP");
-    expect(events.at(-1)?.type).toBe("agent-pipeline/app/PLAN_REVIEWED");
-    expect((events.at(-1)?.payload as { verdict: string }).verdict).toBe("request_changes");
+    expect(last?.type).toBe("agent-pipeline/app/PLAN_REVIEWED");
+    expect((last?.payload as { verdict: string } | undefined)?.verdict).toBe("request_changes");
   });
 
   test("イベントが無ければ空（bootstrap 前）", () => {
