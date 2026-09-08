@@ -5,8 +5,14 @@ import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/state-file.ts";
 import type { AgentName, RunResult, Verdict } from "../types.ts";
-import { fromOutcome, type Outcome } from "./from-outcome.ts";
-import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
+import { fromOutcome, type Outcome, RunFailed } from "./from-outcome.ts";
+import {
+  agentFailed,
+  agentStarted,
+  humanApproval,
+  humanRequestChanges,
+  retry,
+} from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
 import type { RootState } from "./store/createStore.ts";
 import { createStore } from "./store/createStore.ts";
@@ -127,13 +133,24 @@ export const COMMANDS: Record<string, Command> = {
     output: (_root, outputs) => ({ record_path: outputs.record_path }),
   },
   finish: {
-    // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
-    action: (a, _config, root) =>
-      fromOutcome(
-        outcomeOf(a),
-        { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null },
-        root.app.phase,
-      ),
+    /**
+     * どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）。
+     * **止まる結果は `RunFailed` で飛んでくるので、ここで受けて記録する action に変える。**
+     * 投げたまま抜けると `state.json` が書かれず、run が無音で止まる（設計書 §7.1）。
+     */
+    action: (a, _config, root) => {
+      const context = { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null };
+      try {
+        return fromOutcome(outcomeOf(a), context, root.app.phase);
+      } catch (failure) {
+        if (!(failure instanceof RunFailed)) throw failure;
+        return agentFailed({
+          ...context,
+          reason: failure.reason,
+          api_error_status: failure.api_error_status,
+        });
+      }
+    },
     output: transitionOutput,
   },
   approve: {

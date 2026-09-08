@@ -1105,6 +1105,15 @@ function writeStateFile(dir, snapshot, now) {
 }
 
 // src/redux/from-outcome.ts
+class RunFailed extends Error {
+  reason;
+  api_error_status;
+  constructor(reason, api_error_status = null) {
+    super(reason);
+    this.reason = reason;
+    this.api_error_status = api_error_status;
+  }
+}
 var FAILURE_REASON = {
   api_error: (outcome) => `api_error:${outcome.api_error_status ?? "unknown"}`,
   invalid: (outcome) => {
@@ -1116,11 +1125,7 @@ var FAILURE_REASON = {
 };
 function fromOutcome(outcome, context, phase) {
   if (outcome.result !== "ok") {
-    return agentFailed({
-      ...context,
-      reason: FAILURE_REASON[outcome.result](outcome),
-      api_error_status: outcome.api_error_status ?? null
-    });
+    throw new RunFailed(FAILURE_REASON[outcome.result](outcome), outcome.api_error_status ?? null);
   }
   switch (phase) {
     case "planning":
@@ -1131,14 +1136,14 @@ function fromOutcome(outcome, context, phase) {
       return completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false });
     case "plan_review":
       if (!outcome.verdict)
-        return agentFailed({ ...context, reason: "missing_verdict" });
+        throw new RunFailed("missing_verdict");
       return planReviewed({ ...context, verdict: outcome.verdict });
     case "dev_review":
       if (!outcome.verdict)
-        return agentFailed({ ...context, reason: "missing_verdict" });
+        throw new RunFailed("missing_verdict");
       return devReviewed({ ...context, verdict: outcome.verdict });
     default:
-      return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
+      throw new RunFailed(`transition_incomplete: ${phase} (ok)`);
   }
 }
 
@@ -1768,7 +1773,20 @@ var COMMANDS = {
     output: (_root, outputs) => ({ record_path: outputs.record_path })
   },
   finish: {
-    action: (a, _config, root) => fromOutcome(outcomeOf(a), { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null }, root.app.phase),
+    action: (a, _config, root) => {
+      const context = { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null };
+      try {
+        return fromOutcome(outcomeOf(a), context, root.app.phase);
+      } catch (failure) {
+        if (!(failure instanceof RunFailed))
+          throw failure;
+        return agentFailed({
+          ...context,
+          reason: failure.reason,
+          api_error_status: failure.api_error_status
+        });
+      }
+    },
     output: transitionOutput
   },
   approve: {
