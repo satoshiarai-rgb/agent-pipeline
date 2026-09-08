@@ -1671,7 +1671,7 @@ var COMMANDS = {
       agent: need(a.agent, "agent"),
       model: a.model ?? config.models.default
     }),
-    output: (_root, outputs) => ({ record_path: outputs.record_path })
+    output: (_root, outputs) => ({ event_path: outputs.event_path })
   },
   finish: {
     action: (a, _config, root) => mapValidationToAction(reportOf(a), root.app.phase, {

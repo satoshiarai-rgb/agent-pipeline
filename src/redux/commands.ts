@@ -137,7 +137,7 @@ export const COMMANDS: Record<string, Command> = {
         agent: need(a.agent, "agent") as AgentName,
         model: a.model ?? config.models.default,
       }),
-    output: (_root, outputs) => ({ record_path: outputs.record_path }),
+    output: (_root, outputs) => ({ event_path: outputs.event_path }),
   },
   finish: {
     // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
