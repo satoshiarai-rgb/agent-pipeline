@@ -21,10 +21,8 @@ import {
 
 /**
  * CLI の語彙 → store 操作の対応表。**判断は 1 つも持たない。**
- *
- *   action + output  状態を変える 6 つ（action を作って dispatch し、出力を射影する）
- *   read             読むだけの 3 つ（selector を読む。何も書かない）
- *   plain            store を使わない 2 つ（成果物と契約だけを見る）
+ * コマンドは 4 つのケース（`Dispatching` / `Reading` / `Writing` / `Plain`）のいずれかで、
+ * それぞれ必要な関数だけを持つ。
  *
  * action を 1 つ足すときに触るのはこの表の 1 行。移行前は 9 ファイルに分かれていたが、
  * 中身が「action を作って dispatch する」だけになったので分ける意味が無くなった。
@@ -107,15 +105,33 @@ const transitionOutput = (root: RootState, _outputs: unknown, config: Config) =>
   continue_chain: selectContinueChain(root, config),
 });
 
-interface Command {
+/** 状態を変える 6 つ。action を作って dispatch し、その後の状態を出力に射影する */
+interface Dispatching {
   /** dispatch する action。`root` はいまの状態（走っていたフェーズを見るために渡す） */
-  action?: (a: Args, config: Config, root: RootState) => PipelineAction;
-  output?: (root: RootState, outputs: Record<string, unknown>, config: Config) => unknown;
-  read?: (root: RootState, a: Args, config: Config, configError: string | null) => unknown;
-  /** action を使わずにファイルを書き直すもの（スナップショットの再生成） */
-  write?: (root: RootState, config: Config, configError: string | null) => unknown;
-  plain?: (a: Args, config: Config) => unknown;
+  action: (a: Args, config: Config, root: RootState) => PipelineAction;
+  output: (root: RootState, outputs: Record<string, unknown>, config: Config) => unknown;
 }
+
+/** 読むだけの 3 つ。selector を読み、何も書かない */
+interface Reading {
+  read: (root: RootState, a: Args, config: Config, configError: string | null) => unknown;
+}
+
+/** action を使わずファイルを書き直す 1 つ（スナップショットの再生成） */
+interface Writing {
+  write: (root: RootState, config: Config, configError: string | null) => unknown;
+}
+
+/** store を使わない 2 つ。成果物と契約だけを見る */
+interface Plain {
+  plain: (a: Args, config: Config) => unknown;
+}
+
+/**
+ * ケースごとの union。持つ関数が必須になるので、`output` を書き忘れた `Dispatching` の行は
+ * 型が通らず、`runCommand` 側のキャストも要らなくなる（キーの有無で絞る）。
+ */
+type Command = Dispatching | Reading | Writing | Plain;
 
 export const COMMANDS: Record<string, Command> = {
   /** run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する */
@@ -230,7 +246,7 @@ export function runCommand(
 ): unknown {
   const cmd = COMMANDS[command];
   if (!cmd) return undefined;
-  if (cmd.plain) return cmd.plain(args, config);
+  if ("plain" in cmd) return cmd.plain(args, config);
 
   const dir = need(args.dir, "dir");
   const { store, outputs, state } = createStore({
@@ -239,12 +255,10 @@ export function runCommand(
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1),
   });
-  if (cmd.read) return cmd.read(state(), args, config, configError);
-  if (cmd.write) return cmd.write(state(), config, configError);
+  if ("read" in cmd) return cmd.read(state(), args, config, configError);
+  if ("write" in cmd) return cmd.write(state(), config, configError);
 
-  const result = store.dispatch(
-    (cmd.action as NonNullable<Command["action"]>)(args, config, state()),
-  );
+  const result = store.dispatch(cmd.action(args, config, state()));
   if (isRejection(result)) return result;
-  return cmd.output?.(state(), outputs, config);
+  return cmd.output(state(), outputs, config);
 }

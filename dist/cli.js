@@ -1740,7 +1740,7 @@ function runCommand(command, args, config, configError = null) {
   const cmd = COMMANDS[command];
   if (!cmd)
     return;
-  if (cmd.plain)
+  if ("plain" in cmd)
     return cmd.plain(args, config);
   const dir = need(args.dir, "dir");
   const { store, outputs, state } = createStore2({
@@ -1749,14 +1749,14 @@ function runCommand(command, args, config, configError = null) {
     run_id: args["run-id"] ?? null,
     attempt: Number(args.attempt ?? 1)
   });
-  if (cmd.read)
+  if ("read" in cmd)
     return cmd.read(state(), args, config, configError);
-  if (cmd.write)
+  if ("write" in cmd)
     return cmd.write(state(), config, configError);
   const result = store.dispatch(cmd.action(args, config, state()));
   if (isRejection(result))
     return result;
-  return cmd.output?.(state(), outputs, config);
+  return cmd.output(state(), outputs, config);
 }
 
 // src/cli.ts
