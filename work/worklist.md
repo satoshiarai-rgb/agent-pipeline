@@ -6,7 +6,12 @@
 
 ---
 
-## 現在地（2026-09-08）
+## 現在地（2026-09-08 夕）
+
+**次の一手: (1) `agent-` prefix を入れた状態で dry-run を 1 回 → (2) タグ `v1`（I-13）→ (3) 2 つ目の配布先（R-2）。**
+(1) を挟むのは、ワークフローのファイル名変更が 5 フェーズすべての `uses:` に効くため
+（今日の 2 回目の dry-run は prefix 変更**前**の状態で通した。変更後に確認したのは
+「参照が解決すること」だけ = 閉じた issue へのコメントで run が failure でなく skipped になること）。
 
 **フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
 状態の正は追記専用のイベントログで、状態の変更は Redux の store を通る（K-26 / A-53 は段取り 7 まで完了）。
@@ -54,6 +59,21 @@
 - `decision-records.jsonl`（K-18）は 7 レコードが新形式で書かれ `validate` を通った
 - 最後の 1 件（`manual` の AC-13）は構造的にエージェントが実行できず、人間が検証して閉じた。
   completion が「この run は blocked です」と自己申告する報告を書いたのは期待どおりの挙動
+
+### 2026-09-08 に入れたもの（時系列）
+
+1. **イベントログを状態の正にした**（A-53 段取り 2〜4）。`runs/*.json` と `deriveRunStats` は消え、`pipeline_version` を 2 に上げた
+2. **middleware の並び順をテストで固定**（段取り 5）。subscriber 側の分解は行わない判断
+3. **死んだ実行を `/agent retry` で戻せるようにした**（段取り 6 / I-8）。判定は `selectStale` 1 つ、`stale.yml` は作らない。**A-32 は不要として閉じた**
+4. **`validate` コマンドを `finish` に畳んだ**（段取り 7）。CLI 引数 5 本と action outputs 3 つ、`dispatch.yml` の step 1 つが消えた
+5. **CLI の対応表を捨てて `runCommand` の分岐にした。** 表・ケースごとの型・type guard・引数を組み立てるヘルパをすべて畳み、1 コマンド = 1 つの `if` ブロックに
+6. **`src/commands/` を畳んだ。** 状態を使う判断は `redux/`、うち dispatch の外で走る I/O は `redux/effects/`（`validate` / `explain` / `compose`）。`compose` も `--agent` をやめて in_flight から取る
+7. **`Config` → `PipelineSettings`、`defaults.ts` → `pipelineSettings.ts`。** `config` という語は配布先の `.agent/config.json` を読む側だけに残した
+8. **文書の食い違いを直した**（A-54）。効かない復旧手順・起動ラベルの手動作成・`--force` の渡し方・組織リポジトリの `approvers` など
+9. **A-55 の 3 件を決めた**（barrel 1 段 / `labels` 上書き不可 / 到達しない分岐は残す）
+10. **ワークフロー名に `agent-` prefix**（`agent-bootstrap` / `agent-dispatch` / `agent-comment` / 配布先は `agent-pipeline.yml`）。検証用リポジトリの参照も追随済み
+11. **契約を `docs/agent-contract.md` に昇格**（`work/` は捨てる前提のため）
+12. **実機バグ 2 件を dry-run で発見して修正**: 削除済み `approve.yml` への参照でラッパーが無効化 / `action.yml` が `issue` / `branch` を宣言しておらず `bootstrap` に届いていなかった（drift を捕まえるテストを 2 件追加）
 
 ### 今日（2026-09-07）入れた修正
 
@@ -165,7 +185,7 @@
 
 棚卸し（2026-09-07）後に本当に残っているもの。おおむね上から順に手を動かせる。
 
-- [ ] A-53: **reducer/action への移行（K-26 / K-27）。段取りは 1 → 6。1〜4 はタグ `v1`（I-13）と 2 つ目の配布先（R-2）より前に置く**（`state.json` の役割とイベントのファイル形式が変わるため、配布後だと移行が要る）
+- [x] A-53: **完了（2026-09-08）。reducer/action への移行（K-26 / K-27）。段取り 1〜7 すべて。** 状態の正は追記専用のイベントログ、`state.json` はその射影、状態の変更は Redux の store（ducks 2 スライス + middleware 5 本 + selector）を通る。実機（`compass-wiki` issue #15 / #17）で dry-run を 2 回通した
   - [x] 1: **完了（2026-09-07）。** action の FSA 化とガード表、`combineReducers({ info, app })`、middleware（`hydrate` / `guard` / `snapshot` / `run-record` / `review-file`）、selector、`redux/runCommand.ts`（当時は `commands.ts` の対応表）。**振る舞いは変えていない**（`blocked_reason` の文字列・CLI の出力・`state.json` と `runs/*.json` の形式はそのまま。実機相当の CLI 実行で確認）。テストは 314 件（判断は reducer / guards / selectors のテストへ移り、コマンドの薄い表は `index.test.ts` が語彙の網羅を見る）。削除したのは 13 ファイル（`commands/{start,finish,approve,request-changes,retry,block,route,label,human-transition,input}.ts`、`transitions.ts` ほか）。あわせて `finish` に `--run-id` / `--attempt` を渡し、`--record-path` の受け渡しをやめた（閉じるレコードは `in_flight` から分かる）。`dist/cli.js` は 44.7KB → 67.9KB
   - [x] 2: **完了（2026-09-08）。イベントログが状態の正になった。** `events/<連番>-<timestamp>-<run_id>-<attempt>-<type>.json`（`src/file/eventLog.ts`）。**先頭の連番が畳み込みの順序を決める** — 時計の分解能や `run_id` の桁数に依存しない（`9999999999` と `17301992044` を文字列で並べると桁数の少ない方が後になる。決定記録が踏んだのと同じ問題 / K-25）。書くのは `type` / `payload` / `error` だけで `meta` は落とす。`hydrate` middleware が `init` で全イベントを 1 件ずつ `meta.hydrate` 付きで再生し、`eventLog` middleware が追記する（`APPENDABLE` の表）。`BOOTSTRAP` は**スライスを跨ぐ action**（`info` が識別子、`app` が phase を `planning` に）なので `store/global/` に置いた
     - **削除**: `file/runRecord.ts` / `middlewares/runRecord.ts` / `utils/deriveRunStats.ts` / `templates/run-record.json` / `RESTORE` と `RestorePayload`（+ それぞれのテスト）。`agent-bootstrap.yml` の heredoc は CLI の `bootstrap` コマンドに置き換えた
@@ -174,7 +194,8 @@
     - 実機相当の確認: `bootstrap` → planner → plan-reviewer(approve) → 人間の承認 → developer → dev-reviewer(approve) → completion で `done` まで、**12 イベントだけで**到達（`state.json` はスナップショットのみ）
   - [x] 3: **完了（2026-09-08。段取り 2 に含めて済んだ）。** 承認・差し戻し・retry も同じ `dispatch` を通るので、`eventLog` middleware がそのまま書く（`HUMAN_APPROVAL` / `HUMAN_REQUEST_CHANGES` / `RETRY`）。`agent-comment.yml` が `run-id` / `attempt` を渡すようにして、人間のイベントも名前が衝突しない形にした。契約 §4 の completion の入力とプロンプト・`docs/` の記述も `events/*.json` に直した
   - [x] 4: **完了（2026-09-08。同上）。** `hydrate` が `state.json` を読まなくなり、`state.json` は `snapshot` middleware が書くだけの射影になった。`blocked` の導出と `blocked_from` の廃止はレビュー反映で済んでいたので、残りは読み取りをやめるだけだった。`docs/troubleshooting.md` の「手で再開する」は「イベントを 1 件足して push する」に書き換えた
-  - [ ] 5: **middleware と subscriber の分解。** 1 副作用 1 ファイル。受け入れ条件は「ワークフローに渡す output の名前と値が今と 1 対 1 で変わらない」。middleware の並び順（`guard`, `snapshot`, `event-log`, `hydrate`）が「イベント追記 → スナップショット書き出し」を決めることをテストで固定する（逆順だと、落ちたときに正であるイベントが失われる）
+  - [x] 5: **完了（2026-09-08）。middleware の分解と並び順の固定まで。** 1 副作用 1 ファイル（`guard` / `snapshot` / `reviewFile` / `eventLog` / `hydrate`）で、`middlewares/index.ts` の配列が順序の正。`__tests__/order.test.ts` が「**イベントの追記はスナップショットの書き出しより先**」を固定する（`state.json` をディレクトリに差し替えて書き出しだけを失敗させ、開始イベントが残ることを見る。逆順だとスナップショットだけが進み、正が失われる）
+    - **subscriber 側の分解は行わない（判断）。** output は `outputs` に積んで `runCommand` の分岐がそのまま返す形で足りており、`subscribe` を挟むと「1 起動 1 dispatch」の中で 1 回しか呼ばれない購読者を作るだけになる。ワークフローに渡す output の名前と値は変わっていない
   - [x] 7（追加。2026-09-08）: **`validate` コマンドを `finish` に畳んだ。** 検査結果を CLI 引数 5 本（`--result` / `--verdict` / `--api-error-status` / `--detail` / `--acceptance-passed`）で YAML 越しに運び直していたのをやめ、`finish` が `src/redux/validate.ts` を直接呼ぶ。**検査する相手は `start` が記録した in_flight**（`selectInFlightAgent`）で、`--agent` も渡さない
     - **不変条件は CLI 側で守る。** 検査は `try` の中で行い、例外は `invalid_artifacts: validate_crashed: …` にして `blocked` にする（`agent-dispatch.yml` にあった `|| 'invalid'` の保険が不要になった）。`start` を通っていなければ `実行が記録されていない（start が無い）`
     - **消えたもの**: CLI の `validate` コマンド、上記 5 引数、`action.yml` の outputs 3 つ（`verdict` / `acceptance_passed` / `api_error_status`）、`agent-dispatch.yml` の step 1 つ、イベントログの二重畳み込み。`oversize` は `finish` の出力になった
@@ -203,7 +224,10 @@
   - (2) **公開 IF の barrel は 1 段にした。** `src/redux/index.ts` を削除し、`src/index.ts` は実際に外から import される 3 つ（`defaults` / `Config` / `validateRun`）だけにした。`src/__tests__/index.test.ts` は「export の集合がこの 2 名前と一致する」ことを見る形に変え、増やすときに「誰が import するか」を先に決めさせる
   - (3) **`labels` は上書き不可にした。** `mergeSettings.ts` の `OVERRIDABLE` から外し、`install/config.json` の雛形からも落とした。理由は、起動ラベルが配布先のラッパーの `if:` に直書きなので `trigger` を変えても黙って無視され、`prefix` を変えると起動ラベルが prefix 外になって bootstrap 後に外れなくなること。`docs/installation.md` と `CLAUDE.md` の「上書きできるもの」の一覧からも削除し、`settings.ts` の該当キーに理由を書いた
 
-- [ ] I-13: タグ `v1` / `v1.0.0` を打つ
+- [ ] I-13: **タグ `v1` / `v1.0.0` を打つ。** 前提と手順:
+  - **先に dry-run を 1 回**（`agent-` prefix 後の状態が実機で未通過）。`gh variable set AGENT_DRY_RUN --body true` → issue に `agent:go` → `/agent approve` → `done` まで → 変数を `false` に戻す
+  - タグを打ったら、配布先の参照を `@main` から `@v1` に変える手順を `docs/installation.md` に書く（いまは「`@main` を指定してください」と書いてある）
+  - `pipeline_version` は 2（イベントログに移した時点で上げた）。**タグ v1 = pipeline_version 2** という対応を決定記録に残す
 - [ ] A-48: **`.claude/**` の扱いをプロンプトで 2 点直す（実機 3 本目 / issue #11 の plan-reviewer の指摘）。** (1) **理由を計画に書かせる**。planner プロンプトは「書き込めない」という事実だけを渡しているため、planner が根拠なしに前提へ写し、レビュアーが「このリポジトリには `.claude/skills/**` など追跡済みファイルがあるのに、書けないというのは自明でない」と差し戻した。**レビュアーには成果物しか渡らない**（設計書 §3.3）ので、理由（Claude Code が sensitive file として拒否する / K-19）を前提に明示させないと同じ差し戻しが構造的に起き続ける。(2) **設置用の完成品を `agent-work/issue-<n>/` に置かせない**。現在の developer プロンプトは `staged/` に置くよう指示しているが、run ディレクトリは issue ごとに閉じるハーネスのスクラッチで、`state.json` / `runs/` / `reviews/` が同居する。**恒久的に参照される設置元は issue 番号に依存しない場所**（例: リポジトリ直下の `settings.example.json`）に置き、README に設置手順を書かせる — K-19、実機 3 本目
 - [ ] A-50: **App トークンの権限を実行単位で絞る（A-35 の残り）。** `create-github-app-token@v3` の `permission-*` 入力で、ジョブごとに必要な権限だけを取る（bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents、comment は contents / pull-requests）。App 自体の権限に加えて実行単位でも落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1
 - [ ] A-34: **`log.md` の追記も同じ問題を持つ。** 追記専用でも同じ行域（末尾）を触るため、並行時は rebase で競合する（自動マージされて順序が入れ替わる可能性もある）。A-33 の `runs/` レコードがそのまま実行ログになるので、`log.md` は**ハーネスが書く実体ではなく、completing フェーズで `runs/` を時刻順に連結して生成する読み物**に変える。人間が PR で 1 ファイルとして読める利点は維持できる — A-33、設計書 §5.6
