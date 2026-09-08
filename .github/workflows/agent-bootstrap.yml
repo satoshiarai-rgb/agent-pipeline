@@ -3,7 +3,7 @@
 # 配布先の薄いラッパーから jobs.<id>.uses で呼ばれる。
 # 認証は secrets: inherit で受け取るため、ここで secrets を宣言しない。
 
-name: bootstrap
+name: agent-bootstrap
 
 on:
   workflow_call:

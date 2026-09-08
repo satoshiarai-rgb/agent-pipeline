@@ -197,7 +197,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 - **やること**: 配布先の 343 行を中央の reusable workflow 3 本に移し、ラッパーを 69 行にする
   - 中央 `.github/workflows/{bootstrap,approve,dispatch}.yml`（`on: workflow_call`）
   - 配布先はイベントを受けて `jobs.<id>.uses` で呼び分けるだけ。認証は `secrets: inherit`
-  - ダミーエージェントは中央 `dispatch.yml` の `dry_run` 入力で分岐する。**新しい配布先を
+  - ダミーエージェントは中央 `agent-dispatch.yml` の `dry_run` 入力で分岐する。**新しい配布先を
     導入するときトークンを使わず配線を確認できるので、検証用の足場としてだけでなく
     本番でも役に立つ**（設計書 §9-9「小さな issue で 1 本通す」）
 - **確認**: `route` の outputs が `run` に渡る。`route` が `agent=none` を返したとき `run` が skip される
@@ -212,7 +212,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 ### Step B-5: 中央と配布先の 2 リポジトリに分ける
 
 - **学ぶ概念**: 別リポジトリの reusable workflow / composite action の参照、`secrets: inherit`、リポジトリの可視性と Actions のアクセス設定
-- **やること**: 個人アカウント内に配布先役の検証用リポジトリを 1 つ作り、`uses: satoshiarai-rgb/agent-pipeline/.github/workflows/dispatch.yml@v1` で呼ぶ。App を両方のリポジトリにインストールする
+- **やること**: 個人アカウント内に配布先役の検証用リポジトリを 1 つ作り、`uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1` で呼ぶ。App を両方のリポジトリにインストールする
 - **確認**: 配布先の Secrets が `secrets: inherit` で中央の reusable に渡る。OIDC トークンの `job_workflow_ref` の実値をログに出して確認する
 - **完了条件**: 配布先には `agent.yml` と `.agent/` しか無い状態で一巡する
 - **判断が必要な点**: 個人アカウントには org の「Accessible from repositories in the organization」に相当する設定が無いため、**private リポジトリの reusable workflow は他リポジトリから参照できない**。中央を public にするか、検証中は 1 リポジトリで完結させるかを決める
@@ -227,7 +227,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 ### Step C-1: issue のラベルで起動する
 
 - **学ぶ概念**: `on: issues: types: [labeled]`、`github.event` の中身、`author_association`、`gh` CLI
-- **やること**: `bootstrap.yml`。`agent:go` ラベルで起動し、認可を確認してブランチ・雛形・draft PR を作る。冪等（ブランチがあれば何もしない）
+- **やること**: `agent-bootstrap.yml`。`agent:go` ラベルで起動し、認可を確認してブランチ・雛形・draft PR を作る。冪等（ブランチがあれば何もしない）
 - **確認**: 権限のない人がラベルを付けても何も起きない。ラベルを 2 回付けても二重に作られない
 - **完了条件**: issue にラベルを付けるだけで、フェーズ B のループが最後まで回る
 - 対応: worklist I-7、A-12、Q-2
@@ -254,7 +254,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 **目的**: ダミーを 1 体ずつ本物の Claude に置き換える。土台が固まっているので、ここからの失敗は「プロンプトの質」の問題に限定される。
 
 **前提（2026-09-05 に完了）**: 配線は済んでいる。`compose-prompt` / `validate-artifacts` は composite ではなく
-ハーネスの CLI コマンド（`compose` / `validate`）として実装され、`dispatch.yml` の `run` job が
+ハーネスの CLI コマンド（`compose` / `validate`）として実装され、`agent-dispatch.yml` の `run` job が
 `compose` → `base-action@v1.0.215` → `validate` → `finish` を通す（worklist I-9 / I-9b / I-9c / I-9d）。
 既定プロンプト 5 本は中央の `prompts/<agent>.md` にある。したがって以下の各ステップでやることは
 「そのエージェントを `dry_run: false` で走らせ、成果物の質を見てプロンプトを直す」ことに絞られる。
@@ -262,8 +262,8 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
 ### Step D-0: 実機確認の手順（配線 → 本物）
 
 配布先は `satoshiarai-rgb/compass-wiki`。`dry_run` はリポジトリ変数 `AGENT_DRY_RUN` で
-切り替える（未設定なら dry run。`install/agent.yml` を配布先の `.github/workflows/agent.yml` に
-コピーしておく。以前の原本 `work/verify/check-dispatch.yml` は A-51 で `install/agent.yml` に
+切り替える（未設定なら dry run。`install/agent-pipeline.yml` を配布先の `.github/workflows/agent-pipeline.yml` に
+コピーしておく。以前の原本 `work/verify/check-agent-dispatch.yml` は A-51 で `install/agent-pipeline.yml` に
 畳んだ。手動起動（`workflow_dispatch` で scenario を選ぶ）は Step B-4〜C-1 用だったので落とした）。
 
 **段 1: dry run で 1 周（トークン消費なし）** — 2026-09-05 に issue #5 で完了

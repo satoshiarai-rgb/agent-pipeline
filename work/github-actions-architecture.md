@@ -22,8 +22,8 @@
 
 | パス | 種別 | 役割 |
 |---|---|---|
-| `.github/workflows/bootstrap.yml` | reusable workflow | ブランチ作成、雛形コミット、draft PR |
-| `.github/workflows/dispatch.yml` | reusable workflow | `route` job で state を読み、`run` job でエージェント実行 |
+| `.github/workflows/agent-bootstrap.yml` | reusable workflow | ブランチ作成、雛形コミット、draft PR |
+| `.github/workflows/agent-dispatch.yml` | reusable workflow | `route` job で state を読み、`run` job でエージェント実行 |
 | `.github/workflows/approve.yml` | reusable workflow | `/approve` 検証、`awaiting_human → developing` |
 | `.github/actions/app-token/action.yml` | composite | App トークン生成と git identity 設定 |
 | `.github/actions/read-state/action.yml` | composite | `state.yml` + config マージ → JSON outputs |
@@ -40,7 +40,7 @@
 
 | パス | 役割 |
 |---|---|
-| `.github/workflows/agent.yml` | 3 イベントを受けて中央の reusable を呼ぶ |
+| `.github/workflows/agent-pipeline.yml` | 3 イベントを受けて中央の reusable を呼ぶ |
 | `.agent/config.yml` | `defaults.yml` への差分 |
 | `.agent/conventions.md` | 固有規約 |
 | `.agent/setup.sh` | ツールチェーン準備 |
@@ -57,10 +57,10 @@ flowchart LR
     E3[issue_comment: /approve]
   end
   subgraph central[中央 org/agent-pipeline]
-    B[bootstrap.yml]
-    D[dispatch.yml]
+    B[agent-bootstrap.yml]
+    D[agent-dispatch.yml]
     A[approve.yml]
-    subgraph D_jobs[dispatch.yml jobs]
+    subgraph D_jobs[agent-dispatch.yml jobs]
       R[route] --> X[run]
     end
     X --> CA1[app-token]
@@ -108,12 +108,12 @@ jobs:
     if: >-
       github.event_name == 'issues' &&
       github.event.label.name == 'agent:go'
-    uses: org/agent-pipeline/.github/workflows/bootstrap.yml@v1
+    uses: org/agent-pipeline/.github/workflows/agent-bootstrap.yml@v1
     secrets: inherit
 
   dispatch:
     if: github.event_name == 'push'
-    uses: org/agent-pipeline/.github/workflows/dispatch.yml@v1
+    uses: org/agent-pipeline/.github/workflows/agent-dispatch.yml@v1
     secrets: inherit
 
   approve:
@@ -133,7 +133,7 @@ jobs:
 
 ## 4. 中央 reusable workflows
 
-### 4.1 `bootstrap.yml`
+### 4.1 `agent-bootstrap.yml`
 
 ```yaml
 on:
@@ -186,7 +186,7 @@ jobs:
 - **PR 番号を `state.yml` に書かない**。書くと 2 回目の push が必要になり dispatch が二重起動する。PR 番号は必要時に `gh pr list --head <branch>` で導出する
 - push と PR 作成の順序は push が先。planner は PR を必要としない
 
-### 4.2 `dispatch.yml`
+### 4.2 `agent-dispatch.yml`
 
 ```yaml
 on:
@@ -437,7 +437,7 @@ Anthropic のフェデレーションルールは `subject_prefix` / `audience` 
     "claims": {
       "repository_owner": "org"
     },
-    "condition": "claims.job_workflow_ref.startsWith('org/agent-pipeline/.github/workflows/dispatch.yml@refs/tags/v1')"
+    "condition": "claims.job_workflow_ref.startsWith('org/agent-pipeline/.github/workflows/agent-dispatch.yml@refs/tags/v1')"
   },
   "target": { "type": "service_account", "service_account_id": "svac_..." },
   "workspace_id": "wrkspc_...",
@@ -450,7 +450,7 @@ Anthropic のフェデレーションルールは `subject_prefix` / `audience` 
 
 - Anthropic は GitHub Actions のような共有 issuer に対して、`repository_owner` などのテナント識別クレームか `repo:org/` の subject prefix による制約を必須にしている。`repository_owner` を必ず入れる
 - `job_workflow_ref` は **caller 側に `id-token: write` があるときだけ**トークンに含まれる。§3 の permissions が効いている
-- 配布先が `@v1.2.0` のようにパッチ固定すると `job_workflow_ref` の ref が変わりルールに一致しなくなる。配布先は `@v1` に統一するか、CEL を `startsWith('...dispatch.yml@refs/tags/v1')` のように緩める（上記の通り）
+- 配布先が `@v1.2.0` のようにパッチ固定すると `job_workflow_ref` の ref が変わりルールに一致しなくなる。配布先は `@v1` に統一するか、CEL を `startsWith('...agent-dispatch.yml@refs/tags/v1')` のように緩める（上記の通り）
 - リポジトリごとのコスト配賦が必要になったら、この 1 本を残したまま `condition` に `claims.repository == 'org/product-a'` を足したルールを別サービスアカウント向けに追加する。ルールは複数一致しうるため、評価順序の仕様を Console 側で確認する
 
 ---
@@ -486,7 +486,7 @@ Anthropic のフェデレーションルールは `subject_prefix` / `audience` 
 
 | 箇所 | 変更 | 理由 |
 |---|---|---|
-| §4.1 | `run.yml` を廃止し、`dispatch.yml` の `run` job + composite actions に統合 | ネストを 2 段に抑え、WIF の `job_workflow_ref` を 1 つに固定する |
+| §4.1 | `run.yml` を廃止し、`agent-dispatch.yml` の `run` job + composite actions に統合 | ネストを 2 段に抑え、WIF の `job_workflow_ref` を 1 つに固定する |
 | §5.1 | `state.yml` から `pr` フィールドを削除。`gh pr list --head` で導出 | bootstrap の 2 回目 push による dispatch 二重起動を防ぐ |
 | §6.4 手順 4 | `started_at` の push に `[skip ci]` を付与 | 中間 push で dispatch が再起動し同フェーズが二重に走るのを防ぐ |
 | §6.4 手順 5 | `claude-code-action` ではなく `claude-code-action/base-action` を使用 | ハーネスは自前で持つため full action の GitHub 連携機能が不要。`prompt_file` と tool 制限が扱いやすい |
@@ -512,8 +512,8 @@ Anthropic のフェデレーションルールは `subject_prefix` / `audience` 
 
 1. 中央: `scripts/state.py`（read / start / finish / transition）と `defaults.yml` の遷移表。ユニットテストをここに集中させる
 2. 中央: `read-state` / `finalize` composite。git 操作なしでローカル実行できる形にする
-3. 中央: `dispatch.yml` を、エージェント step をダミー（`echo` で成果物を生成）に置き換えて通す。状態機械と push ループの挙動をここで確認
-4. 中央: `bootstrap.yml` / `approve.yml`
+3. 中央: `agent-dispatch.yml` を、エージェント step をダミー（`echo` で成果物を生成）に置き換えて通す。状態機械と push ループの挙動をここで確認
+4. 中央: `agent-bootstrap.yml` / `approve.yml`
 5. Anthropic: WIF ルール作成、`base-action` を空プロンプトで通す
 6. 中央: `compose-prompt` と planner プロンプト。planner だけで 1 issue 通す
 7. 残りのエージェントを順に追加

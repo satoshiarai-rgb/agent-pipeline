@@ -7,13 +7,13 @@
 | 原本 | 置き場所 | 必須 |
 |---|---|---|
 | [`install.sh`](install.sh) | （コピーしない。実行するだけ） | 下の「コピー」を参照 |
-| [`agent.yml`](agent.yml) | `.github/workflows/agent.yml` | **必須。** これが唯一の入口 |
+| [`agent-pipeline.yml`](agent-pipeline.yml) | `.github/workflows/agent-pipeline.yml` | **必須。** これが唯一の入口 |
 | [`conventions.md`](conventions.md) | `.agent/conventions.md` | 任意。このリポジトリの流儀を伝える唯一の手段 |
 | [`setup.sh`](setup.sh) | `.agent/setup.sh` | 任意。テストを走らせる準備が必要なら |
 | [`issue-template.yml`](issue-template.yml) | `.github/ISSUE_TEMPLATE/agent-task.yml` | 任意。issue の入力を揃える |
 | [`config.json`](config.json) | `.agent/config.json` | 任意。往復回数・モデル・上限・ツール・承認できる人を変えたいときだけ |
 
-`agent.yml` は原則そのままコピーして使えます（中央の reusable workflow を呼ぶだけなので、
+`agent-pipeline.yml` は原則そのままコピーして使えます（中央の reusable workflow を呼ぶだけなので、
 配布先ごとに変える箇所がありません）。残りは雛形で、中身を書き換えて使います。
 
 **`config.json` は `install.sh` では置きません。** 中身は上書きできるキーの一覧で、値はすべて
@@ -71,6 +71,6 @@ AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # 版を指
 ```bash
 BASE=https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install
 mkdir -p .github/workflows .agent
-curl -fsSL "$BASE/agent.yml"   -o .github/workflows/agent.yml
+curl -fsSL "$BASE/agent.yml"   -o .github/workflows/agent-pipeline.yml
 curl -fsSL "$BASE/config.json" -o .agent/config.json
 ```

@@ -3,7 +3,7 @@
 # route ジョブが状態を読んで判断し、run ジョブが実行と遷移を担う。
 # 状態を書くのはこのワークフローだけで、エージェントは書かない（設計書 §7.1）。
 
-name: dispatch
+name: agent-dispatch
 
 on:
   workflow_call:
@@ -248,7 +248,7 @@ jobs:
         uses: anthropics/claude-code-action/base-action@v1.0.215
         with:
           prompt_file: ${{ steps.compose.outputs.prompt_path }}
-          # 上限とツールはハーネスが決める（契約 §5）。組み立ては src/utils/resolve-agent.ts
+          # 上限とツールはハーネスが決める（契約 §5）。組み立ては src/utils/resolveAgent.ts
           claude_args: ${{ needs.route.outputs.claude_args }}
           # K-7: Console 取得まではサブスクリプション認証。WIF への差し替え手順は A-29
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
@@ -372,7 +372,7 @@ jobs:
       # blocked は人間が state.json を直して push するまで進まないので、
       # 緑のまま静かに止まるより赤で気付けた方がよい
       # ---- 止まった理由と次の一手を PR に届ける（設計書 §5.5）
-      # 案内の文面はハーネスが理由から組み立てる（src/commands/explain.ts）。
+      # 案内の文面はハーネスが理由から組み立てる（src/redux/effects/explain.ts）。
       # ここでは貼るだけ。コメントは GITHUB_TOKEN で行う（空の run を作らない / K-22）
       - id: explain
         if: always() && (needs.route.outputs.action == 'block' || steps.finish.outputs.phase == 'blocked')

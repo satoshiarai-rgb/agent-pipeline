@@ -17,7 +17,7 @@ const create = actionCreatorFactory("agent-pipeline");
 export const init = create<undefined>("INIT", { hydrate: true });
 
 /**
- * run の最初のイベント（`bootstrap.yml` が 1 度だけ書く）。**識別子はここで確定し、
+ * run の最初のイベント（`agent-bootstrap.yml` が 1 度だけ書く）。**識別子はここで確定し、
  * 以後変わらない。** 環境の注入（`CONFIGURE`）と違って永続化する — 畳み込みで
  * 復元できる必要があるため。
  *

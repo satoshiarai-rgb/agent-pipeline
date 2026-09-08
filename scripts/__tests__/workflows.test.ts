@@ -29,7 +29,7 @@ const ROOT = join(import.meta.dir, "../..");
 const CENTRAL = join(ROOT, ".github/workflows");
 const VERIFY = join(ROOT, "work/verify");
 /** 配布先に置くラッパーの原本。docs も検証用リポジトリもこれを参照する（A-51） */
-const CALLER = join(ROOT, "install/agent.yml");
+const CALLER = join(ROOT, "install/agent-pipeline.yml");
 
 interface Step {
   id?: string;
@@ -111,9 +111,17 @@ describe("ワークフローの YAML", () => {
     }
   });
 
+  // 名前は `agent-` で始める（他のワークフローと混ざらないため / 2026-09-08）。
+  // ファイル名と name: が食い違うと、run 一覧のどれがどのファイルか分からなくなる
   test("ファイル名と name: が一致している（コピーの事故を防ぐ）", () => {
-    for (const wf of all.filter((w) => w.name.startsWith("check-"))) {
+    for (const wf of all) {
       expect(wf.doc.name, wf.name).toBe(wf.name.replace(/\.yml$/, ""));
+    }
+  });
+
+  test("中央のワークフローと配布先のラッパーは agent- で始まる", () => {
+    for (const wf of all.filter((w) => !w.name.startsWith("check-"))) {
+      expect(wf.name.startsWith("agent-"), wf.name).toBe(true);
     }
   });
 
@@ -135,7 +143,7 @@ describe("ワークフローの YAML", () => {
 
   /**
    * composite action は**宣言していない `with:` を黙って捨てる**。
-   * 実際に踏んだ失敗: `bootstrap.yml` が `issue:` を渡していたが `action.yml` に
+   * 実際に踏んだ失敗: `agent-bootstrap.yml` が `issue:` を渡していたが `action.yml` に
    * 入力が無く、CLI に `--issue` が届かないまま exit 2（run 34196607818）。
    */
   test("action に渡す with: のキーはすべて action.yml が宣言している", () => {
@@ -204,7 +212,7 @@ describe("run: ブロックのシェル構文", () => {
 });
 
 describe("dry run のダミーエージェント（実際に走らせる）", () => {
-  const dispatch = all.find((w) => w.path === join(CENTRAL, "dispatch.yml"));
+  const dispatch = all.find((w) => w.path === join(CENTRAL, "agent-dispatch.yml"));
   const script = dispatch?.doc.jobs?.run?.steps?.find((s) => s.id === "dummy")?.run;
   const dirs: string[] = [];
   afterEach(() => {
@@ -369,7 +377,7 @@ describe("dry run のダミーエージェント（実際に走らせる）", ()
 
 describe("規模超過の PR コメント（実際に走らせる）", () => {
   // 上限超過でも止めずに警告を出す（K-21）。heredoc が閉じるかを実行して確かめる
-  const dispatch = all.find((w) => w.path === join(CENTRAL, "dispatch.yml"));
+  const dispatch = all.find((w) => w.path === join(CENTRAL, "agent-dispatch.yml"));
   const step = dispatch?.doc.jobs?.run?.steps?.find((st) => st.name?.includes("規模超過"));
   const dirs: string[] = [];
   afterEach(() => {
@@ -434,7 +442,7 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
     expect(first.stderr).toBe("");
     expect(first.status).toBe(0);
     const placed = [
-      ".github/workflows/agent.yml",
+      ".github/workflows/agent-pipeline.yml",
       ".agent/conventions.md",
       ".agent/setup.sh",
       ".github/ISSUE_TEMPLATE/agent-task.yml",
@@ -631,7 +639,7 @@ describe("gh コマンドの書き方", () => {
 });
 
 describe("PR コメントの解析（人間が書いた文字列の境界）", () => {
-  const comment = all.find((w) => w.name === "comment.yml");
+  const comment = all.find((w) => w.name === "agent-comment.yml");
   const parse = comment?.doc.jobs?.comment?.steps?.find((st) => st.id === "parse")?.run;
   const dirs: string[] = [];
   afterEach(() => {

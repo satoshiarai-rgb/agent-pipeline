@@ -68,7 +68,7 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 
 | 置き場所 | 内容 | 原本 |
 |---|---|---|
-| `.github/workflows/agent.yml` | **必須。** 唯一の入口。中央を呼ぶだけなので直す箇所はありません | [`install/agent.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/agent.yml) |
+| `.github/workflows/agent-pipeline.yml` | **必須。** 唯一の入口。中央を呼ぶだけなので直す箇所はありません | [`install/agent-pipeline.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/agent-pipeline.yml) |
 | `.agent/conventions.md` | 全エージェントに渡される、このリポジトリの約束事 | [`install/conventions.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/conventions.md) |
 | `.agent/setup.sh` | テストを実行できる状態にするための準備 | [`install/setup.sh`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/setup.sh) |
 | `.github/ISSUE_TEMPLATE/agent-task.yml` | issue の入力を揃えるフォーム | [`install/issue-template.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/issue-template.yml) |

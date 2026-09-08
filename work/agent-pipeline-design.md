@@ -118,8 +118,8 @@ issue 起票（ラベル agent:go）
 
 ```
 .github/workflows/
-  bootstrap.yml        # reusable: ブランチ作成、雛形コミット、draft PR 作成
-  dispatch.yml         # reusable: state.yml を読み、次のエージェントを決めて run.yml を呼ぶ
+  agent-bootstrap.yml        # reusable: ブランチ作成、雛形コミット、draft PR 作成
+  agent-dispatch.yml         # reusable: state.yml を読み、次のエージェントを決めて run.yml を呼ぶ
   run.yml              # reusable: Claude Code を実行し、成果物を検証し、state.yml を更新して push
   approve.yml          # reusable: /approve コメントを検証し、awaiting_human → developing に遷移
 prompts/
@@ -154,7 +154,7 @@ scripts/
   conventions.md       # このリポジトリ固有の規約
   setup.sh             # テスト実行に必要なツールチェーンの準備（言語ごとに異なる）
 .github/
-  workflows/agent.yml  # 中央を呼ぶだけの薄いラッパー
+  workflows/agent-pipeline.yml  # 中央を呼ぶだけの薄いラッパー
   ISSUE_TEMPLATE/agent-task.yml
 agent-work/            # main にマージして残す（決定済み）
   issue-123/
@@ -358,7 +358,7 @@ npm ci
 
 ## 6. ワークフロー設計
 
-### 6.1 配布先 `.github/workflows/agent.yml`（薄いラッパー）
+### 6.1 配布先 `.github/workflows/agent-pipeline.yml`（薄いラッパー）
 
 ```yaml
 name: agent
@@ -384,12 +384,12 @@ concurrency:
 jobs:
   bootstrap:
     if: github.event_name == 'issues' && github.event.label.name == 'agent:go'
-    uses: org/agent-pipeline/.github/workflows/bootstrap.yml@v1
+    uses: org/agent-pipeline/.github/workflows/agent-bootstrap.yml@v1
     secrets: inherit
 
   dispatch:
     if: github.event_name == 'push'
-    uses: org/agent-pipeline/.github/workflows/dispatch.yml@v1
+    uses: org/agent-pipeline/.github/workflows/agent-dispatch.yml@v1
     secrets: inherit
 
   approve:
@@ -398,7 +398,7 @@ jobs:
     secrets: inherit
 ```
 
-### 6.2 `bootstrap.yml`（中央）
+### 6.2 `agent-bootstrap.yml`（中央）
 
 1. `author_association` が `config.approvers` に含まれるか検証。含まれなければ何もしない
 2. ブランチ `claude/issue-<n>` が既に存在すれば何もしない（冪等）
@@ -406,7 +406,7 @@ jobs:
 4. draft PR を作成（本文に plan.md へのリンク、`Closes #<n>`）。PR 番号を `state.yml` に記録
 5. push → dispatch が起動
 
-### 6.3 `dispatch.yml`（中央）
+### 6.3 `agent-dispatch.yml`（中央）
 
 1. ブランチ名から issue 番号を得て `state.yml` を読む
 2. `pipeline_version` 不一致、`total_steps` 上限超過、`phase` が `done` / `blocked` / `awaiting_human` なら終了
@@ -507,7 +507,7 @@ Anthropic 側の初期設定（Console 組織、ワークスペース、上限�
 
 ## 9. 新規リポジトリへの展開手順
 
-1. `install/agent.yml` を `.github/workflows/agent.yml` にコピー
+1. `install/agent-pipeline.yml` を `.github/workflows/agent-pipeline.yml` にコピー
 2. `install/config.yml` を `.agent/config.yml` にコピーし、必要な差分のみ記入
 3. `install/conventions.md` を `.agent/conventions.md` にコピーし、§5.8 の各節を埋める
 4. `install/setup.sh` を `.agent/setup.sh` にコピーし、ツールチェーン準備を書く

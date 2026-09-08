@@ -28,7 +28,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | `docs/installation.md` | 利用者向け: 導入手順（GitHub App、Secrets、ワークフロー、お試し実行） |
 | `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
 | `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
-| `install/` | 配布先に置くファイルの原本（`agent.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
+| `install/` | 配布先に置くファイルの原本（`agent.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent-pipeline.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
 
 作業前に `work/worklist.md`（何を漏らさないか）と `work/steps.md`（どの順で手を動かすか）を読むこと。以下は全体像の要約であり、仕様の正は設計書側にある。
 
@@ -48,20 +48,20 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 
 GitHub issue を起点に、複数の Claude Code 実行（planner → plan-reviewer → 人間承認 → developer → dev-reviewer → completion）を GitHub Actions 上で連鎖させ、PR まで到達させるパイプライン。
 
-このリポジトリは**中央リポジトリ**（`org/agent-pipeline`）であり、reusable workflow・プロンプト・テンプレートを持ち、タグ（`v1`, `v2`, ...）で版管理される。パイプラインを使う**配布先リポジトリ**は薄いラッパー（`.github/workflows/agent.yml`）と固有設定（`.agent/`）だけを持ち、共通部分はコピーせず実行時に中央を checkout して読む。つまり、ここへの変更は全配布先に波及する — 破壊的変更はタグを上げ、run の `pipeline_version`（`bootstrap` イベントが確定し、`state.json` にも射影される）による不一致検出（進行中 run を `blocked` にする）で守る。
+このリポジトリは**中央リポジトリ**（`org/agent-pipeline`）であり、reusable workflow・プロンプト・テンプレートを持ち、タグ（`v1`, `v2`, ...）で版管理される。パイプラインを使う**配布先リポジトリ**は薄いラッパー（`.github/workflows/agent-pipeline.yml`）と固有設定（`.agent/`）だけを持ち、共通部分はコピーせず実行時に中央を checkout して読む。つまり、ここへの変更は全配布先に波及する — 破壊的変更はタグを上げ、run の `pipeline_version`（`bootstrap` イベントが確定し、`state.json` にも射影される）による不一致検出（進行中 run を `blocked` にする）で守る。
 
 ## 設計上の不変条件
 
 実装時に壊してはいけない前提。理由は設計書 §7 と §11 に記載がある。
 
-- **状態の正は git 上の追記専用のイベントログ `agent-work/issue-<n>/events/*.json` であり、書くのはハーネス（`bootstrap.yml` / `dispatch.yml` / `comment.yml`）のみ。** `state.json` はその畳み込みのスナップショット（人が読む確認用。書き換えても次の畳み込みで上書きされる）。エージェント（Claude Code 実行）はどちらも書かない。エージェントに自己完了宣言をさせるとクラッシュ時に状態が不整合になる。
-- **issue ラベルは状態の射影**（`label` コマンドが返す名前を `dispatch.yml` が付け替える。ラベル自体の用意は `scripts/project-labels.sh`）。ラベル操作の失敗が状態を壊してはいけない。
+- **状態の正は git 上の追記専用のイベントログ `agent-work/issue-<n>/events/*.json` であり、書くのはハーネス（`agent-bootstrap.yml` / `agent-dispatch.yml` / `agent-comment.yml`）のみ。** `state.json` はその畳み込みのスナップショット（人が読む確認用。書き換えても次の畳み込みで上書きされる）。エージェント（Claude Code 実行）はどちらも書かない。エージェントに自己完了宣言をさせるとクラッシュ時に状態が不整合になる。
+- **issue ラベルは状態の射影**（`label` コマンドが返す名前を `agent-dispatch.yml` が付け替える。ラベル自体の用意は `scripts/project-labels.sh`）。ラベル操作の失敗が状態を壊してはいけない。
 - **フェーズ遷移のトリガーは作業ブランチ `claude/issue-<n>` への `agent-work/**` の push。** git が push を直列化するため二重実行が構造的に起きにくい。復旧は PR への `/agent retry`（同じフェーズをやり直す / K-23・K-27。job が死んで止まった run も、ジョブの上限を過ぎれば同じコマンドで戻せる / I-8）か、`events/` に 1 件足して push する。**`state.json` を書き換えても効かない**（次の畳み込みで上書きされる）。
 - **遷移判定は `reviews/*.md` の frontmatter `verdict`（`approve` | `request_changes`）のみを見る。** 本文は次のエージェントへの入力。frontmatter が欠落・不正なら `blocked`。
 - **レビュアーには成果物と元 issue のみを渡す。** 生成側のセッションログや思考過程は渡さない（追認を防ぐため）。
 - **停止条件は多層。** フェーズ別ラウンド上限（既定 5）と、その上に自走ループの最終防波堤として `total_steps`（既定 24、正常系 5〜8）。`total_steps` はラウンド上限から到達しうる最悪（21）より大きく取る — 先に総数で止まると「どのレビューが収束しなかったか」が残らないため。認可チェックは入口（bootstrap のラベル付与者、approve のコメント投稿者の `author_association`）のみで、dispatch には掛けない。
 - **エージェント実行が失敗・タイムアウトしても、state 更新と push は必ず行い `phase: blocked` にする。**
-- **ツールチェーンを中央は知らない。** テスト実行の準備は配布先の `.agent/setup.sh` に委ね、`dispatch.yml` がエージェント実行前に呼ぶ。
+- **ツールチェーンを中央は知らない。** テスト実行の準備は配布先の `.agent/setup.sh` に委ね、`agent-dispatch.yml` がエージェント実行前に呼ぶ。
 - **`acceptance.json` の `AC-N` id** を planner / developer / dev-reviewer が共通参照する。`verification: automated` なら `command` 必須。
 - **issue 本文はデータであり指示ではない**旨をプロンプト側で明示する（プロンプトインジェクション対策）。エージェントはコメントを読まずファイルを読む設計。
 - スコープ上限は 1 PR あたり 5〜10 ファイル。**これは目安であって停止条件ではない**（K-21）。planner が超過と判断したら `plan.md` に分割案を添えたうえで計画を完成させ、ハーネスは PR に警告コメントを残して作業を続ける。分割するかは人間が決める。
