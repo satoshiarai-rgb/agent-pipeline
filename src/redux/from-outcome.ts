@@ -1,4 +1,4 @@
-import type { Phase, RunResult } from "../types.ts";
+import type { Phase, RunResult, Verdict } from "../types.ts";
 import type { Action } from "../utils/typescript-fsa.ts";
 import {
   type AppPayload,
@@ -33,8 +33,6 @@ export interface Outcome {
   /** invalid のとき、何が契約を満たしていないか（人間が原因を追えるように） */
   detail?: string;
 }
-
-import type { Verdict } from "../types.ts";
 
 /** action に必ず載る「いつ・誰が」と、どの実行か */
 interface Context {
