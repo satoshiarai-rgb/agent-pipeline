@@ -50,11 +50,17 @@ GitHub 標準の `GITHUB_TOKEN` で足りるためです。
 
 ## 3. ファイルを置く
 
-あなたのリポジトリで次を実行します。**既にあるファイルは上書きしません**（上書きするなら
-`--force`）。置いたあとにやることも最後に表示されます。
+あなたのリポジトリで次を実行します。**既にあるファイルは上書きしません**。置いたあとに
+やることも最後に表示されます。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/install.sh | bash
+```
+
+上書きしたいときは `--force` を渡します（パイプで渡すので `-s --` が必要です）。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/install.sh | bash -s -- --force
 ```
 
 置かれるのは 4 つで、**必須はワークフロー 1 枚だけ**です。残りは雛形なので、使わないものは
@@ -81,8 +87,9 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 | `claude/**` ブランチへの `agent-work/**` の push | 次のフェーズを起動する（フェーズの連鎖はこれで起きます） |
 
 呼び出す側より広い権限は要求できないため、このワークフローが `contents` / `pull-requests` /
-`issues` / `id-token` の write を宣言します。作業ブランチへの push は `concurrency` で
-直列化されます（理由はファイル内のコメントに書いてあります）。
+`issues` の write を宣言します（`id-token: write` も書いてありますが、これは将来の認証方式
+（Workload Identity Federation）用で、現時点では使っていません）。作業ブランチへの push は
+`concurrency` で直列化されます（理由はファイル内のコメントに書いてあります）。
 
 参照先は現時点では `@main` を指定してください。版が切られたら `@v1` のようなタグに
 固定できるようになります。
@@ -99,8 +106,8 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
   実行の直後にそのまま成果物をコミットするので、**生成物が `.gitignore` で無視されているか
   確認してください**（→
   [install/README.md の「前提」](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#前提)）
-- **`.agent/config.json`** で、レビューの往復回数・モデル・エージェントの上限・ツールを
-  このリポジトリだけ変えられます（雛形は
+- **`.agent/config.json`** で、レビューの往復回数・モデル・エージェントの上限・ツール・
+  **承認できる人（`approvers`）**・ラベルの prefix を、このリポジトリだけ変えられます（雛形は
   [`install/config.json`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/config.json)
   で、**上書きできるキーの一覧**です。値はすべて `null` = 既定を継承なので、変えたいキーにだけ
   値を書きます）
@@ -116,7 +123,15 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
   規則は 3 つです。**書いたキーだけが上書きされ**（書かなかったキーは本体の既定に追従します）、
   **`null` は「既定を継承」**、**既定に無いキーや型違いはエラー**になります（誤字を黙って
   無視しないため）。エラーのときは一部だけ適用せず、`blocked` にして理由を PR にコメントします。
-  状態機械（`transitions`）と版（`pipeline_version`）は本体のもので、上書きできません
+  フェーズの遷移そのものと版（`pipeline_version`）は本体のもので、上書きできません
+
+  **組織のリポジトリで使うなら `approvers` を確認してください。** 既定は
+  `["OWNER", "COLLABORATOR"]` で、組織のメンバーがコメントすると GitHub は `MEMBER` を返すため、
+  `/agent approve` が `not_authorized: MEMBER` で弾かれます
+
+  ```json
+  { "approvers": ["OWNER", "COLLABORATOR", "MEMBER"] }
+  ```
 - **`.agent/prompts/<agent>.md`** はエージェントの考え方そのものを変えたいときに使います。
   雛形は置かれないので、本体の
   [`prompts/`](https://github.com/satoshiarai-rgb/agent-pipeline/tree/main/prompts) から写します
@@ -128,10 +143,21 @@ Claude を呼ばず、ダミーの成果物で最初から最後まで一巡さ�
 ワークフローの配線・権限・ラベルだけを確認できます。`AGENT_DRY_RUN` が未設定なら
 お試し実行になります（手順 3 のワークフローの `if` を参照）。
 
+**起動ラベルは自分で作ります**（状態のラベル `agent:planning` などはパイプラインが必要に
+なった時点で作りますが、起動用の `agent:go` だけは最初に用意する必要があります）。
+
+```bash
+gh label create agent:go --description "エージェントパイプラインを起動する" --color 1f883d
+```
+
+**`.agent/setup.sh` は雛形のまま `npm ci` を実行します。** あなたのリポジトリに
+`package-lock.json` が無ければ失敗し、そのフェーズは `agent_failed` で止まります。
+お試し実行の前に、中身を自分のリポジトリに合うものへ（あるいは空に）してください。
+
 適当な issue を立てて `agent:go` ラベルを付けると、次が起きます。
 
 1. `claude/issue-<n>` ブランチと作業ディレクトリができ、draft PR が開く
-2. issue のラベルが `agent:go` から `agent:planning` に付け替わる（ラベルは自動で作られます）
+2. issue のラベルが `agent:go` から `agent:planning` に付け替わる
 3. 計画 → 計画レビューと進み、`agent:awaiting-human` で止まる
 4. その PR に `/agent approve` とコメントすると、実装 → 実装レビュー → 完了報告と進む
 5. `agent:done` になり、PR の draft が外れる

@@ -12,7 +12,7 @@ description: エージェントパイプラインの状態機械を操作する�
 
 inputs:
   command:
-    description: "start | route | finish | approve | request-changes | retry | snapshot | label | explain | compose"
+    description: "bootstrap | start | route | finish | approve | request-changes | retry | snapshot | label | explain | compose"
     required: true
   dir:
     description: "run のディレクトリ（agent-work/issue-<n>）"

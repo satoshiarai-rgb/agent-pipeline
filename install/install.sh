@@ -76,7 +76,10 @@ cat <<'NEXT'
   3. .agent/conventions.md を埋める（埋めない節は削る）。.agent/setup.sh にテストの準備を書く。
      使わない雛形はファイルごと削ってよい（無くても動く）
   4. .gitignore を確認する（setup.sh の実行後に、そのまま成果物をコミットするため）
-  5. お試し実行で配線を確かめる。AGENT_DRY_RUN が未設定ならダミーの成果物で一巡する
+  5. 起動ラベルを作る（状態のラベルはパイプラインが作るが、これだけは自分で）
+       gh label create agent:go --description "エージェントパイプラインを起動する" --color 1f883d
+  6. お試し実行で配線を確かめる。AGENT_DRY_RUN が未設定ならダミーの成果物で一巡する
+     .agent/setup.sh は雛形のまま npm ci を実行する。合わないなら先に中身を直す
        gh issue create --title "ダミー: 配線確認" --body "..."
        gh issue edit <n> --add-label agent:go
      一巡したら本番に切り替える

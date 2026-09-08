@@ -11,7 +11,7 @@
 | [`conventions.md`](conventions.md) | `.agent/conventions.md` | 任意。このリポジトリの流儀を伝える唯一の手段 |
 | [`setup.sh`](setup.sh) | `.agent/setup.sh` | 任意。テストを走らせる準備が必要なら |
 | [`issue-template.yml`](issue-template.yml) | `.github/ISSUE_TEMPLATE/agent-task.yml` | 任意。issue の入力を揃える |
-| [`config.json`](config.json) | `.agent/config.json` | 任意。往復回数・モデル・上限・ツールを変えたいときだけ |
+| [`config.json`](config.json) | `.agent/config.json` | 任意。往復回数・モデル・上限・ツール・承認できる人を変えたいときだけ |
 
 `agent.yml` は原則そのままコピーして使えます（中央の reusable workflow を呼ぶだけなので、
 配布先ごとに変える箇所がありません）。残りは雛形で、中身を書き換えて使います。
@@ -35,16 +35,28 @@
   実行時の読み取りは `GITHUB_TOKEN` で足りるため）
 - Secrets に `AGENT_APP_CLIENT_ID` / `AGENT_APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`
 
-ラベル（`agent:go`、`agent:planning`、…）は事前に作らなくてよく、パイプラインが必要に
-なった時点で作ります。
+**起動ラベル `agent:go` は自分で作ります。**
+
+```bash
+gh label create agent:go --description "エージェントパイプラインを起動する" --color 1f883d
+```
+
+状態のラベル（`agent:planning`、`agent:awaiting-human`、…）は事前に作らなくてよく、
+パイプラインが必要になった時点で作ります。
 
 ## コピー
 
-上の 4 つをまとめて置きます（**既にあるファイルは上書きしません**。`--force` で上書き）。
-置いたあとに何をするかも最後に出ます。
+上の 4 つをまとめて置きます（**既にあるファイルは上書きしません**）。置いたあとに何をするかも
+最後に出ます。
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/install.sh | bash
+```
+
+上書きするなら `--force` を渡します（パイプ経由では `-s --` が必要です）。
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install/install.sh | bash -s -- --force
 ```
 
 手元に本体の checkout があるなら、そこから置くこともできます（同じ内容です）。
@@ -58,6 +70,7 @@ AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # 版を指
 
 ```bash
 BASE=https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main/install
+mkdir -p .github/workflows .agent
 curl -fsSL "$BASE/agent.yml"   -o .github/workflows/agent.yml
 curl -fsSL "$BASE/config.json" -o .agent/config.json
 ```
