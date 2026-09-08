@@ -5,10 +5,9 @@ import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/stateFile.ts";
 import type { AgentName, RunResult, Verdict } from "../types.ts";
-import { mapValidationToAction, type ValidationReport } from "./mapValidationToAction.ts";
+import { mapValidationToAction } from "./mapValidationToAction.ts";
 import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
-import type { RootState } from "./store/createStore.ts";
 import { createStore } from "./store/createStore.ts";
 import { bootstrap } from "./store/global/actions.ts";
 import {
@@ -72,35 +71,12 @@ const need = <T>(v: T | undefined, name: string): T => {
   return v;
 };
 
-/** ISO 基本形式。イベントのファイル名の先頭になる（段取り 2 で使う） */
+/** ISO 基本形式。イベントのファイル名の先頭になる */
 const timestamp = () =>
   new Date()
     .toISOString()
     .replace(/[-:]/g, "")
     .replace(/\.\d{3}Z$/, "Z");
-const runOf = (a: Args) => ({
-  run_id: need(a["run-id"], "run-id"),
-  attempt: Number(a.attempt ?? 1),
-});
-const harness = () => ({ timestamp: timestamp(), by: "harness" });
-const human = (a: Args) => ({
-  timestamp: timestamp(),
-  by: `human:${need(a.association, "association")}`,
-});
-
-const reportOf = (a: Args): ValidationReport => ({
-  result: need(a.result, "result") as RunResult,
-  verdict: (a.verdict as Verdict | undefined) ?? null,
-  acceptance_passed: a["acceptance-passed"] ?? false,
-  api_error_status: a["api-error-status"] ? Number(a["api-error-status"]) : null,
-  detail: a.detail,
-});
-
-/** 遷移の結果を返すコマンドの出力（ワークフローが読む形） */
-const transitionOutput = (root: RootState, config: Config) => ({
-  ...selectStatus(root, config),
-  continue_chain: selectContinueChain(root, config),
-});
 
 /** ガードが弾いたとき、dispatch はこの形を返す（middleware が戻り値を差し替える） */
 export const isRejection = (r: unknown): r is { ok: false; reason: string } =>
@@ -162,27 +138,34 @@ export function runCommand(
   // 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
   // なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）
   if (command === "snapshot") {
-    writeStateFile(dir, selectSnapshot(state(), config, configError), new Date());
-    return transitionOutput(state(), config);
+    const snapshot = selectSnapshot(state(), config, configError);
+    writeStateFile(dir, snapshot, new Date());
+    const root = state();
+    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
 
   // run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する
   if (command === "bootstrap") {
+    const issue = need(args.issue, "issue");
     const action = bootstrap({
-      ...harness(),
-      issue: Number(need(args.issue, "issue")),
+      timestamp: timestamp(),
+      by: "harness",
+      issue: Number(issue),
       branch: need(args.branch, "branch"),
       pipeline_version: config.pipeline_version,
     });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    return transitionOutput(state(), config);
+    const root = state();
+    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
 
   if (command === "start") {
     const action = agentStarted({
-      ...harness(),
-      ...runOf(args),
+      timestamp: timestamp(),
+      by: "harness",
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
       agent: need(args.agent, "agent") as AgentName,
       model: args.model ?? config.models.default,
     });
@@ -193,32 +176,55 @@ export function runCommand(
 
   // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
   if (command === "finish") {
-    const action = mapValidationToAction(reportOf(args), state().app.phase, {
-      ...harness(),
-      ...runOf(args),
-      session_id: args["session-id"] ?? null,
-    });
+    const status = args["api-error-status"];
+    let apiErrorStatus: number | null = null;
+    if (status) apiErrorStatus = Number(status);
+    const action = mapValidationToAction(
+      {
+        result: need(args.result, "result") as RunResult,
+        verdict: (args.verdict as Verdict | undefined) ?? null,
+        acceptance_passed: args["acceptance-passed"] ?? false,
+        api_error_status: apiErrorStatus,
+        detail: args.detail,
+      },
+      state().app.phase,
+      {
+        timestamp: timestamp(),
+        by: "harness",
+        run_id: need(args["run-id"], "run-id"),
+        attempt: Number(args.attempt ?? 1),
+        session_id: args["session-id"] ?? null,
+      },
+    );
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
-    return transitionOutput(state(), config);
+    const root = state();
+    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
 
   if (command === "approve") {
-    const action = humanApproval(human(args));
+    const association = need(args.association, "association");
+    const action = humanApproval({ timestamp: timestamp(), by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
     return { ok: true, phase: selectStatus(state(), config).phase };
   }
 
   if (command === "request-changes") {
-    const action = humanRequestChanges({ ...human(args), body: need(args.body, "body") });
+    const association = need(args.association, "association");
+    const action = humanRequestChanges({
+      timestamp: timestamp(),
+      by: `human:${association}`,
+      body: need(args.body, "body"),
+    });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
     return { ok: true, phase: state().app.phase, review_path: outputs.review_path };
   }
 
   if (command === "retry") {
-    const action = retry(human(args));
+    const association = need(args.association, "association");
+    const action = retry({ timestamp: timestamp(), by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result)) return result;
     const { phase } = selectStatus(state(), config);

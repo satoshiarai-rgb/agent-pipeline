@@ -1634,26 +1634,6 @@ var need = (v, name) => {
   return v;
 };
 var timestamp = () => new Date().toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
-var runOf = (a) => ({
-  run_id: need(a["run-id"], "run-id"),
-  attempt: Number(a.attempt ?? 1)
-});
-var harness = () => ({ timestamp: timestamp(), by: "harness" });
-var human = (a) => ({
-  timestamp: timestamp(),
-  by: `human:${need(a.association, "association")}`
-});
-var reportOf = (a) => ({
-  result: need(a.result, "result"),
-  verdict: a.verdict ?? null,
-  acceptance_passed: a["acceptance-passed"] ?? false,
-  api_error_status: a["api-error-status"] ? Number(a["api-error-status"]) : null,
-  detail: a.detail
-});
-var transitionOutput = (root, config) => ({
-  ...selectStatus(root, config),
-  continue_chain: selectContinueChain(root, config)
-});
 var isRejection = (r) => typeof r === "object" && r !== null && r.ok === false;
 function runCommand(command, args, config, configError = null) {
   if (command === "validate")
@@ -1691,25 +1671,32 @@ function runCommand(command, args, config, configError = null) {
   if (command === "explain")
     return explainRun(state(), dir, config, configError);
   if (command === "snapshot") {
-    writeStateFile(dir, selectSnapshot(state(), config, configError), new Date);
-    return transitionOutput(state(), config);
+    const snapshot2 = selectSnapshot(state(), config, configError);
+    writeStateFile(dir, snapshot2, new Date);
+    const root = state();
+    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
   if (command === "bootstrap") {
+    const issue = need(args.issue, "issue");
     const action = bootstrap({
-      ...harness(),
-      issue: Number(need(args.issue, "issue")),
+      timestamp: timestamp(),
+      by: "harness",
+      issue: Number(issue),
       branch: need(args.branch, "branch"),
       pipeline_version: config.pipeline_version
     });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    return transitionOutput(state(), config);
+    const root = state();
+    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
   if (command === "start") {
     const action = agentStarted({
-      ...harness(),
-      ...runOf(args),
+      timestamp: timestamp(),
+      by: "harness",
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
       agent: need(args.agent, "agent"),
       model: args.model ?? config.models.default
     });
@@ -1719,32 +1706,52 @@ function runCommand(command, args, config, configError = null) {
     return { event_path: outputs.event_path };
   }
   if (command === "finish") {
-    const action = mapValidationToAction(reportOf(args), state().app.phase, {
-      ...harness(),
-      ...runOf(args),
+    const status = args["api-error-status"];
+    let apiErrorStatus = null;
+    if (status)
+      apiErrorStatus = Number(status);
+    const action = mapValidationToAction({
+      result: need(args.result, "result"),
+      verdict: args.verdict ?? null,
+      acceptance_passed: args["acceptance-passed"] ?? false,
+      api_error_status: apiErrorStatus,
+      detail: args.detail
+    }, state().app.phase, {
+      timestamp: timestamp(),
+      by: "harness",
+      run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
       session_id: args["session-id"] ?? null
     });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
-    return transitionOutput(state(), config);
+    const root = state();
+    return { ...selectStatus(root, config), continue_chain: selectContinueChain(root, config) };
   }
   if (command === "approve") {
-    const action = humanApproval(human(args));
+    const association = need(args.association, "association");
+    const action = humanApproval({ timestamp: timestamp(), by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
     return { ok: true, phase: selectStatus(state(), config).phase };
   }
   if (command === "request-changes") {
-    const action = humanRequestChanges({ ...human(args), body: need(args.body, "body") });
+    const association = need(args.association, "association");
+    const action = humanRequestChanges({
+      timestamp: timestamp(),
+      by: `human:${association}`,
+      body: need(args.body, "body")
+    });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
     return { ok: true, phase: state().app.phase, review_path: outputs.review_path };
   }
   if (command === "retry") {
-    const action = retry(human(args));
+    const association = need(args.association, "association");
+    const action = retry({ timestamp: timestamp(), by: `human:${association}` });
     const result = store.dispatch(action);
     if (isRejection(result))
       return result;
