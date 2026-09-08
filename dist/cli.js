@@ -1104,22 +1104,22 @@ function writeStateFile(dir, snapshot, now) {
   writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
 }
 
-// src/redux/from-outcome.ts
+// src/redux/map-validation-to-action.ts
 var FAILURE_REASON = {
-  api_error: (outcome) => `api_error:${outcome.api_error_status ?? "unknown"}`,
-  invalid: (outcome) => {
-    if (outcome.detail)
-      return `invalid_artifacts: ${outcome.detail}`;
+  api_error: (report) => `api_error:${report.api_error_status ?? "unknown"}`,
+  invalid: (report) => {
+    if (report.detail)
+      return `invalid_artifacts: ${report.detail}`;
     return "invalid_artifacts";
   },
   agent_failed: () => "agent_failed"
 };
-function fromOutcome(outcome, context, phase) {
-  if (outcome.result !== "ok") {
+function mapValidationToAction(report, phase, context) {
+  if (report.result !== "ok") {
     return agentFailed({
       ...context,
-      reason: FAILURE_REASON[outcome.result](outcome),
-      api_error_status: outcome.api_error_status ?? null
+      reason: FAILURE_REASON[report.result](report),
+      api_error_status: report.api_error_status ?? null
     });
   }
   switch (phase) {
@@ -1128,15 +1128,15 @@ function fromOutcome(outcome, context, phase) {
     case "developing":
       return implemented(context);
     case "completing":
-      return completed({ ...context, acceptance_passed: outcome.acceptance_passed ?? false });
+      return completed({ ...context, acceptance_passed: report.acceptance_passed ?? false });
     case "plan_review":
-      if (!outcome.verdict)
+      if (!report.verdict)
         return agentFailed({ ...context, reason: "missing_verdict" });
-      return planReviewed({ ...context, verdict: outcome.verdict });
+      return planReviewed({ ...context, verdict: report.verdict });
     case "dev_review":
-      if (!outcome.verdict)
+      if (!report.verdict)
         return agentFailed({ ...context, reason: "missing_verdict" });
-      return devReviewed({ ...context, verdict: outcome.verdict });
+      return devReviewed({ ...context, verdict: report.verdict });
     default:
       return agentFailed({ ...context, reason: `transition_incomplete: ${phase} (ok)` });
   }
@@ -1746,7 +1746,7 @@ var human = (a) => ({
   timestamp: timestamp(),
   by: `human:${need(a.association, "association")}`
 });
-var outcomeOf = (a) => ({
+var reportOf = (a) => ({
   result: need(a.result, "result"),
   verdict: a.verdict ?? null,
   acceptance_passed: a["acceptance-passed"] ?? false,
@@ -1768,7 +1768,11 @@ var COMMANDS = {
     output: (_root, outputs) => ({ record_path: outputs.record_path })
   },
   finish: {
-    action: (a, _config, root) => fromOutcome(outcomeOf(a), { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null }, root.app.phase),
+    action: (a, _config, root) => mapValidationToAction(reportOf(a), root.app.phase, {
+      ...harness(),
+      ...runOf(a),
+      session_id: a["session-id"] ?? null
+    }),
     output: transitionOutput
   },
   approve: {
@@ -1867,7 +1871,7 @@ var USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
   explain  blocked の理由と次の一手を markdown で返す（PR に貼る）
 
 store を使わない:
-  validate 成果物が契約を満たすか検証し Outcome を返す
+  validate 成果物が契約を満たすか検証し、検証結果（ValidationReport）を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
                                               [--repo]

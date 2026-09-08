@@ -10,7 +10,7 @@ import {
 import { decisionRecordProblems } from "../file/decision-records.ts";
 import { completedCleanly, readApiErrorStatus } from "../file/execution-log.ts";
 import { latestReviewPath, readVerdict } from "../file/review-file.ts";
-import type { Outcome } from "../redux/from-outcome.ts";
+import type { ValidationReport } from "../redux/map-validation-to-action.ts";
 import type { AgentName } from "../types.ts";
 
 // ---------------------------------------------------------------- 検証の部品
@@ -81,8 +81,8 @@ const noWorkflowChanges: Check = ({ changed }) => {
 interface Contract {
   /** 満たさなければ invalid。上から順に見て最初の違反を理由にする */
   checks: Check[];
-  /** checks を通ったあとに走る。成果物から読み取った値を Outcome に足す */
-  postProcess?: (a: Artifacts) => Partial<Outcome>;
+  /** checks を通ったあとに走る。成果物から読み取った値を検証結果に足す */
+  postProcess?: (a: Artifacts) => Partial<ValidationReport>;
 }
 
 const CONTRACT: Record<AgentName, Contract> = {
@@ -119,7 +119,7 @@ const CONTRACT: Record<AgentName, Contract> = {
 // -------------------------------------------------------------------- 入り口
 
 /**
- * 契約（work/agent-contract.md §4）を強制し、finish に渡す Outcome を組み立てる。
+ * 契約（work/agent-contract.md §4）を強制し、finish に渡す検証結果を組み立てる。
  * プロンプトは配布先で差し替えられる（K-15）ので、成果物の形を見るのはここだけ（K-16）。
  *
  * 見る順序:
@@ -139,7 +139,7 @@ export function validateRun(input: {
   execution_file?: string | null;
   /** developer の差分。git status から取ったファイル名の一覧 */
   changed_files?: string[];
-}): Outcome {
+}): ValidationReport {
   const { dir, agent, agent_failed = false, execution_file, changed_files = [] } = input;
 
   const apiError = readApiErrorStatus(execution_file);

@@ -5,7 +5,7 @@ import { validateRun } from "../commands/validate.ts";
 import type { Config } from "../defaults.ts";
 import { writeStateFile } from "../file/state-file.ts";
 import type { AgentName, RunResult, Verdict } from "../types.ts";
-import { fromOutcome, type Outcome } from "./from-outcome.ts";
+import { mapValidationToAction, type ValidationReport } from "./map-validation-to-action.ts";
 import { agentStarted, humanApproval, humanRequestChanges, retry } from "./store/app/actions.ts";
 import { agentFor } from "./store/app/reducer.ts";
 import type { RootState } from "./store/createStore.ts";
@@ -91,7 +91,7 @@ const human = (a: Args) => ({
   by: `human:${need(a.association, "association")}`,
 });
 
-const outcomeOf = (a: Args): Outcome => ({
+const reportOf = (a: Args): ValidationReport => ({
   result: need(a.result, "result") as RunResult,
   verdict: (a.verdict as Verdict | undefined) ?? null,
   acceptance_passed: a["acceptance-passed"] ?? false,
@@ -129,11 +129,11 @@ export const COMMANDS: Record<string, Command> = {
   finish: {
     // どのフェーズが走っていたかで action が決まる（フェーズごとに別の action / K-26）
     action: (a, _config, root) =>
-      fromOutcome(
-        outcomeOf(a),
-        { ...harness(), ...runOf(a), session_id: a["session-id"] ?? null },
-        root.app.phase,
-      ),
+      mapValidationToAction(reportOf(a), root.app.phase, {
+        ...harness(),
+        ...runOf(a),
+        session_id: a["session-id"] ?? null,
+      }),
     output: transitionOutput,
   },
   approve: {

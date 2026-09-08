@@ -6,7 +6,7 @@ import { defaults } from "../defaults.ts";
 import { readStateFile } from "../file/state-file.ts";
 import type { Args } from "../redux/commands.ts";
 import { runCommand } from "../redux/commands.ts";
-import type { Outcome } from "../redux/from-outcome.ts";
+import type { ValidationReport } from "../redux/map-validation-to-action.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
 import type { AgentName, Phase } from "../types.ts";
 
@@ -82,7 +82,7 @@ export const start = (dir: string, agent: AgentName, run_id: string, config = de
 export function runOnce(
   dir: string,
   agent: AgentName,
-  outcome: Outcome,
+  report: ValidationReport,
   config = defaults,
 ): Transitioned {
   const run_id = String(++seq);
@@ -93,14 +93,14 @@ export function runOnce(
       dir,
       "run-id": run_id,
       attempt: "1",
-      result: outcome.result,
-      verdict: outcome.verdict ?? undefined,
-      detail: outcome.detail,
+      result: report.result,
+      verdict: report.verdict ?? undefined,
+      detail: report.detail,
       "api-error-status":
-        outcome.api_error_status === null || outcome.api_error_status === undefined
+        report.api_error_status === null || report.api_error_status === undefined
           ? undefined
-          : String(outcome.api_error_status),
-      "acceptance-passed": outcome.acceptance_passed ?? false,
+          : String(report.api_error_status),
+      "acceptance-passed": report.acceptance_passed ?? false,
       "session-id": `sess-${run_id}`,
     },
     config,

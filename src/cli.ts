@@ -24,7 +24,7 @@ const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
   explain  blocked の理由と次の一手を markdown で返す（PR に貼る）
 
 store を使わない:
-  validate 成果物が契約を満たすか検証し Outcome を返す
+  validate 成果物が契約を満たすか検証し、検証結果（ValidationReport）を返す
              --agent [--agent-failed] [--execution-file <path>] [--changed-files <path>]
   compose  エージェントに渡すプロンプトを組み立てる --agent --run-id --attempt --central --out
                                               [--repo]
