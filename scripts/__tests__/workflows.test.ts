@@ -491,7 +491,7 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
     const text = readFileSync(join(INSTALL, "README.md"), "utf8");
     for (const f of [
       "install.sh",
-      "agent.yml",
+      "agent-pipeline.yml",
       "conventions.md",
       "setup.sh",
       "issue-template.yml",
