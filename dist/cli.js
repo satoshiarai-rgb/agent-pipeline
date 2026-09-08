@@ -7,7 +7,7 @@ import { parseArgs } from "node:util";
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
-// src/settings.ts
+// src/pipelineSettings.ts
 var defaultSettings = {
   pipeline_version: 2,
   models: {
@@ -924,7 +924,7 @@ var ADVICE = [
     body: () => `**\`/agent retry\` は受け付けません。** やり直しても同じ理由で止まるためです。
 
 - レビューが収束していないなら、**issue を分けて立て直す**のが正しい対処です（同一 issue の 2 周目は行いません）
-- 上限そのものを変えるなら、中央の \`src/settings.ts\` の \`limits\` を直します`
+- 上限そのものを変えるなら、中央の \`src/pipelineSettings.ts\` の \`limits\` を直します`
   },
   {
     when: "config_invalid",

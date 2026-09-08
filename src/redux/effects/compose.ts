@@ -18,7 +18,7 @@ import {
   reviewPath,
   reviewPaths,
 } from "../../file/reviewFile.ts";
-import type { Settings } from "../../settings.ts";
+import type { PipelineSettings } from "../../pipelineSettings.ts";
 import type { AgentName } from "../../types.ts";
 
 // ---------------------------------------------------------------- 入力の部品
@@ -141,7 +141,7 @@ export interface ComposeResult {
  */
 export function composeRun(input: {
   dir: string;
-  settings: Settings;
+  settings: PipelineSettings;
   agent: AgentName;
   /** 配布先のチェックアウト（既定はカレント） */
   repo?: string;

@@ -1,5 +1,5 @@
 import { applyMiddleware, combineReducers, legacy_createStore } from "redux";
-import type { Settings } from "../../settings.ts";
+import type { PipelineSettings } from "../../pipelineSettings.ts";
 import createAppReducer from "./app/index.ts";
 import type { AppState } from "./app/reducer.ts";
 import { init } from "./global/actions.ts";
@@ -29,7 +29,7 @@ export interface RootState {
 
 export interface Wiring {
   dir: string;
-  settings: Settings;
+  settings: PipelineSettings;
   run_id?: string | null;
   attempt?: number;
 }

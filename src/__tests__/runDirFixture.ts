@@ -5,13 +5,13 @@ import type { Criterion } from "../file/acceptanceFile.ts";
 import { appendEvent } from "../file/eventLog.ts";
 import { nextReviewNumber, reviewPath, saveReview } from "../file/reviewFile.ts";
 import { readStateFile } from "../file/stateFile.ts";
+import type { PipelineSettings } from "../pipelineSettings.ts";
+import { defaultSettings } from "../pipelineSettings.ts";
 import type { ValidationReport } from "../redux/effects/validate.ts";
 import type { Args } from "../redux/runCommand.ts";
 import { runCommand } from "../redux/runCommand.ts";
 import { agentFailed, agentStarted } from "../redux/store/app/actions.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
-import type { Settings } from "../settings.ts";
-import { defaultSettings } from "../settings.ts";
 import type { AgentName, Phase } from "../types.ts";
 import { stringifyJson } from "../utils/stringifyJson.ts";
 
@@ -23,8 +23,11 @@ const nextRun = () => String(++seq);
  * **CLI と同じ経路でコマンドを 1 つ走らせる**（`redux/runCommand.ts` の分岐を通す）。
  * 1 起動 = 1 store = 1 action なので、本番と同じく毎回イベントログを畳み直す。
  */
-export const cli = (command: string, args: Args, settings: Settings = defaultSettings): unknown =>
-  runCommand(command, args, settings);
+export const cli = (
+  command: string,
+  args: Args,
+  settings: PipelineSettings = defaultSettings,
+): unknown => runCommand(command, args, settings);
 
 interface Transitioned {
   phase: Phase;

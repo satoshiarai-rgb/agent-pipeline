@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { defaultSettings } from "../settings.ts";
+import { defaultSettings } from "../pipelineSettings.ts";
 
 describe("defaultSettings", () => {
   test("確定した判断が値として入っている", () => {

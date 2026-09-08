@@ -1,4 +1,4 @@
-import type { Settings } from "../../../settings.ts";
+import type { PipelineSettings } from "../../../pipelineSettings.ts";
 import type { AgentName, Phase } from "../../../types.ts";
 import { reducerWithInitialState } from "../../../utils/typescriptFsaReducers.ts";
 import { bootstrap } from "../global/actions.ts";
@@ -104,7 +104,7 @@ const closed = {
  * **どの action がどう状態を変えるかの表。** 1 action = 1 遷移で、遷移先は case の中に
  * 直接書く。`settings` を畳み込むのはレビューの往復上限（`limits`）だけ。
  */
-export const createAppReducer = (settings: Settings) =>
+export const createAppReducer = (settings: PipelineSettings) =>
   reducerWithInitialState(initialApp)
     // run が始まった。ここから計画のフェーズ（識別子は info スライスが受ける）
     .case(bootstrap, (state) => ({ ...state, phase: "planning" as const }))

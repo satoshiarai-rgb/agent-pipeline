@@ -1,5 +1,5 @@
 import type { Snapshot } from "../../../file/stateFile.ts";
-import type { Settings } from "../../../settings.ts";
+import type { PipelineSettings } from "../../../pipelineSettings.ts";
 import type { AgentName, Phase, RoundKey } from "../../../types.ts";
 import { resolveAgent } from "../../../utils/resolveAgent.ts";
 import { parseTimestamp } from "../../../utils/timestamp.ts";
@@ -32,7 +32,7 @@ export const selectInFlightAgent = (root: RootState): AgentName | null => root.a
  * 人間の操作の `payload.timestamp`（ハーネスが打った時刻）を渡す — selector は
  * 時計を持たない（同じ state から同じ答えが出る状態を保つ）。
  */
-export function selectStale(root: RootState, settings: Settings, now: string): boolean {
+export function selectStale(root: RootState, settings: PipelineSettings, now: string): boolean {
   const { in_flight_agent, in_flight_since } = root.app;
   if (!in_flight_agent || !in_flight_since) return false;
   const started = parseTimestamp(in_flight_since);
@@ -47,7 +47,7 @@ export const labelFor = (phase: Phase, prefix: string): string =>
   `${prefix}${phase.replace(/_/g, "-")}`;
 
 /** いま issue に付いているべきラベル。どれを外すかはワークフローが prefix で決める */
-export function selectLabel(root: RootState, settings: Settings) {
+export function selectLabel(root: RootState, settings: PipelineSettings) {
   const { prefix, trigger } = settings.labels;
   const { phase } = selectStatus(root, settings);
   return {
@@ -76,7 +76,7 @@ export function selectLabel(root: RootState, settings: Settings) {
  */
 function selectEnvStop(
   root: RootState,
-  settings: Settings,
+  settings: PipelineSettings,
   config_error: string | null = null,
 ): string | null {
   const { total_steps } = root.app;
@@ -100,7 +100,7 @@ interface Status {
 
 export function selectStatus(
   root: RootState,
-  settings: Settings,
+  settings: PipelineSettings,
   config_error: string | null = null,
 ): Status {
   const { phase, failure_reason } = root.app;
@@ -119,13 +119,13 @@ export function selectStatus(
  * 判定は「次にエージェントを起動するか」。`awaiting_human` も止める
  * （人間のコメントを待つ間の push は route が none を返すだけの run を作る）
  */
-export const selectContinueChain = (root: RootState, settings: Settings): boolean =>
+export const selectContinueChain = (root: RootState, settings: PipelineSettings): boolean =>
   !isIdle(selectStatus(root, settings).phase);
 
 /** `state.json` に書き出す内容。状態の射影であって、状態の正ではない（K-26） */
 export const selectSnapshot = (
   root: RootState,
-  settings: Settings,
+  settings: PipelineSettings,
   config_error: string | null = null,
 ): Snapshot => ({
   pipeline_version: root.info.pipeline_version ?? 0,
@@ -154,7 +154,7 @@ export interface NextAction {
  */
 export function selectNextAction(
   root: RootState,
-  settings: Settings,
+  settings: PipelineSettings,
   config_error: string | null = null,
 ): NextAction {
   const { app } = root;

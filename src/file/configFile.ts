@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { defaultSettings, type Settings } from "../settings.ts";
+import { defaultSettings, type PipelineSettings } from "../pipelineSettings.ts";
 import { mergeSettings } from "../utils/mergeSettings.ts";
 
 /**
@@ -8,14 +8,14 @@ import { mergeSettings } from "../utils/mergeSettings.ts";
  *
  * 書くのは人間だけで、ハーネスは読むだけ。上限・モデル・ツールを配布先ごとに変えられる
  * ようにするためのファイルで、無くても動く（A-19 / 設計書 §5.7）。
- * 重ね方の規則は `src/utils/merge-settings.ts` にある。
+ * 重ね方の規則は `src/utils/merge-pipelineSettings.ts` にある。
  */
 
 /** 配布先のチェックアウトからの相対パス */
 export const CONFIG_PATH = join(".agent", "config.json");
 
 export interface LoadedSettings {
-  settings: Settings;
+  settings: PipelineSettings;
   /** 読んだファイル。無ければ null（既定のまま動く） */
   source: string | null;
   /**

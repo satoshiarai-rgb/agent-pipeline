@@ -1,4 +1,4 @@
-import type { Settings } from "../../../settings.ts";
+import type { PipelineSettings } from "../../../pipelineSettings.ts";
 import type { Action, AnyAction } from "../../../utils/typescriptFsa.ts";
 import type { AppPayload, Origin } from "../app/actions.ts";
 import { humanApproval, humanRequestChanges, retry } from "../app/actions.ts";
@@ -24,7 +24,7 @@ import { isReplay } from "./types.ts";
 export type Guard = (
   root: RootState,
   action: Action<AppPayload>,
-  settings: Settings,
+  settings: PipelineSettings,
 ) => string | null;
 
 /** payload.by は "human:<author_association>"。認可は入口でのみ見る（設計書 §7.3） */
@@ -87,7 +87,11 @@ const GUARDS: Record<string, Guard[]> = {
 };
 
 /** 受け付けない理由。null なら通す */
-export function rejection(root: RootState, action: AnyAction, settings: Settings): string | null {
+export function rejection(
+  root: RootState,
+  action: AnyAction,
+  settings: PipelineSettings,
+): string | null {
   for (const guard of GUARDS[action.type] ?? []) {
     const reason = guard(root, action as Action<AppPayload>, settings);
     if (reason) return reason;

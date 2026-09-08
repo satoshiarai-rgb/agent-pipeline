@@ -1,4 +1,4 @@
-import type { Settings } from "../settings.ts";
+import type { PipelineSettings } from "../pipelineSettings.ts";
 import type { AgentName } from "../types.ts";
 
 /**
@@ -8,7 +8,7 @@ import type { AgentName } from "../types.ts";
  *   - レビュアーのモデルは models.reviewer が null なら default に落とす（設計書 §3.3）
  *   - Claude Code に渡すフラグはここで組み立てる（上限とツールはハーネスの責務 / 契約 §5）
  */
-export function resolveAgent(settings: Settings, agent: AgentName) {
+export function resolveAgent(settings: PipelineSettings, agent: AgentName) {
   const a = settings.agents[agent];
   if (!a) throw new Error(`既定値に agents.${agent} がありません`);
   const tools = settings.tool_profiles[a.tools];

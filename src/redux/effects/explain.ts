@@ -1,5 +1,5 @@
 import { hasAcceptance, readAcceptance } from "../../file/acceptanceFile.ts";
-import type { Settings } from "../../settings.ts";
+import type { PipelineSettings } from "../../pipelineSettings.ts";
 import type { RootState } from "../store/createStore.ts";
 import { selectStatus } from "../store/global/selectors.ts";
 
@@ -106,7 +106,7 @@ const ADVICE: Advice[] = [
       `**\`/agent retry\` は受け付けません。** やり直しても同じ理由で止まるためです。
 
 - レビューが収束していないなら、**issue を分けて立て直す**のが正しい対処です（同一 issue の 2 周目は行いません）
-- 上限そのものを変えるなら、中央の \`src/settings.ts\` の \`limits\` を直します`,
+- 上限そのものを変えるなら、中央の \`src/pipelineSettings.ts\` の \`limits\` を直します`,
   },
   {
     when: "config_invalid",
@@ -149,7 +149,7 @@ const FALLBACK: Omit<Advice, "when"> = {
 export function explainRun(
   root: RootState,
   dir: string,
-  settings: Settings,
+  settings: PipelineSettings,
   config_error: string | null = null,
 ): { markdown: string; reason: string } | null {
   const status = selectStatus(root, settings, config_error);

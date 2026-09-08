@@ -1,6 +1,6 @@
 import { readFileSync } from "node:fs";
 import { writeStateFile } from "../file/stateFile.ts";
-import type { Settings } from "../settings.ts";
+import type { PipelineSettings } from "../pipelineSettings.ts";
 import type { AgentName } from "../types.ts";
 import { formatTimestamp } from "../utils/timestamp.ts";
 import { composeRun } from "./effects/compose.ts";
@@ -83,7 +83,7 @@ const isRejection = (r: unknown): r is { ok: false; reason: string } =>
 export function runCommand(
   command: string,
   args: Args,
-  settings: Settings,
+  settings: PipelineSettings,
   configError: string | null = null,
 ): unknown {
   const dir = need(args.dir, "dir");

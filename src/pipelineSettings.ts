@@ -1,6 +1,6 @@
 import type { AgentName } from "./types.ts";
 
-export interface Settings {
+export interface PipelineSettings {
   pipeline_version: number;
   models: { default: string; reviewer: string | null };
   limits: Record<"plan_review_rounds" | "dev_review_rounds" | "total_steps", number>;
@@ -20,7 +20,7 @@ export interface Settings {
  * **フェーズの遷移はここに無い** — 状態機械は中央のもので配布先が変えられてはならないので、
  * `src/redux/store/app/reducer.ts` の各 case が直接持つ（K-26）。
  */
-export const defaultSettings: Settings = {
+export const defaultSettings: PipelineSettings = {
   /**
    * 中央リポジトリのメジャー版。合わない run は blocked にする。
    * 2 にしたのは状態の正を `state.json` からイベントログに移したため（K-26 / A-53 段取り 2）。

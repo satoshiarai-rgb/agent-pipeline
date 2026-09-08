@@ -1,5 +1,5 @@
 import type { Middleware } from "redux";
-import type { Settings } from "../../../settings.ts";
+import type { PipelineSettings } from "../../../pipelineSettings.ts";
 import type { RootState } from "../createStore.ts";
 import type { PipelineDispatch } from "../global/actions.ts";
 
@@ -9,7 +9,7 @@ import type { PipelineDispatch } from "../global/actions.ts";
  * （store の enhancer は要らない）。
  */
 export interface Wiring {
-  settings: Settings;
+  settings: PipelineSettings;
   outputs: Record<string, unknown>;
 }
 

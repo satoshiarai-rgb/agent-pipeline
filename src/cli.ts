@@ -46,7 +46,7 @@ const fail = (message: string): never => {
 };
 
 /**
- * 既定値（src/settings.ts）に配布先の `.agent/config.json` を重ねる（A-19）。
+ * 既定値（src/pipelineSettings.ts）に配布先の `.agent/config.json` を重ねる（A-19）。
  * 上書きが壊れていたとき、**route は落とさず `blocked` として返す**（状態を書かずに
  * 落ちると run が無音で止まる）。他のコマンドは人間の操作が起点なので即座に失敗させる。
  */

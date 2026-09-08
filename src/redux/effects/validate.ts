@@ -12,7 +12,7 @@ import {
 import { decisionRecordProblems } from "../../file/decisionRecords.ts";
 import { completedCleanly, readApiErrorStatus } from "../../file/executionLog.ts";
 import { latestReviewPath, readVerdict } from "../../file/reviewFile.ts";
-import type { Settings } from "../../settings.ts";
+import type { PipelineSettings } from "../../pipelineSettings.ts";
 import type { AgentName, RunResult, Verdict } from "../../types.ts";
 
 /**
@@ -154,7 +154,7 @@ const CONTRACT: Record<AgentName, Contract> = {
  */
 export function validateRun(input: {
   dir: string;
-  settings: Settings;
+  settings: PipelineSettings;
   agent: AgentName;
   /** エージェントの step が失敗したか */
   agent_failed?: boolean;

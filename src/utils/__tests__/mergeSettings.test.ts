@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { settings } from "../../__tests__/helpers.ts";
-import { defaultSettings } from "../../settings.ts";
+import { defaultSettings } from "../../pipelineSettings.ts";
 import { mergeSettings } from "../mergeSettings.ts";
 
 const base = settings();

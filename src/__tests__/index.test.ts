@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
+import { defaultSettings } from "../pipelineSettings.ts";
 import { MissingArg, runCommand } from "../redux/runCommand.ts";
-import { defaultSettings } from "../settings.ts";
 
 describe("公開 IF（index.ts）", () => {
   test("外から import されるものだけを re-export している（A-55）", async () => {

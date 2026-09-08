@@ -1,7 +1,7 @@
-import type { Settings } from "../settings.ts";
+import type { PipelineSettings } from "../pipelineSettings.ts";
 
 /**
- * 既定値（`src/settings.ts`）に配布先の上書きを重ねる（A-19 / K-11）。
+ * 既定値（`src/pipelineSettings.ts`）に配布先の上書きを重ねる（A-19 / K-11）。
  *
  * 規則は 4 つだけで、すべてこのファイルの中で表現している:
  *   - **書いたキーだけを上書きする**（深いマージ）。書かなかったキーは中央の既定に追従する
@@ -22,10 +22,10 @@ const OVERRIDABLE = [
   "tool_profiles",
   "agents",
   "approvers",
-] as const satisfies readonly (keyof Settings)[];
+] as const satisfies readonly (keyof PipelineSettings)[];
 
 /** マージ後にだけ確かめられる整合性（1 つのキーだけを見ても決まらないもの） */
-const CONSISTENCY: ((c: Settings) => string | null)[] = [
+const CONSISTENCY: ((c: PipelineSettings) => string | null)[] = [
   (c) => {
     const dangling = Object.entries(c.agents)
       .filter(([, a]) => !(a.tools in c.tool_profiles))
@@ -37,7 +37,7 @@ const CONSISTENCY: ((c: Settings) => string | null)[] = [
 ];
 
 export interface MergeResult {
-  settings: Settings;
+  settings: PipelineSettings;
   /** 空なら上書きは受け付けられた。1 つでもあれば settings は既定のまま返る */
   errors: string[];
 }
@@ -101,7 +101,7 @@ function mergeValue(path: string, base: unknown, over: unknown, errors: string[]
 }
 
 /** 既定値に上書きを重ねる。errors が空でなければ settings は base のまま */
-export function mergeSettings(base: Settings, override: unknown): MergeResult {
+export function mergeSettings(base: PipelineSettings, override: unknown): MergeResult {
   const errors: string[] = [];
   if (!isRecord(override))
     return { settings: base, errors: ["最上位はオブジェクトで書いてください"] };
@@ -117,7 +117,7 @@ export function mergeSettings(base: Settings, override: unknown): MergeResult {
     merged[key] = mergeValue(key, merged[key], value, errors);
   }
 
-  const settings = merged as unknown as Settings;
+  const settings = merged as unknown as PipelineSettings;
   errors.push(
     ...CONSISTENCY.map((check) => check(settings)).filter((e): e is string => e !== null),
   );
