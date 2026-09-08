@@ -15,10 +15,10 @@ export interface Config {
  *   - 説明のコメントを書ける（JSON には書けない）
  *   - 型チェックが効く（遷移表の phase 名の誤字を tsc が見つける）
  *   - YAML パーサが不要になり、バンドルが 248KB → 15KB になった
- * 配布先の `.agent/config.json` による上書きは `src/file/config-file.ts` が重ねる（A-19）。
- * 上書きできるキーと規則は `src/utils/merge-config.ts` の表が正。
- * **遷移表はここに無い** — 状態機械は中央のもので配布先が変えられてはならないので、
- * `src/redux/app/reducer.ts` の `TRANSITIONS` が持つ（K-26）。
+ * 配布先の `.agent/config.json` による上書きは `src/file/configFile.ts` が重ねる（A-19）。
+ * 上書きできるキーと規則は `src/utils/mergeConfig.ts` の `OVERRIDABLE` が正。
+ * **フェーズの遷移はここに無い** — 状態機械は中央のもので配布先が変えられてはならないので、
+ * `src/redux/store/app/reducer.ts` の各 case が直接持つ（K-26）。
  */
 export const defaults: Config = {
   /**
@@ -80,6 +80,8 @@ export const defaults: Config = {
   /**
    * issue ラベルは状態の射影（設計書 §2.3）。ラベル操作の失敗は状態を壊さない。
    * trigger はパイプラインを起動するラベルで、bootstrap が成功したら外す。
+   * **配布先から上書きできない**（起動ラベルは配布先のラッパーの `if:` に直書きなので、
+   * ここだけ変えても効かず、prefix を変えると起動ラベルが外れなくなる / A-55）。
    */
   labels: {
     prefix: "agent:",

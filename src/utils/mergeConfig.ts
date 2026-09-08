@@ -8,7 +8,9 @@ import type { Config } from "../defaults.ts";
  *   - **`null` は「継承」**。既定に戻したいときに、キーを消さずに書ける
  *   - **既定に無いキーはエラー**（誤字を黙って無視しない）。型が違うのもエラー
  *   - **上書きできるのは下の OVERRIDABLE だけ。** 版の握手（`pipeline_version`）は中央のもの。
- *     状態機械（遷移表）はそもそも設定に無く、`src/redux/app/reducer.ts` が持つ（K-26）
+ *     フェーズの遷移はそもそも設定に無く、`src/redux/store/app/reducer.ts` が持つ（K-26）。
+ *     **`labels` も中央のもの**（配布先のラッパーが起動ラベルを直書きしているので、
+ *     ここで prefix や trigger を変えても半分しか効かない / A-55）
  *
  * エラーは投げずに集めて返す。呼び出し側（`route`）が `blocked` にして人間に伝えるため。
  */
@@ -20,7 +22,6 @@ const OVERRIDABLE = [
   "tool_profiles",
   "agents",
   "approvers",
-  "labels",
 ] as const satisfies readonly (keyof Config)[];
 
 /** マージ後にだけ確かめられる整合性（1 つのキーだけを見ても決まらないもの） */

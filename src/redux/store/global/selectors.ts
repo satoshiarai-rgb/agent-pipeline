@@ -181,6 +181,8 @@ export function selectNextAction(
     };
   }
   const agent = agentFor(phase);
+  // 非 idle の 5 フェーズはすべてエージェントを持つので、いまここには到達しない。
+  // **フェーズを足したときに黙って進まない状態を作らないための番犬として残す**（A-55 の判断）
   if (!agent) return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
   return { ...base, action: "run", reason: "dispatch", run: resolveAgent(config, agent) };
 }

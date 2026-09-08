@@ -20,7 +20,9 @@ export const reviewFile: AgentMiddleware =
     if (!humanRequestChanges.match(action as never)) return next(action);
 
     const { info, app } = store.getState();
-    // 人間が差し戻せるのは計画の承認待ちだけなので、通常は計画側になる
+    // 人間が差し戻せるのは計画の承認待ちだけなので、いまは常に計画側になる。
+    // **`dev` の枝は今は到達しないが残す**（将来 dev_review でも差し戻せるように
+    // するときの余地。消すとその想定ごと消える / A-55 の判断）
     let kind: "plan" | "dev" = "plan";
     if (app.phase === "dev_review") kind = "dev";
     outputs.review_path = saveReview({

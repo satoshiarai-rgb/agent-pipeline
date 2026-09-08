@@ -9,6 +9,5 @@
     "dev-reviewer": { "max_turns": null, "timeout_minutes": null, "tools": null },
     "completion": { "max_turns": null, "timeout_minutes": null, "tools": null }
   },
-  "approvers": null,
-  "labels": { "prefix": null, "trigger": null }
+  "approvers": null
 }

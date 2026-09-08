@@ -1,13 +1,11 @@
 /**
- * ハーネスの公開 IF。実装はすべて `redux/` の下（状態機械と、状態を使う判断・I/O）にあり、
- * ここは「外から呼べるもの」の一覧としてまとめるだけ。
+ * ハーネスを埋め込んで使うための公開 IF。**ワークフローが叩くのは CLI**
+ * （`cli.ts` → `redux/runCommand.ts` の分岐）で、ここは外から import される分だけを並べる。
  *
- * ワークフローが叩くのは CLI（`cli.ts` → `redux/runCommand.ts` の分岐）で、
- * この一覧はテストと将来の埋め込み利用のためにある。
+ * 一覧を広く持つと、どこからも使われない re-export が溜まって「何が外向きか」が
+ * 分からなくなるので、**実際に import されているものだけ**を置く（A-55）。
  */
 
 export type { Config } from "./defaults.ts";
 export { defaults } from "./defaults.ts";
-export type { LoadedConfig } from "./file/configFile.ts";
-export { CONFIG_PATH, readConfig } from "./file/configFile.ts";
-export * from "./redux/index.ts";
+export { validateRun } from "./redux/effects/validate.ts";

@@ -43,8 +43,7 @@ var OVERRIDABLE = [
   "limits",
   "tool_profiles",
   "agents",
-  "approvers",
-  "labels"
+  "approvers"
 ];
 var CONSISTENCY = [
   (c) => {

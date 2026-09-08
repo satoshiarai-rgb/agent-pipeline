@@ -107,7 +107,7 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
   確認してください**（→
   [install/README.md の「前提」](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#前提)）
 - **`.agent/config.json`** で、レビューの往復回数・モデル・エージェントの上限・ツール・
-  **承認できる人（`approvers`）**・ラベルの prefix を、このリポジトリだけ変えられます（雛形は
+  **承認できる人（`approvers`）**を、このリポジトリだけ変えられます（雛形は
   [`install/config.json`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/config.json)
   で、**上書きできるキーの一覧**です。値はすべて `null` = 既定を継承なので、変えたいキーにだけ
   値を書きます）

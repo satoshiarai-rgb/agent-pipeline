@@ -3,11 +3,11 @@ import { defaults } from "../defaults.ts";
 import { MissingArg, runCommand } from "../redux/runCommand.ts";
 
 describe("公開 IF（index.ts）", () => {
-  test("ワークフローから呼ぶものを re-export している", async () => {
+  test("外から import されるものだけを re-export している（A-55）", async () => {
     const api = await import("../index.ts");
-    for (const name of ["runCommand", "createStore", "validateRun", "composeRun", "readConfig"]) {
-      expect(typeof api[name as keyof typeof api], name).toBe("function");
-    }
+    // 実際の利用者は scripts/__tests__/workflows.test.ts の 2 つだけ。
+    // 増やすなら「誰が import するか」を先に決める
+    expect(Object.keys(api).sort()).toEqual(["defaults", "validateRun"]);
   });
 
   // 語彙は runCommand の中の表にある。知っているコマンドは引数不足で MissingArg になり、
