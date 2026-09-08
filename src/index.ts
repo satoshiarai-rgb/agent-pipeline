@@ -12,6 +12,6 @@ export { explainRun } from "./commands/explain.ts";
 export { validateRun } from "./commands/validate.ts";
 export type { Config } from "./defaults.ts";
 export { defaults } from "./defaults.ts";
-export type { LoadedConfig } from "./file/config-file.ts";
-export { CONFIG_PATH, readConfig } from "./file/config-file.ts";
+export type { LoadedConfig } from "./file/configFile.ts";
+export { CONFIG_PATH, readConfig } from "./file/configFile.ts";
 export * from "./redux/index.ts";

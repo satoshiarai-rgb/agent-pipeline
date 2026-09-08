@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { rec } from "../../__tests__/helpers.ts";
-import { deriveRunStats } from "../derive-run-stats.ts";
+import { deriveRunStats } from "../deriveRunStats.ts";
 
 describe("deriveRunStats", () => {
   test("total_steps は全レコード数", () => {

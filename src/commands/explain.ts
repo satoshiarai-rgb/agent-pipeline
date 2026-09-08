@@ -1,5 +1,5 @@
 import type { Config } from "../defaults.ts";
-import { hasAcceptance, readAcceptance } from "../file/acceptance-file.ts";
+import { hasAcceptance, readAcceptance } from "../file/acceptanceFile.ts";
 import type { RootState } from "../redux/store/createStore.ts";
 import { selectStatus } from "../redux/store/global/selectors.ts";
 

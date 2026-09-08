@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config } from "../../__tests__/helpers.ts";
-import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
+import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
 import { validateRun } from "../validate.ts";
 
 const c = config();

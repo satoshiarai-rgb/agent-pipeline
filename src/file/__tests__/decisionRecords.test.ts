@@ -1,13 +1,13 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
-import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
+import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
 import {
   decisionRecordPath,
   decisionRecordPaths,
   decisionRecordProblems,
   decisionRecordsDir,
-} from "../decision-records.ts";
+} from "../decisionRecords.ts";
 
 afterEach(cleanupRuns);
 

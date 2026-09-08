@@ -1,7 +1,7 @@
 import { guard } from "./guard.ts";
 import { hydrate } from "./hydrate.ts";
-import { reviewFile } from "./review-file.ts";
-import { runRecord } from "./run-record.ts";
+import { reviewFile } from "./reviewFile.ts";
+import { runRecord } from "./runRecord.ts";
 import { snapshot } from "./snapshot.ts";
 import type { AgentMiddleware } from "./types.ts";
 

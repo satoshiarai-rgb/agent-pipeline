@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
-import { parseJson } from "../utils/parse-json.ts";
+import { parseJson } from "../utils/parseJson.ts";
 
 /**
  * acceptance.json の内容（契約 §4）。planner が書き、developer が status を更新し、

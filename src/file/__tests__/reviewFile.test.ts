@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { nextReviewNumber, reviewPath, saveReview } from "../review-file.ts";
+import { nextReviewNumber, reviewPath, saveReview } from "../reviewFile.ts";
 
 let dir = "";
 afterEach(() => dir && rmSync(dir, { recursive: true, force: true }));

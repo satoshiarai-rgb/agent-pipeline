@@ -5,20 +5,15 @@ import {
   decisionRecordPath,
   decisionRecordPaths,
   type Execution,
-} from "../file/decision-records.ts";
+} from "../file/decisionRecords.ts";
 import {
   type PromptRoots,
   readConventions,
   readPrompt,
   writeComposedPrompt,
-} from "../file/prompt-file.ts";
-import {
-  latestReviewPath,
-  nextReviewNumber,
-  reviewPath,
-  reviewPaths,
-} from "../file/review-file.ts";
-import { recordPaths } from "../file/run-record.ts";
+} from "../file/promptFile.ts";
+import { latestReviewPath, nextReviewNumber, reviewPath, reviewPaths } from "../file/reviewFile.ts";
+import { recordPaths } from "../file/runRecord.ts";
 import type { AgentName } from "../types.ts";
 
 // ---------------------------------------------------------------- 入力の部品

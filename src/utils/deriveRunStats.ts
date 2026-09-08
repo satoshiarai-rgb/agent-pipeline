@@ -1,4 +1,4 @@
-import type { RunRecord } from "../file/run-record.ts";
+import type { RunRecord } from "../file/runRecord.ts";
 
 /**
  * 実行レコードから状態を導出する（A-33）。

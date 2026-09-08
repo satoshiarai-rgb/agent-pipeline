@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { dirname, join } from "node:path";
 import { config } from "../../__tests__/helpers.ts";
-import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
+import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
 import type { AgentName } from "../../types.ts";
 import { composeRun } from "../compose.ts";
 

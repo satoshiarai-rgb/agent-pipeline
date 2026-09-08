@@ -1,5 +1,5 @@
 import { existsSync, readFileSync } from "node:fs";
-import { parseJson } from "../utils/parse-json.ts";
+import { parseJson } from "../utils/parseJson.ts";
 
 /**
  * base-action が書く実行ログ（execution_file）。

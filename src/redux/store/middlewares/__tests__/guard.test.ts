@@ -12,7 +12,7 @@ import {
   retry as retryCmd,
   runOnce,
   start,
-} from "../../../../__tests__/run-dir-fixture.ts";
+} from "../../../../__tests__/runDirFixture.ts";
 
 const c = config();
 afterEach(cleanupRuns);

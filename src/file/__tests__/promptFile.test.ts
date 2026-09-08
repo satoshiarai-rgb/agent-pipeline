@@ -7,7 +7,7 @@ import {
   readConventions,
   readPrompt,
   writeComposedPrompt,
-} from "../prompt-file.ts";
+} from "../promptFile.ts";
 
 const dirs: string[] = [];
 const root = () => {

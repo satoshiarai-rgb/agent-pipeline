@@ -40,7 +40,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 - **エージェントは `.github/workflows/**` を変更しない。** GitHub App に Workflows 権限を与えない（エージェントが自身の起動条件を書き換えられないようにするため）
 - **`.claude/**` も同じ扱い。** Claude Code が「センシティブファイル」として書き込みを拒否し、**許可ルール（`Edit(.claude/**)` を含む）では開けられない**。開ける手段は `--permission-mode bypassPermissions`（全権限チェックの無効化）だけなので採らない。必要な変更は run ディレクトリに成果物を置いて人間が設置する（K-19）
 - **現時点の検証はすべて個人アカウント `satoshiarai-rgb` 配下のリポジトリに限る。** 組織アカウント（`<org>`）には触らない
-- **上限・モデル・ツール・approvers・ラベルは配布先の `.agent/config.json` で上書きできる**（A-19）。書いたキーだけを重ね、`null` は継承、既定に無いキーと型違いはエラー。**状態機械（`transitions`）と `pipeline_version` は上書きできない。** 規則の正は `src/utils/merge-config.ts` の `OVERRIDABLE` と `mergeValue`、読み込みは `src/file/config-file.ts`。受け付けられないときは `route` が `config_invalid` で `blocked` にする（例外を投げると状態が git に載らず run が無音で止まる）
+- **上限・モデル・ツール・approvers・ラベルは配布先の `.agent/config.json` で上書きできる**（A-19）。書いたキーだけを重ね、`null` は継承、既定に無いキーと型違いはエラー。**状態機械（`transitions`）と `pipeline_version` は上書きできない。** 規則の正は `src/utils/mergeConfig.ts` の `OVERRIDABLE` と `mergeValue`、読み込みは `src/file/configFile.ts`。受け付けられないときは `route` が `config_invalid` で `blocked` にする（例外を投げると状態が git に載らず run が無音で止まる）
 - モデルは生成・レビュー共に `claude-opus-5`（既定）
 - `verification: manual` の受け入れ条件は developer が `evidence` 付きで `passed` にし、dev-reviewer が照合する
 
@@ -90,4 +90,4 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 
 注意（構成案が誤っている箇所。`work/worklist.md` A-24 で修正予定）:
 
-- **ツールの指定は 3 つの役割に分かれる**（2026-09-05 に実機で確認）。`--tools` はそのツールを使える状態にするか（コンテキストからも消える）、`--allowed-tools` は確認を求めずに実行してよいか、`--disallowed-tools` は明示的な拒否。**`--tools` だけでは書き込みが拒否される** — planner に `--tools Read,Glob,Grep,Write` だけを渡した実行は `permission_denials_count: 3` で `plan.md` を書けなかった。ハーネスは同じ集合を `--tools` と `--allowed-tools` の両方に渡す（`src/utils/resolve-agent.ts`）
+- **ツールの指定は 3 つの役割に分かれる**（2026-09-05 に実機で確認）。`--tools` はそのツールを使える状態にするか（コンテキストからも消える）、`--allowed-tools` は確認を求めずに実行してよいか、`--disallowed-tools` は明示的な拒否。**`--tools` だけでは書き込みが拒否される** — planner に `--tools Read,Glob,Grep,Write` だけを渡した実行は `permission_denials_count: 3` で `plan.md` を書けなかった。ハーネスは同じ集合を `--tools` と `--allowed-tools` の両方に渡す（`src/utils/resolveAgent.ts`）

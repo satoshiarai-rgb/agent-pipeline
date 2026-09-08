@@ -1,5 +1,5 @@
 import { type Config, defaults } from "../defaults.ts";
-import type { RunRecord } from "../file/run-record.ts";
+import type { RunRecord } from "../file/runRecord.ts";
 import type { AppState } from "../redux/store/app/reducer.ts";
 import { initialApp } from "../redux/store/app/reducer.ts";
 import type { RootState } from "../redux/store/createStore.ts";

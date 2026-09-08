@@ -1,7 +1,7 @@
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import { type Config, defaults } from "../defaults.ts";
-import { mergeConfig } from "../utils/merge-config.ts";
+import { mergeConfig } from "../utils/mergeConfig.ts";
 
 /**
  * 配布先の `.agent/config.json`（既定値への差分）を読む。

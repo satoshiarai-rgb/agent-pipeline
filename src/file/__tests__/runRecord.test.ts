@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
-import { cleanupRuns, makeRun } from "../../__tests__/run-dir-fixture.ts";
+import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
 import {
   closeRecord,
   openRecord,
@@ -9,7 +9,7 @@ import {
   recordFileName,
   recordPath,
   saveRecord,
-} from "../run-record.ts";
+} from "../runRecord.ts";
 
 afterEach(cleanupRuns);
 

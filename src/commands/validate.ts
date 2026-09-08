@@ -6,11 +6,11 @@ import {
   allPassed,
   hasAcceptance,
   readAcceptance,
-} from "../file/acceptance-file.ts";
-import { decisionRecordProblems } from "../file/decision-records.ts";
-import { completedCleanly, readApiErrorStatus } from "../file/execution-log.ts";
-import { latestReviewPath, readVerdict } from "../file/review-file.ts";
-import type { ValidationReport } from "../redux/map-validation-to-action.ts";
+} from "../file/acceptanceFile.ts";
+import { decisionRecordProblems } from "../file/decisionRecords.ts";
+import { completedCleanly, readApiErrorStatus } from "../file/executionLog.ts";
+import { latestReviewPath, readVerdict } from "../file/reviewFile.ts";
+import type { ValidationReport } from "../redux/mapValidationToAction.ts";
 import type { AgentName } from "../types.ts";
 
 // ---------------------------------------------------------------- 検証の部品

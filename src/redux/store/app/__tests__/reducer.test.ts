@@ -9,8 +9,8 @@ import {
   retry,
   route,
   runOnce,
-} from "../../../../__tests__/run-dir-fixture.ts";
-import { type RunRecord, readRecords } from "../../../../file/run-record.ts";
+} from "../../../../__tests__/runDirFixture.ts";
+import { type RunRecord, readRecords } from "../../../../file/runRecord.ts";
 import { agentFor, isIdle } from "../reducer.ts";
 
 const c = config();

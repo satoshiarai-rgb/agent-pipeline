@@ -3,7 +3,7 @@ import { mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "nod
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { defaults } from "../../defaults.ts";
-import { CONFIG_PATH, readConfig } from "../config-file.ts";
+import { CONFIG_PATH, readConfig } from "../configFile.ts";
 
 const dirs: string[] = [];
 afterEach(() => {

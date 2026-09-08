@@ -3,10 +3,10 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import type { Config } from "../defaults.ts";
 import { defaults } from "../defaults.ts";
-import { readStateFile } from "../file/state-file.ts";
+import { readStateFile } from "../file/stateFile.ts";
 import type { Args } from "../redux/commands.ts";
 import { runCommand } from "../redux/commands.ts";
-import type { ValidationReport } from "../redux/map-validation-to-action.ts";
+import type { ValidationReport } from "../redux/mapValidationToAction.ts";
 import type { NextAction } from "../redux/store/global/selectors.ts";
 import type { AgentName, Phase } from "../types.ts";
 

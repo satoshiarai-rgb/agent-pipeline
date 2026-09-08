@@ -1,6 +1,6 @@
-import { readRecords } from "../../../file/run-record.ts";
-import { readStateFile } from "../../../file/state-file.ts";
-import { deriveRunStats } from "../../../utils/derive-run-stats.ts";
+import { readRecords } from "../../../file/runRecord.ts";
+import { readStateFile } from "../../../file/stateFile.ts";
+import { deriveRunStats } from "../../../utils/deriveRunStats.ts";
 import { init, restore } from "../global/actions.ts";
 import type { AgentMiddleware } from "./types.ts";
 

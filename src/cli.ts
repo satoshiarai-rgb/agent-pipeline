@@ -1,6 +1,6 @@
 #!/usr/bin/env node
 import { parseArgs } from "node:util";
-import { readConfig } from "./file/config-file.ts";
+import { readConfig } from "./file/configFile.ts";
 import { type Args, CLI_OPTIONS, MissingArg, runCommand } from "./redux/commands.ts";
 
 /**

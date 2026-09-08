@@ -1,9 +1,9 @@
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { Phase } from "../types.ts";
-import { parseJson } from "../utils/parse-json.ts";
+import { parseJson } from "../utils/parseJson.ts";
 import { pick } from "../utils/pick.ts";
-import { stringifyJson } from "../utils/stringify-json.ts";
+import { stringifyJson } from "../utils/stringifyJson.ts";
 
 /** state.json のうち、遷移判断に使わない識別子とメタ情報 */
 interface RunMeta {

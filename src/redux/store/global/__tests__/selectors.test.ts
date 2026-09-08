@@ -2,7 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { config, rootOf } from "../../../../__tests__/helpers.ts";
-import { cleanupRuns, label, makeRun, route } from "../../../../__tests__/run-dir-fixture.ts";
+import { cleanupRuns, label, makeRun, route } from "../../../../__tests__/runDirFixture.ts";
 import { PHASES } from "../../../../types.ts";
 import {
   labelFor,

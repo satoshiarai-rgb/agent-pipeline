@@ -1,5 +1,5 @@
 import { describe, expect, test } from "bun:test";
-import { stringifyJson } from "../stringify-json.ts";
+import { stringifyJson } from "../stringifyJson.ts";
 
 describe("stringifyJson", () => {
   test("読み直して同じ値になる", () => {

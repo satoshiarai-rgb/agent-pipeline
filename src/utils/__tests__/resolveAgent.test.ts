@@ -1,6 +1,6 @@
 import { describe, expect, test } from "bun:test";
 import { config } from "../../__tests__/helpers.ts";
-import { resolveAgent } from "../resolve-agent.ts";
+import { resolveAgent } from "../resolveAgent.ts";
 
 const AGENTS = ["planner", "plan-reviewer", "developer", "dev-reviewer", "completion"] as const;
 

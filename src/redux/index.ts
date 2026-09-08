@@ -5,8 +5,8 @@
 
 export type { Args } from "./commands.ts";
 export { COMMANDS, isRejection, MissingArg, runCommand } from "./commands.ts";
-export type { ValidationReport } from "./map-validation-to-action.ts";
-export { mapValidationToAction } from "./map-validation-to-action.ts";
+export type { ValidationReport } from "./mapValidationToAction.ts";
+export { mapValidationToAction } from "./mapValidationToAction.ts";
 export * from "./store/app/actions.ts";
 export type { RootState, Wiring } from "./store/createStore.ts";
 export { createStore } from "./store/createStore.ts";

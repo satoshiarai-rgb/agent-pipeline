@@ -1,9 +1,9 @@
 import { existsSync, mkdirSync, readdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import type { AgentName, Phase, RunResult, Verdict } from "../types.ts";
-import { parseJson } from "../utils/parse-json.ts";
+import { parseJson } from "../utils/parseJson.ts";
 import { pick } from "../utils/pick.ts";
-import { stringifyJson } from "../utils/stringify-json.ts";
+import { stringifyJson } from "../utils/stringifyJson.ts";
 
 /**
  * runs/<agent>-<run_id>-<attempt>.json の内容。1 実行 1 ファイルの追記専用（A-33）。

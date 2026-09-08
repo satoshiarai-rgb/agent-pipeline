@@ -1,7 +1,7 @@
 import { describe, expect, test } from "bun:test";
 import { config } from "../../__tests__/helpers.ts";
 import { defaults } from "../../defaults.ts";
-import { mergeConfig } from "../merge-config.ts";
+import { mergeConfig } from "../mergeConfig.ts";
 
 const base = config();
 /** 上書きを重ねる。エラーが無いことを前提にする呼び方 */

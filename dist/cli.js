@@ -3,7 +3,7 @@
 // src/cli.ts
 import { parseArgs } from "node:util";
 
-// src/file/config-file.ts
+// src/file/configFile.ts
 import { existsSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 
@@ -37,7 +37,7 @@ var defaults = {
   }
 };
 
-// src/utils/merge-config.ts
+// src/utils/mergeConfig.ts
 var OVERRIDABLE = [
   "models",
   "limits",
@@ -112,7 +112,7 @@ function mergeConfig(base, override) {
   return errors.length > 0 ? { config: base, errors } : { config, errors };
 }
 
-// src/file/config-file.ts
+// src/file/configFile.ts
 var CONFIG_PATH = join(".agent", "config.json");
 function readConfig(repo) {
   const path = join(repo, CONFIG_PATH);
@@ -143,7 +143,7 @@ import { readFileSync as readFileSync10 } from "node:fs";
 import { existsSync as existsSync6 } from "node:fs";
 import { join as join6 } from "node:path";
 
-// src/file/decision-records.ts
+// src/file/decisionRecords.ts
 import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync2 } from "node:fs";
 import { basename, join as join2 } from "node:path";
 
@@ -161,7 +161,7 @@ function parseFrontmatter(text) {
   };
 }
 
-// src/file/decision-records.ts
+// src/file/decisionRecords.ts
 var DIR = "decision-records";
 var SHAPE = "<run_id>-<attempt>-<slug>.md";
 var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
@@ -203,7 +203,7 @@ function byExecution(a, b) {
 }
 var execution = (name) => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);
 
-// src/file/prompt-file.ts
+// src/file/promptFile.ts
 import { existsSync as existsSync3, mkdirSync, readFileSync as readFileSync3, writeFileSync } from "node:fs";
 import { dirname, join as join3 } from "node:path";
 function promptCandidates(agent, roots) {
@@ -234,7 +234,7 @@ function writeComposedPrompt(path, text) {
   return path;
 }
 
-// src/file/review-file.ts
+// src/file/reviewFile.ts
 import { existsSync as existsSync4, mkdirSync as mkdirSync2, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join4 } from "node:path";
 function renderReview(input) {
@@ -280,11 +280,11 @@ function readVerdict(path) {
   return value === "approve" || value === "request_changes" ? value : null;
 }
 
-// src/file/run-record.ts
+// src/file/runRecord.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
 import { join as join5 } from "node:path";
 
-// src/utils/parse-json.ts
+// src/utils/parseJson.ts
 function parseJson(text, source = "JSON") {
   try {
     return JSON.parse(text);
@@ -303,13 +303,13 @@ function pick(source, keys) {
   return out;
 }
 
-// src/utils/stringify-json.ts
+// src/utils/stringifyJson.ts
 function stringifyJson(value) {
   return `${JSON.stringify(value, null, 2)}
 `;
 }
 
-// src/file/run-record.ts
+// src/file/runRecord.ts
 function normalizeRecord(r) {
   return {
     agent: r.agent,
@@ -454,7 +454,7 @@ function composeRun(input) {
   };
 }
 
-// src/file/acceptance-file.ts
+// src/file/acceptanceFile.ts
 import { existsSync as existsSync7, readFileSync as readFileSync6 } from "node:fs";
 import { join as join7 } from "node:path";
 function acceptancePath(dir) {
@@ -503,7 +503,7 @@ function hasAcceptance(dir) {
   return existsSync7(acceptancePath(dir));
 }
 
-// src/utils/resolve-agent.ts
+// src/utils/resolveAgent.ts
 function resolveAgent(config, agent) {
   const a = config.agents[agent];
   if (!a)
@@ -955,7 +955,7 @@ ${advice.body(dir)}`
 import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
 import { join as join8 } from "node:path";
 
-// src/file/execution-log.ts
+// src/file/executionLog.ts
 import { existsSync as existsSync8, readFileSync as readFileSync7 } from "node:fs";
 function readResultEvent(path) {
   if (!existsSync8(path))
@@ -1060,7 +1060,7 @@ function readLatestVerdict(dir, kind) {
   return path ? readVerdict(path) : null;
 }
 
-// src/file/state-file.ts
+// src/file/stateFile.ts
 import { readFileSync as readFileSync9, writeFileSync as writeFileSync4 } from "node:fs";
 import { join as join9 } from "node:path";
 function parseStateFile(text) {
@@ -1104,7 +1104,7 @@ function writeStateFile(dir, snapshot, now) {
   writeFileSync4(stateFilePath(dir), renderStateFile(snapshot, now));
 }
 
-// src/redux/map-validation-to-action.ts
+// src/redux/mapValidationToAction.ts
 var FAILURE_REASON = {
   api_error: (report) => `api_error:${report.api_error_status ?? "unknown"}`,
   invalid: (report) => {
@@ -1557,7 +1557,7 @@ var guard = ({ config }) => (store) => (next) => (action) => {
   return next(action);
 };
 
-// src/utils/derive-run-stats.ts
+// src/utils/deriveRunStats.ts
 function deriveRunStats(records) {
   return {
     total_steps: records.length,
@@ -1593,7 +1593,7 @@ var hydrate = () => (store) => (next) => (action) => {
   return;
 };
 
-// src/redux/store/middlewares/review-file.ts
+// src/redux/store/middlewares/reviewFile.ts
 var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
   if (isReplay(action))
     return next(action);
@@ -1614,7 +1614,7 @@ var reviewFile = ({ outputs }) => (store) => (next) => (action) => {
   return next(action);
 };
 
-// src/redux/store/middlewares/run-record.ts
+// src/redux/store/middlewares/runRecord.ts
 var resultOf = (type, reason) => {
   if (type !== agentFailed.type)
     return "ok";

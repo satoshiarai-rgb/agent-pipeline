@@ -4,7 +4,7 @@ import {
   readRecords,
   recordPath,
   saveRecord,
-} from "../../../file/run-record.ts";
+} from "../../../file/runRecord.ts";
 import type { RunResult } from "../../../types.ts";
 import {
   agentFailed,
