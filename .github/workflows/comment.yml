@@ -176,10 +176,13 @@ jobs:
         run: bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"
 
       - name: 受け付けられなかった理由を PR に返す
+        # 3 つのコマンドすべてを見る。1 つ抜けると、成功した操作のあとに
+        # 「受け付けませんでした」を投稿してしまう（retry で実際に起きていた）
         if: |
           steps.parse.outputs.command != 'none' &&
           steps.approve.outputs.ok != 'true' &&
-          steps.request_changes.outputs.ok != 'true'
+          steps.request_changes.outputs.ok != 'true' &&
+          steps.retry.outputs.ok != 'true'
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           PR: ${{ inputs.pr }}

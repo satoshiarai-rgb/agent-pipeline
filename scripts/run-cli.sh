@@ -27,7 +27,6 @@ add --repo "${CLI_REPO:-}"
 add --central "${CLI_CENTRAL:-$GITHUB_ACTION_PATH}"
 add --out "${CLI_OUT:-${RUNNER_TEMP:-/tmp}/agent-prompt.md}"
 [ "${CLI_AGENT_FAILED:-}" = "true" ] && args+=(--agent-failed)
-[ "${CLI_OVERSIZE:-}" = "true" ] && args+=(--oversize)
 [ "${CLI_ACCEPTANCE_PASSED:-}" = "true" ] && args+=(--acceptance-passed)
 
 out=$(node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}")

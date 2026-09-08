@@ -21,7 +21,10 @@ import {
 export interface Outcome {
   result: RunResult;
   verdict?: Verdict | null;
-  /** planner の規模判定が上限超過。止めずに PR へ警告を出すために使う（K-21） */
+  /**
+   * planner の規模判定が上限超過。**`validate` の出力としてワークフローが読み**、
+   * PR に警告コメントを出す（K-21）。状態は変えないので store には渡らない
+   */
   oversize?: boolean;
   /** completing で acceptance.json が全 passed だったか */
   acceptance_passed?: boolean;

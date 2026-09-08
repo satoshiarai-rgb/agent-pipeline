@@ -44,7 +44,6 @@ export const CLI_OPTIONS = {
   verdict: { type: "string" },
   "api-error-status": { type: "string" },
   detail: { type: "string" },
-  oversize: { type: "boolean", default: false },
   "acceptance-passed": { type: "boolean", default: false },
   "session-id": { type: "string" },
   association: { type: "string" },
@@ -95,7 +94,6 @@ const human = (a: Args) => ({
 const outcomeOf = (a: Args): Outcome => ({
   result: need(a.result, "result") as RunResult,
   verdict: (a.verdict as Verdict | undefined) ?? null,
-  oversize: a.oversize ?? false,
   acceptance_passed: a["acceptance-passed"] ?? false,
   api_error_status: a["api-error-status"] ? Number(a["api-error-status"]) : null,
   detail: a.detail,

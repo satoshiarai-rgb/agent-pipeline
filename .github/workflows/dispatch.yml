@@ -36,8 +36,6 @@ jobs:
       phase: ${{ steps.route.outputs.phase }}
       reason: ${{ steps.route.outputs.reason }}
       model: ${{ steps.route.outputs.model }}
-      max_turns: ${{ steps.route.outputs.max_turns }}
-      tools: ${{ steps.route.outputs.tools }}
       timeout_minutes: ${{ steps.route.outputs.timeout_minutes }}
       job_timeout_minutes: ${{ steps.route.outputs.job_timeout_minutes }}
       claude_args: ${{ steps.route.outputs.claude_args }}
@@ -118,7 +116,7 @@ jobs:
           git push
 
       # ---- 実行の開始を記録し、[skip ci] を付けて push（再入させない / A-36）
-      - id: start
+      - name: 実行の開始を記録する
         if: needs.route.outputs.action == 'run'
         uses: satoshiarai-rgb/agent-pipeline@main
         with:
@@ -308,7 +306,6 @@ jobs:
           result: ${{ steps.validate.outputs.result || 'invalid' }}
           detail: ${{ steps.validate.outputs.detail || 'validate が結果を返さなかった' }}
           verdict: ${{ steps.validate.outputs.verdict }}
-          oversize: ${{ steps.validate.outputs.oversize }}
           acceptance-passed: ${{ steps.validate.outputs.acceptance_passed }}
           api-error-status: ${{ steps.validate.outputs.api_error_status }}
           session-id: ${{ steps.agent.outputs.session_id }}

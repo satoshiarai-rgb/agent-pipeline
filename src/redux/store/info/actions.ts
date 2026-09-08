@@ -1,8 +1,7 @@
 import actionCreatorFactory from "../../../utils/typescript-fsa.ts";
 
 /**
- * この起動の環境を動かす action。どちらも**永続化しない**
- * （`CONFIGURE` は環境、`HYDRATED` は再生が終わった合図）。
+ * この起動の環境を動かす action。**永続化しない。**
  *
  * **`issue` / `branch` / `pipeline_version` はここに無い。** それらは環境ではなく
  * run 自身の記録なので、`RESTORE`（いまはスナップショット、段取り 2 以降は
@@ -17,13 +16,9 @@ export interface ConfigurePayload {
   attempt: number;
 }
 
-/** `hydrated` は payload を持たないので undefined を含む */
-export type InfoPayload = ConfigurePayload | undefined;
+export type InfoPayload = ConfigurePayload;
 
 const create = actionCreatorFactory("agent-pipeline/info");
 
 /** 起動時に環境を注入する */
 export const configure = create<ConfigurePayload>("CONFIGURE");
-
-/** 再生が終わった合図。subscriber がこれを見て書き込みを判断する */
-export const hydrated = create<undefined>("HYDRATED");

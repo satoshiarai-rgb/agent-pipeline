@@ -10,12 +10,6 @@ import { selectStatus } from "../redux/store/selectors.ts";
  * 状態を読むだけで何も書かないので、ワークフローは出力をコメントするだけでよい。
  */
 
-/** 案内を組み立てるのに使える情報 */
-interface Context {
-  dir: string;
-  reason: string;
-}
-
 /**
  * 理由ごとの案内。**上から順に最初に一致したものを使う**。
  * `blocked_reason` の文字列は finish が組み立てるものと 1 対 1 に対応する。
@@ -25,7 +19,7 @@ interface Advice {
   when: string;
   title: string;
   /** markdown の本文。番号付きの手順を返す */
-  body: (c: Context) => string;
+  body: (dir: string) => string;
 }
 
 /** 未達の受け入れ条件を表にする。人間が「何を確かめればよいか」を読めるように */
@@ -54,7 +48,7 @@ const ADVICE: Advice[] = [
   {
     when: "acceptance_not_passed",
     title: "受け入れ条件が全て `passed` になっていません",
-    body: ({ dir }) =>
+    body: (dir) =>
       `${pendingCriteria(dir)}
 **\`manual\` の項目は人間が確認します。** 手順は次のとおりです。
 
@@ -70,7 +64,7 @@ const ADVICE: Advice[] = [
   {
     when: "invalid_artifacts",
     title: "成果物が契約を満たしていません",
-    body: ({ dir }) =>
+    body: (dir) =>
       `理由は上の \`blocked_reason\` に出ています（\`work/agent-contract.md\` §4 の検証列に対応します）。
 
 1. 足りない成果物を確かめる（\`${dir}/\` の中身）
@@ -80,7 +74,7 @@ const ADVICE: Advice[] = [
   {
     when: "missing_verdict",
     title: "レビューに `verdict` がありません",
-    body: ({ dir }) =>
+    body: (dir) =>
       `ハーネスはレビューの frontmatter の \`verdict\`（\`approve\` か \`request_changes\`）だけを見て遷移を決めます。
 
 1. \`${dir}/reviews/\` の最新のファイルを見る
@@ -117,7 +111,7 @@ const ADVICE: Advice[] = [
   {
     when: "config_invalid",
     title: "`.agent/config.json` を受け付けられません",
-    body: ({ dir }) =>
+    body: (dir) =>
       `どのキーがどう違うかは上の \`blocked_reason\` に出ています。**設定は一部だけ適用せず全体を捨てる**ので、
 直すまで中央の既定で動くことはありません（どの設定で動いたのか分からなくなるのを避けるため）。
 
@@ -140,10 +134,9 @@ const ADVICE: Advice[] = [
   },
 ];
 
-const FALLBACK: Advice = {
-  when: "",
+const FALLBACK: Omit<Advice, "when"> = {
   title: "止まりました",
-  body: ({ dir }) =>
+  body: (dir) =>
     `1. \`${dir}/state.json\` の \`blocked_reason\` と Actions のログを読む
 2. 原因を直す
 3. ${retryLine}`,
@@ -164,7 +157,6 @@ export function explainRun(
 
   const reason = status.blocked_reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
-  const context: Context = { dir, reason };
 
   return {
     reason,
@@ -174,6 +166,6 @@ export function explainRun(
 blocked_reason: ${reason}
 \`\`\`
 
-${advice.body(context)}`,
+${advice.body(dir)}`,
   };
 }

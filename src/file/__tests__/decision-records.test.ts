@@ -7,7 +7,6 @@ import {
   decisionRecordPaths,
   decisionRecordProblems,
   decisionRecordsDir,
-  readDecisionRecords,
 } from "../decision-records.ts";
 
 afterEach(cleanupRuns);
@@ -53,17 +52,16 @@ describe("読み込み", () => {
     expect(decisionRecordPaths(makeRun())).toEqual([]);
   });
 
-  test("1 ファイル 1 レコードとして読む", () => {
+  test("1 ファイル 1 レコードとしてパスを列挙する（中身は読まない）", () => {
     const dir = makeRun();
     write(dir, "session-ttl");
     write(dir, "token-rotation", RECORD.replace("easy", "hard").replace("design", "requirements"));
 
     // prefix が同じなら名前順（session-ttl → token-rotation）
-    const rs = readDecisionRecords(dir);
-    expect(rs.map((r) => r.type)).toEqual(["design", "requirements"]);
-    expect(rs.map((r) => r.reversibility)).toEqual(["easy", "hard"]);
-    expect(rs[0]?.title).toBe("セッション有効期限を 24h にした");
-    expect(rs[0]?.body).toContain("既存の refresh token に揃えた");
+    expect(decisionRecordPaths(dir).map((p) => basename(p))).toEqual([
+      "17293840112-1-session-ttl.md",
+      "17293840112-1-token-rotation.md",
+    ]);
   });
 
   test("実行順に返す（run_id の桁が増えても順序が壊れない）", () => {

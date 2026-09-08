@@ -10,7 +10,6 @@ interface RunMeta {
   pipeline_version: number;
   issue: number;
   branch: string;
-  updated_at: string | null;
 }
 
 export interface StateFile {
@@ -32,7 +31,6 @@ function parseStateFile(text: string): StateFile {
       pipeline_version: Number(raw.pipeline_version ?? 0),
       issue: raw.issue,
       branch: typeof raw.branch === "string" ? raw.branch : "",
-      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null,
     },
     phase: raw.phase,
     blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null,
@@ -49,11 +47,11 @@ const STATE_KEYS = [
   "updated_at",
 ] as const satisfies readonly (keyof StateFileShape)[];
 
-/** state.json の平坦な形（読むときは meta と phase に分けるが、書くときはこの形） */
-type StateFileShape = RunMeta & { phase: Phase; blocked_reason: string | null };
+/** 書き出す内容。`updated_at` は書くときに入れる（読み戻して使う値ではない） */
+export type Snapshot = RunMeta & { phase: Phase; blocked_reason: string | null };
 
-/** 書き出す内容。`updated_at` は書くときに入れる */
-export type Snapshot = Omit<StateFileShape, "updated_at">;
+/** state.json の平坦な形（書くときの形） */
+type StateFileShape = Snapshot & { updated_at: string };
 
 /**
  * state.json を組み立てる。キー順を固定して差分を安定させる。

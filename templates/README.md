@@ -6,7 +6,7 @@
 利用者向けの説明——各ファイルの中身、`blocked` の理由と復旧手順——は
 [`docs/troubleshooting.md`](../docs/troubleshooting.md) にある。ここには実装側の注記だけを置く。
 
-- 作業ディレクトリを書くのはハーネス（`bootstrap.yml` / `dispatch.yml` / `comment.yml` / `approve.yml`）だけで、
+- 作業ディレクトリを書くのはハーネス（`bootstrap.yml` / `dispatch.yml` / `comment.yml`）だけで、
   エージェントは `state.json` と `runs/` を書かない（設計書 §7.1）
 - `runs/<agent>-<run_id>-<attempt>.json` は追記専用。`total_steps` と `rounds` は
   ファイル数から導出する（A-33）

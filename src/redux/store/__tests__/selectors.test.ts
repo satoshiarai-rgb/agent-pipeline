@@ -5,7 +5,6 @@ import { config, rootOf } from "../../../__tests__/helpers.ts";
 import { cleanupRuns, label, makeRun, route } from "../../../__tests__/run-dir-fixture.ts";
 import { PHASES } from "../../../types.ts";
 import {
-  allLabels,
   labelFor,
   selectContinueChain,
   selectLabel,
@@ -108,7 +107,7 @@ describe("selectNextAction: ファイルから読んだ状態でも同じ", () =
   });
 });
 
-describe("selectLabel / labelFor / allLabels", () => {
+describe("selectLabel / labelFor", () => {
   test("アンダースコアをハイフンにして prefix を付ける", () => {
     expect(labelFor("plan_review", "agent:")).toBe("agent:plan-review");
     expect(labelFor("awaiting_human", "agent:")).toBe("agent:awaiting-human");
@@ -123,13 +122,6 @@ describe("selectLabel / labelFor / allLabels", () => {
     for (const phase of PHASES) {
       expect(labelFor(phase, "agent:")).toMatch(/^agent:[a-z-]+$/);
     }
-  });
-
-  test("allLabels は射影先と起動用ラベルを列挙する", () => {
-    const labels = allLabels("agent:", "agent:go");
-    expect(labels).toContain("agent:planning");
-    expect(labels).toContain("agent:go");
-    expect(labels.length).toBe(PHASES.length + 1);
   });
 
   test("いま付いているべきラベルと issue 番号を返す", () => {

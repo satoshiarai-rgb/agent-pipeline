@@ -1,7 +1,6 @@
 import type { Config } from "../../defaults.ts";
 import type { Snapshot } from "../../file/state-file.ts";
 import type { Phase, RoundKey } from "../../types.ts";
-import { PHASES } from "../../types.ts";
 import { resolveAgent } from "../../utils/resolve-agent.ts";
 import { agentFor, isIdle } from "./app/reducer.ts";
 import type { RootState } from "./createStore.ts";
@@ -19,12 +18,6 @@ import type { RootState } from "./createStore.ts";
 /** phase をラベル名に射影する。`plan_review` → `agent:plan-review`（設計書 §2.3） */
 export const labelFor = (phase: Phase, prefix: string): string =>
   `${prefix}${phase.replace(/_/g, "-")}`;
-
-/** パイプラインが管理するラベルの全体（射影先 + 起動用） */
-export const allLabels = (prefix: string, trigger: string): string[] => [
-  ...PHASES.map((p) => labelFor(p, prefix)),
-  trigger,
-];
 
 /** いま issue に付いているべきラベル。どれを外すかはワークフローが prefix で決める */
 export function selectLabel(root: RootState, config: Config) {
@@ -54,7 +47,7 @@ export function selectLabel(root: RootState, config: Config) {
  * 状態と設定から毎回計算できる停止の理由（イベントとして記録しない 3 つ）。
  * `route` はこれを見たときだけスナップショットを書き直させる（まだ記録されていないため）。
  */
-export function selectEnvStop(
+function selectEnvStop(
   root: RootState,
   config: Config,
   config_error: string | null = null,
@@ -71,7 +64,7 @@ export function selectEnvStop(
   return null;
 }
 
-export interface Status {
+interface Status {
   /** 導出された phase。止まっていれば blocked、そうでなければ実行位置そのもの */
   phase: Phase;
   /** 止まっている理由。null なら止まっていない */

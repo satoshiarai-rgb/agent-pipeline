@@ -12,19 +12,10 @@ import { type Frontmatter, parseFrontmatter } from "../utils/frontmatter.ts";
  *
  * frontmatter は機械が読む 3 つ（`type` / `title` / `reversibility`）だけで、内容は本文にある
  * （`reviews/*.md` と同じ「機械は frontmatter、人は本文」の形 / 設計書 §5.4）。
+ *
+ * ハーネスがするのは**名前と形の検査**（`decisionRecordProblems`）と**パスの列挙**
+ * （`decisionRecordPaths` → 次のエージェントへの入力）だけで、中身は読まない。
  */
-export interface DecisionRecord {
-  path: string;
-  /** 記録の種類。次に誰が受け取る記録かで切る */
-  type: DecisionType;
-  /** 一行の見出し */
-  title: string;
-  /** 後戻りの容易さ。困難なものだけを人間が重点確認する */
-  reversibility: "easy" | "hard";
-  /** 決めたこと・前提・影響・採らなかった案。機械は読まない */
-  body: string;
-}
-
 /** 実行を一意にする組。`runs/<agent>-<run_id>-<attempt>.json` と同じもの */
 export interface Execution {
   run_id: string;
@@ -68,24 +59,6 @@ export function decisionRecordPaths(dir: string): string[] {
   return readdirSync(base)
     .sort(byExecution)
     .map((name) => join(base, name));
-}
-
-/** 1 ファイル 1 レコード。形は `decisionRecordProblems` が先に見る */
-export function readDecisionRecord(path: string): DecisionRecord {
-  const frontmatter = parseFrontmatter(readFileSync(path, "utf8"));
-  if (!frontmatter) throw new Error(`${basename(path)} に frontmatter がありません`);
-  const { fields, body } = frontmatter;
-  return {
-    path,
-    type: fields.type as DecisionType,
-    title: fields.title ?? "",
-    reversibility: fields.reversibility as DecisionRecord["reversibility"],
-    body,
-  };
-}
-
-export function readDecisionRecords(dir: string): DecisionRecord[] {
-  return decisionRecordPaths(dir).map(readDecisionRecord);
 }
 
 /**

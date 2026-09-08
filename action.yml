@@ -31,7 +31,6 @@ inputs:
   verdict: { description: "finish: approve | request_changes", required: false }
   api-error-status: { description: "finish: api_error のときの HTTP ステータス", required: false }
   detail: { description: "finish: invalid のとき、契約を満たさない理由（validate の detail をそのまま渡す）", required: false }
-  oversize: { description: "finish: planner の規模判定が上限超過なら true", required: false }
   acceptance-passed: { description: "finish: acceptance.json が全 passed なら true", required: false }
   session-id: { description: "finish: base-action の session_id", required: false }
   # compose
@@ -42,16 +41,12 @@ inputs:
   association: { description: "コメント投稿者の author_association", required: false }
   body: { description: "request-changes: コメント本文", required: false }
 
+# 読み手のある値だけを宣言する（run-cli.sh は CLI の JSON のスカラーを
+# すべて GITHUB_OUTPUT に展開するので、宣言していない値も同ジョブ内では読める）
 outputs:
   prompt_path:
     description: "compose: 組み立てたプロンプト（base-action の prompt_file に渡す）"
     value: ${{ steps.run.outputs.prompt_path }}
-  role_prompt:
-    description: "compose: 使った役割プロンプト（配布先の上書きか中央の既定か）"
-    value: ${{ steps.run.outputs.role_prompt }}
-  review_path:
-    description: "compose / request-changes: レビューファイルのパス"
-    value: ${{ steps.run.outputs.review_path }}
   result:
     description: "validate: ok | invalid | agent_failed | api_error（finish にそのまま渡す）"
     value: ${{ steps.run.outputs.result }}
@@ -73,15 +68,6 @@ outputs:
   markdown:
     description: "explain: blocked の理由と次の一手（PR に貼る markdown）"
     value: ${{ steps.run.outputs.markdown }}
-  label:
-    description: "label: いま issue に付いているべきラベル"
-    value: ${{ steps.run.outputs.label }}
-  issue:
-    description: "label: issue 番号"
-    value: ${{ steps.run.outputs.issue }}
-  json:
-    description: "CLI の出力全体（JSON）"
-    value: ${{ steps.run.outputs.json }}
   action:
     description: "route: run | none | block"
     value: ${{ steps.run.outputs.action }}
@@ -91,18 +77,12 @@ outputs:
   phase:
     description: "遷移後（route では現在）の phase"
     value: ${{ steps.run.outputs.phase }}
-  total_steps:
-    description: "レコード数（導出値）"
-    value: ${{ steps.run.outputs.total_steps }}
   continue_chain:
     description: "finish: false なら HEAD コミットに [skip ci] を付ける"
     value: ${{ steps.run.outputs.continue_chain }}
   blocked_reason:
     description: "blocked のときの理由"
     value: ${{ steps.run.outputs.blocked_reason }}
-  record_path:
-    description: "start: 作成した実行レコードのパス"
-    value: ${{ steps.run.outputs.record_path }}
   ok:
     description: "approve / request-changes / retry: 遷移したかどうか"
     value: ${{ steps.run.outputs.ok }}
@@ -112,18 +92,12 @@ outputs:
   model:
     description: "route: 使うモデル"
     value: ${{ steps.run.outputs.model }}
-  max_turns:
-    description: "route: --max-turns に渡す値"
-    value: ${{ steps.run.outputs.max_turns }}
   timeout_minutes:
     description: "route: エージェント step の timeout-minutes"
     value: ${{ steps.run.outputs.timeout_minutes }}
   job_timeout_minutes:
     description: "route: run job の timeout-minutes（エージェントの上限 + 10 分）"
     value: ${{ steps.run.outputs.job_timeout_minutes }}
-  tools:
-    description: "route: --tools に渡す値"
-    value: ${{ steps.run.outputs.tools }}
   claude_args:
     description: "route: base-action の claude_args に渡すフラグ列（モデル・上限・ツール）"
     value: ${{ steps.run.outputs.claude_args }}
@@ -143,7 +117,6 @@ runs:
         CLI_RESULT: ${{ inputs.result }}
         CLI_VERDICT: ${{ inputs.verdict }}
         CLI_API_ERROR_STATUS: ${{ inputs.api-error-status }}
-        CLI_OVERSIZE: ${{ inputs.oversize }}
         CLI_ACCEPTANCE_PASSED: ${{ inputs.acceptance-passed }}
         CLI_SESSION_ID: ${{ inputs.session-id }}
         CLI_ASSOCIATION: ${{ inputs.association }}

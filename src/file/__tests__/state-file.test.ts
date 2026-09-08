@@ -17,7 +17,6 @@ describe("readStateFile", () => {
       pipeline_version: 1,
       issue: 123,
       branch: "claude/issue-123",
-      updated_at: null,
     });
   });
 

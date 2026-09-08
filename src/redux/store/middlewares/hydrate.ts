@@ -2,7 +2,6 @@ import { readRecords } from "../../../file/run-record.ts";
 import { readStateFile } from "../../../file/state-file.ts";
 import { deriveRunStats } from "../../../utils/derive-run-stats.ts";
 import { init, restore } from "../global/actions.ts";
-import { hydrated } from "../info/actions.ts";
 import type { AgentMiddleware } from "./types.ts";
 
 /**
@@ -49,6 +48,5 @@ export const hydrate: AgentMiddleware = () => (store) => (next) => (action) => {
       },
     }),
   );
-  store.dispatch(hydrated(undefined));
   return undefined; // init は reducer に渡さない
 };

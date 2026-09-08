@@ -850,7 +850,7 @@ var ADVICE = [
   {
     when: "acceptance_not_passed",
     title: "受け入れ条件が全て `passed` になっていません",
-    body: ({ dir }) => `${pendingCriteria(dir)}
+    body: (dir) => `${pendingCriteria(dir)}
 **\`manual\` の項目は人間が確認します。** 手順は次のとおりです。
 
 1. 条件の内容を実際に確かめる（エージェントが代替検証をしている場合は \`evidence\` に何をどこまで確認したかが書かれています）
@@ -865,7 +865,7 @@ var ADVICE = [
   {
     when: "invalid_artifacts",
     title: "成果物が契約を満たしていません",
-    body: ({ dir }) => `理由は上の \`blocked_reason\` に出ています（\`work/agent-contract.md\` §4 の検証列に対応します）。
+    body: (dir) => `理由は上の \`blocked_reason\` に出ています（\`work/agent-contract.md\` §4 の検証列に対応します）。
 
 1. 足りない成果物を確かめる（\`${dir}/\` の中身）
 2. プロンプトや設定に原因があれば直す
@@ -874,7 +874,7 @@ var ADVICE = [
   {
     when: "missing_verdict",
     title: "レビューに `verdict` がありません",
-    body: ({ dir }) => `ハーネスはレビューの frontmatter の \`verdict\`（\`approve\` か \`request_changes\`）だけを見て遷移を決めます。
+    body: (dir) => `ハーネスはレビューの frontmatter の \`verdict\`（\`approve\` か \`request_changes\`）だけを見て遷移を決めます。
 
 1. \`${dir}/reviews/\` の最新のファイルを見る
 2. 人間が判断を入れるなら frontmatter を直して push する
@@ -907,7 +907,7 @@ var ADVICE = [
   {
     when: "config_invalid",
     title: "`.agent/config.json` を受け付けられません",
-    body: ({ dir }) => `どのキーがどう違うかは上の \`blocked_reason\` に出ています。**設定は一部だけ適用せず全体を捨てる**ので、
+    body: (dir) => `どのキーがどう違うかは上の \`blocked_reason\` に出ています。**設定は一部だけ適用せず全体を捨てる**ので、
 直すまで中央の既定で動くことはありません（どの設定で動いたのか分からなくなるのを避けるため）。
 
 1. \`.agent/config.json\` を直す。書いたキーだけが上書きされ、\`null\` は「既定を継承」、既定に無いキーはエラーになります
@@ -928,9 +928,8 @@ var ADVICE = [
   }
 ];
 var FALLBACK = {
-  when: "",
   title: "止まりました",
-  body: ({ dir }) => `1. \`${dir}/state.json\` の \`blocked_reason\` と Actions のログを読む
+  body: (dir) => `1. \`${dir}/state.json\` の \`blocked_reason\` と Actions のログを読む
 2. 原因を直す
 3. ${retryLine}`
 };
@@ -940,7 +939,6 @@ function explainRun(root, dir, config, config_error = null) {
     return null;
   const reason = status.blocked_reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
-  const context = { dir, reason };
   return {
     reason,
     markdown: `## 止まりました: ${advice.title}
@@ -949,7 +947,7 @@ function explainRun(root, dir, config, config_error = null) {
 blocked_reason: ${reason}
 \`\`\`
 
-${advice.body(context)}`
+${advice.body(dir)}`
   };
 }
 
@@ -1074,8 +1072,7 @@ function parseStateFile(text) {
     meta: {
       pipeline_version: Number(raw.pipeline_version ?? 0),
       issue: raw.issue,
-      branch: typeof raw.branch === "string" ? raw.branch : "",
-      updated_at: typeof raw.updated_at === "string" ? raw.updated_at : null
+      branch: typeof raw.branch === "string" ? raw.branch : ""
     },
     phase: raw.phase,
     blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null
@@ -1477,7 +1474,6 @@ var app_default = createAppReducer;
 // src/redux/store/info/actions.ts
 var create3 = typescript_fsa_default("agent-pipeline/info");
 var configure = create3("CONFIGURE");
-var hydrated = create3("HYDRATED");
 
 // src/redux/store/info/reducer.ts
 var initialInfo = {
@@ -1486,10 +1482,9 @@ var initialInfo = {
   pipeline_version: null,
   dir: "",
   run_id: null,
-  attempt: 1,
-  hydrated: false
+  attempt: 1
 };
-var infoReducer = reducerWithInitialState(initialInfo).case(configure, (s, p) => ({ ...s, ...p })).case(hydrated, (s) => ({ ...s, hydrated: true })).case(restore, (s, p) => ({ ...s, ...p.info })).build();
+var infoReducer = reducerWithInitialState(initialInfo).case(configure, (state, payload) => ({ ...state, ...payload })).case(restore, (state, payload) => ({ ...state, ...payload.info })).build();
 
 // src/redux/store/info/index.ts
 var info_default = infoReducer;
@@ -1564,10 +1559,6 @@ var guard = ({ config }) => (store) => (next) => (action) => {
 function deriveRunStats(records) {
   return {
     total_steps: records.length,
-    rounds: {
-      plan_review: records.filter((r) => r.agent === "plan-reviewer").length,
-      dev_review: records.filter((r) => r.agent === "dev-reviewer").length
-    },
     in_flight: records.find((r) => r.finished_at === null) ?? null
   };
 }
@@ -1597,7 +1588,6 @@ var hydrate = () => (store) => (next) => (action) => {
       in_flight_run_id: stats.in_flight?.run_id ?? null
     }
   }));
-  store.dispatch(hydrated(undefined));
   return;
 };
 
@@ -1716,7 +1706,6 @@ var CLI_OPTIONS = {
   verdict: { type: "string" },
   "api-error-status": { type: "string" },
   detail: { type: "string" },
-  oversize: { type: "boolean", default: false },
   "acceptance-passed": { type: "boolean", default: false },
   "session-id": { type: "string" },
   association: { type: "string" },
@@ -1754,7 +1743,6 @@ var human = (a) => ({
 var outcomeOf = (a) => ({
   result: need(a.result, "result"),
   verdict: a.verdict ?? null,
-  oversize: a.oversize ?? false,
   acceptance_passed: a["acceptance-passed"] ?? false,
   api_error_status: a["api-error-status"] ? Number(a["api-error-status"]) : null,
   detail: a.detail

@@ -18,4 +18,3 @@ import type { AgentMiddleware } from "./types.ts";
  * 逆順にすると、スナップショットだけが進んで正の記録が失われる経路ができる。
  */
 export const middlewares: AgentMiddleware[] = [guard, snapshot, reviewFile, runRecord, hydrate];
-export { guard, hydrate, reviewFile, runRecord, snapshot };

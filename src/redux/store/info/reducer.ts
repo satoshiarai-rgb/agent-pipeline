@@ -1,6 +1,6 @@
 import { reducerWithInitialState } from "../../../utils/typescript-fsa-reducers.ts";
 import { restore } from "../global/actions.ts";
-import { configure, hydrated } from "./actions.ts";
+import { configure } from "./actions.ts";
 
 /** 設置と環境。ここは他のスライスを読まないので `combineReducers` に素直に載る */
 export interface InfoState {
@@ -12,8 +12,6 @@ export interface InfoState {
   dir: string;
   run_id: string | null;
   attempt: number;
-  /** 再生が終わったか。subscriber が見る */
-  hydrated: boolean;
 }
 
 export const initialInfo: InfoState = {
@@ -23,12 +21,10 @@ export const initialInfo: InfoState = {
   dir: "",
   run_id: null,
   attempt: 1,
-  hydrated: false,
 };
 
 /** **どの action がどう状態を変えるかの表**（`switch` を書かない） */
 export const infoReducer = reducerWithInitialState(initialInfo)
-  .case(configure, (s, p) => ({ ...s, ...p }))
-  .case(hydrated, (s) => ({ ...s, hydrated: true }))
-  .case(restore, (s, p) => ({ ...s, ...p.info }))
+  .case(configure, (state, payload) => ({ ...state, ...payload }))
+  .case(restore, (state, payload) => ({ ...state, ...payload.info }))
   .build();
