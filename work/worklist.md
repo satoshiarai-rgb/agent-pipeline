@@ -320,7 +320,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - **決まった内容は `decision-records/` に 1 件 1 ファイル**（問い / 決めたこと / なぜ / 採らなかった案。`type` は `requirements` か `design`、`reversibility` の `hard` は人間が承認時に重点確認）。developer / dev-reviewer / completion に渡り、**承認待ちの PR コメントからもリンクされる**（A-57 に追加）
   - plan-reviewer は**問う側にしない**（役割を分けたまま）。代わりに「見るところ」に**判断の記録の裏取り**（根拠が実ファイルと合っているか、決めきれなかったことが前提に残っているか）を足した
   - 触ったもの: `prompts/planner.md` / `prompts/plan-reviewer.md` / `pipelineSettings.ts`（`plan` プロファイル）/ `install/config.json` / `effects/compose.ts`（planner に `decisions: true` と `DECISIONS`、plan-reviewer にも `DECISIONS`）/ `effects/validate.ts`（planner の記録の形式検査）/ `effects/explain.ts` / `docs/agent-contract.md`
-  - **未検証**: 実機で往復が起きること（planner が `Task` を実際に使えるか、`max_turns 35` で足りるか）。次の live 実行で、**選択肢が複数ある要件をわざと含む issue** を投げて確かめる。ターン数が足りなければ `agents.planner.max_turns` を上げる
+  - **実機で確認（2026-09-09。`compass-wiki` issue #25 → PR #26、live、`v1.0.1` → 途中から `v1.0.2`）**: 判断の記録が **8 件**書かれ、根拠が**ファイル名 + 行番号**（`bin/new-page:231` / `.agent/conventions.md:15` / `docs/domain/context-map.md:95` など）になっていた。**私が書いた `.agent/conventions.md` の行が実際に判断の根拠に使われた**（優先順位「実ファイルとの一致 > …」に照らして消す側に倒す、など）。赤い run はゼロ、`max_turns 100` / 45 分でタイムアウトも無し
+  - ユーザーストーリーは受け手 2 人分で価値が書かれ（「空振りしない」「置き場所を毎回考え直さない」）、規模は 7 ファイルで上限内だったので**分割は正しく発動しなかった**
+  - **計画レビューの往復も起きた**（`plan-01` で `request_changes` → planner が記録 3 件を追加 → `plan-02` で `approve`）。差し戻しの理由が「issue の完了条件『なぜそう決めたのかが残っている』に対応する受け入れ条件が無く、**理由を書かずに全 AC が通る成果物が作れてしまう**」で、質が高い
+  - `status` は同じ run の後半（`v1.0.2`）で **`status: adopted` が実際に書かれた**。`status` を持たない planner の記録（`v1.0.1` 時点）が混在しても検証は落ちず、後方互換の設計どおりに動いた
 - [x] A-59: **決定（2026-09-09）。submodule は best-effort で取る。`actions/checkout` の `submodules: recursive` にはしない。**
   - 理由: submodule が**別 org や private だと App トークンで読めず、checkout ごと失敗する**。checkout で落ちると `finish` に到達しないので、**state を書かないまま run が死ぬ**（一番避けたい形）。実測: `compass-wiki` の submodule は `creal/*`（別 org・private）で、App は個人アカウント配下にしか入っていない
   - 形: checkout の直後に `git submodule update --init --recursive --depth 1` を `continue-on-error: true` で走らせ、失敗したら警告だけ出して続ける。**読めるときは読める、読めないときは空のまま渡る**
