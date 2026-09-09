@@ -916,6 +916,7 @@ var GUIDE = {
     title: "実装が終わりました",
     files: (dir) => [
       join9(dir, "completion.md"),
+      join9(dir, "staged", "README.md"),
       join9(dir, "acceptance.json"),
       ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "dev").reverse(),

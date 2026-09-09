@@ -143,6 +143,14 @@ describe("承認待ちと完了の案内（成果物へのリンク）", () => {
     expect(guide?.markdown).toContain("reviews/plan-01.md");
   });
 
+  test("done: 設置待ちの成果物（staged）があれば並べる（A-48）", () => {
+    const dir = makeRun("done");
+    mkdirSync(join(dir, "staged"), { recursive: true });
+    writeFileSync(join(dir, "staged", "README.md"), "# 人間への依頼\n\ncp ... .claude/\n");
+    const guide = explainAt(dir);
+    expect(guide?.markdown).toContain("staged/README.md");
+  });
+
   test("done: 完了報告と判断の記録を並べ、差し戻しが無いことを書く", () => {
     const guide = explainAt(makeRun("done"));
     expect(guide?.reason).toBe("done");

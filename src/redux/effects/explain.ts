@@ -111,6 +111,8 @@ const GUIDE: Partial<Record<Phase, Guide>> = {
     title: "実装が終わりました",
     files: (dir) => [
       join(dir, "completion.md"),
+      // エージェントが書けない場所の完成品。**設置は人間の作業**として残る（A-48）
+      join(dir, "staged", "README.md"),
       join(dir, "acceptance.json"),
       ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "dev").reverse(),
