@@ -4,13 +4,14 @@ import { type Frontmatter, parseFrontmatter } from "../utils/frontmatter.ts";
 
 /**
  * `decision-records/<run_id>-<attempt>-<slug>.md` の 1 ファイル（契約 §4）。
- * developer が「計画に無い判断」をしたときだけ、判断 1 つにつき 1 ファイルで書く。
+ * planner が「計画を詰める過程で片付いた決定」を、developer が「計画に無い判断」を、
+ * 判断 1 つにつき 1 ファイルで書く。
  *
  * トピックごとにファイルを分けるので、追記が競合せず diff に新規ファイルとして現れる。
  * 名前の prefix（`<run_id>-<attempt>`）はハーネスが決めるため、実行をまたいだ名前の衝突
  * — 過去のラウンドの記録の上書き — が構造的に起きない。エージェントの裁量は `<slug>` だけ。
  *
- * frontmatter は機械が読む 3 つ（`type` / `title` / `reversibility`）だけで、内容は本文にある
+ * frontmatter は機械が読む 4 つ（`type` / `title` / `reversibility` / `status`）だけで、内容は本文にある
  * （`reviews/*.md` と同じ「機械は frontmatter、人は本文」の形 / 設計書 §5.4）。
  *
  * ハーネスがするのは**名前と形の検査**（`decisionRecordProblems`）と**パスの列挙**
@@ -29,6 +30,17 @@ const SHAPE = "<run_id>-<attempt>-<slug>.md";
 const NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 
 const REVERSIBILITY = ["easy", "hard"];
+
+/**
+ * 判断の行き先（2026-09-09 に追加）。**書いてあれば検査するが、無くても違反にしない** —
+ * 進行中の run や既存の配布先に `status` の無い記録が残っており、必須にすると
+ * それらが次のフェーズで `invalid` になって止まるため。プロンプト側は必ず書かせる。
+ *
+ *   adopted   採択した（計画や実装に反映した）
+ *   open      未処理（決めきれなかった。`plan.md` の「前提」にも未確認として残る）
+ *   withdrawn 取り下げた（問い自体が成立しなくなった。経緯として残す）
+ */
+const STATUS = ["adopted", "open", "withdrawn"];
 
 /**
  * 記録の種類（契約 §4）。「次に誰が受け取る記録か」だけで切る。
@@ -78,6 +90,12 @@ const CONTENT: ((f: Frontmatter) => string | null)[] = [
   ({ fields }) => (fields.title ? null : "title が無い"),
   ({ fields }) =>
     REVERSIBILITY.includes(fields.reversibility ?? "") ? null : "reversibility は easy か hard",
+  ({ fields }) => {
+    // 無いのは許す（上の STATUS のコメント）。書いてあるなら 3 値のどれか
+    if (fields.status === undefined) return null;
+    if (STATUS.includes(fields.status)) return null;
+    return `status は ${STATUS.join(" | ")}`;
+  },
   ({ body }) => (body ? null : "本文が無い（何をどう決めたかを書く）"),
 ];
 

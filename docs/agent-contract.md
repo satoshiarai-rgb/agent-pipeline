@@ -185,6 +185,7 @@ agent-work/issue-<n>/decision-records/<run_id>-<attempt>-<slug>.md
 type: design
 title: セッション有効期限を 24h にした
 reversibility: easy
+status: adopted
 ---
 
 ## 決めたこと
@@ -200,7 +201,9 @@ refresh token に揃えて 24h にした。
 7d。ログイン頻度は下がるが、失効の検知が遅れる。
 ```
 
-- frontmatter は `type` / `title` / `reversibility` の 3 つ。すべて必須で、本文も非空
+- frontmatter は `type` / `title` / `reversibility` / `status` の 4 つ。本文も非空
+  （`status` は**書いてあれば検査するが、無くても違反にしない** — `status` を持たない記録が
+  残っている run や配布先を、次のフェーズで止めないため。中央の既定プロンプトは必ず書かせる）
 - `type` は `requirements` | `design` | `harness` | `friction`。**「次に誰が受け取る記録か」で切る**
   （何についての判断かは `title` と本文が持つので、`performance` のような値は置かない）
 
@@ -210,6 +213,14 @@ refresh token に揃えて 24h にした。
   | `design` | 実装方針の選択（構造・依存・アルゴリズム・性能上のトレードオフ） | dev-reviewer |
   | `harness` | パイプライン側の問題（プロンプト・ツール・契約が実装を邪魔した） | 中央リポジトリの保守者 |
   | `friction` | 判断ではない観察（詰まった点・遅かった点） | 配布先 / 中央の改善ネタ |
+
+- `status` は判断の行き先。**決めきれなかった問いも記録として残す**（消さない）
+
+  | 値 | 中身 |
+  |---|---|
+  | `adopted` | 採択した（計画や実装に反映した） |
+  | `open` | 未処理。根拠が足りず決められなかった。本文に選択肢と推奨を残し、`plan.md` の「前提」にも未確認として書く |
+  | `withdrawn` | 取り下げた。問い自体が成立しなくなった、または試して捨てた案。**なぜ取り下げたかを本文に書く**（同じ道を次の実行が試さないため） |
 
 - `reversibility` は `easy` | `hard`。後戻りが困難な判断だけを人間が重点確認する（設計書 §5.4）
 - 本文の見出しは自由。機械は frontmatter しか読まない（`reviews/*.md` と同じ形）

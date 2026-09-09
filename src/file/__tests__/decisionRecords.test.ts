@@ -114,6 +114,28 @@ describe("契約（§4）の検査", () => {
     expect(decisionRecordProblems(dir)[0]).toContain("type は requirements | design");
   });
 
+  test("status は書いてあれば 3 値のどれか。無くても違反ではない", () => {
+    // 無い場合（`status` を持たない既存の記録を止めないため / 2026-09-09）
+    const without = makeRun();
+    write(without, "session-ttl", RECORD);
+    expect(decisionRecordProblems(without)).toEqual([]);
+    // 書いてある場合は検査する
+    const ok = makeRun();
+    write(
+      ok,
+      "session-ttl",
+      RECORD.replace("reversibility: easy", "reversibility: easy\nstatus: open"),
+    );
+    expect(decisionRecordProblems(ok)).toEqual([]);
+    const ng = makeRun();
+    write(
+      ng,
+      "session-ttl",
+      RECORD.replace("reversibility: easy", "reversibility: easy\nstatus: 採択"),
+    );
+    expect(decisionRecordProblems(ng)[0]).toContain("status は adopted | open | withdrawn");
+  });
+
   test("reversibility は easy か hard だけ", () => {
     const dir = makeRun();
     write(dir, "session-ttl", RECORD.replace("reversibility: easy", "reversibility: 容易"));

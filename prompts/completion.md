@@ -17,7 +17,7 @@ PR をレビューする人間のために、**この run で何が起きたの�
    run は `blocked` になる**（人間が見るべき状態なので、その旨を報告に書く）
 2. `verification: automated` の項目は `command` を実行して、報告と実態が合っていることを確かめる
 3. レビューの履歴（何が差し戻され、どう直ったか）を読み、人間が知るべき点を拾う
-4. 決定記録（`decision-records/*.md`）の frontmatter を見て、`reversibility: hard` の判断を拾う。
+4. 決定記録（`decision-records/*.md`）の frontmatter を見て、`reversibility: hard` の判断と `status: open`（未処理のまま残った判断）を拾う。
    `type: friction` は判断ではない観察なので、報告では判断と混ぜない
 
 ## 出力: `completion.md`

@@ -233,6 +233,7 @@ var DIR = "decision-records";
 var SHAPE = "<run_id>-<attempt>-<slug>.md";
 var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 var REVERSIBILITY = ["easy", "hard"];
+var STATUS = ["adopted", "open", "withdrawn"];
 var TYPES = ["requirements", "design", "harness", "friction"];
 function decisionRecordsDir(dir) {
   return join3(dir, DIR);
@@ -253,6 +254,13 @@ var CONTENT = [
   ({ fields }) => TYPES.includes(fields.type) ? null : `type は ${TYPES.join(" | ")}`,
   ({ fields }) => fields.title ? null : "title が無い",
   ({ fields }) => REVERSIBILITY.includes(fields.reversibility ?? "") ? null : "reversibility は easy か hard",
+  ({ fields }) => {
+    if (fields.status === undefined)
+      return null;
+    if (STATUS.includes(fields.status))
+      return null;
+    return `status は ${STATUS.join(" | ")}`;
+  },
   ({ body }) => body ? null : "本文が無い（何をどう決めたかを書く）"
 ];
 function fileProblems(name, text) {

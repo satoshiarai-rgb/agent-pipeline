@@ -33,7 +33,7 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
   - `status: passed` なのに通っていない項目があれば差し戻す
 - **壊していないもの**: 既存のテストが通るか。変更した関数の他の呼び出し元に影響が無いか
 - **エラー処理と境界**: 異常系が放置されていないか
-- **決定記録（`decision-records/*.md`）の判断**: `reversibility: hard` の判断が妥当か。
+- **決定記録（`decision-records/*.md`）の判断**: `reversibility: hard` の判断が妥当か。`status: open`（未処理）の記録が残っていれば、それが実装に影響していないか（決めずに進めていないか）を見る。
   `type: requirements` は計画側の問題なので、実装の差し戻し理由にはせず任意の指摘に回す。
   `type: friction` は判断ではない観察なのでレビューの対象にしない
 

@@ -75,6 +75,7 @@ agent-work/issue-12/decision-records/17293840112-1-session-ttl.md
 type: design
 title: セッション有効期限を 24h にした
 reversibility: easy
+status: adopted
 ---
 
 ## 決めたこと
@@ -97,6 +98,9 @@ refresh token に揃えて 24h にした。
   - `harness`: パイプライン側の問題（プロンプト・渡されたツール・契約が実装を邪魔した）
   - `friction`: 判断ではない観察（詰まった点、遅かった点）。改善のネタとして残す
 - `reversibility` は `easy` か `hard`。**後戻りが困難なものは人間が重点的に確認する**ので正直に書く
+- `status` は `adopted`（採った判断）。**試して捨てた案は `withdrawn`** で残す（同じ道を次の実行が
+  もう一度試さないため）。判断が必要だと分かったが情報が足りず決められなかったものは `open` にして、
+  本文に何が足りないかを書く
 - `title` は日本語の一行。本文の見出しは自由（機械は読まない）。**本文が空だと `blocked`**
 
 ## 禁止
