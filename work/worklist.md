@@ -8,7 +8,8 @@
 
 ## 現在地（2026-09-08 夕）
 
-**次の一手: (1) タグ `v1`（I-13）→ (2) 2 つ目の配布先（R-2）。**
+**次の一手: R-2（2 つ目の配布先）。** タグ `v1` / `v1.0.0` は打ち終わり（I-13）、
+`compass-wiki` を入れ直して `@v1` のピンが端まで効くことも実機で確認した。
 `agent-` prefix と手番の案内コメント（A-57）を入れた状態の dry-run は 2026-09-09 に
 `compass-wiki` issue #19 で `done` まで通した（赤い run は、途中で見つけて直した
 `null` のバグの 1 本だけ）。**実装側でタグの前に必要な確認は済んでいる。**
@@ -239,7 +240,9 @@
   - 配布物 `install/agent-pipeline.yml` は `@v1` を指す。`docs/installation.md` / `README.md` も「`@v1` を使う。固定したいなら `@v1.0.0`。`@main` は開発版」に更新
   - **タグ `v1` = `pipeline_version` 2**。`pipeline_version` を上げる変更は major タグも上げる（K-29）
   - release.sh で 2 つ踏んだので直した: 全角文字が `$VAR` に取り込まれて `set -u` で落ちる（`${VAR}` で囲む。install.sh で踏んだのと同じ形）／**失敗時の trap が書き換えを抱えたまま `git switch` して main に漏らした**（`git reset --hard` を先に置く。漏れた 3 行は `8f48299` で戻した）
-  - **未確認**: `@v1` にピンした配布先が実際に動くこと。これは R-2（2 つ目の配布先）で確かめる
+  - **確認済み（2026-09-09）**: `compass-wiki` を**まっさらな配布先として入れ直して**一巡させた（issue #21 / PR #22、dry run、赤い run はゼロ）。手写しの `check-dispatch.yml` を削除し、利用者と同じ経路（`curl … main/install/install.sh | bash`）で 4 ファイルを設置。**`@v1` のピンが端まで効いていることの証拠**として、`compose` の出力の `role_prompt` が `/home/runner/work/_actions/satoshiarai-rgb/agent-pipeline/v1/prompts/planner.md` を指した（ラッパー → reusable workflow → composite action と `dist/cli.js` → 既定プロンプト、すべて v1）
+  - あわせて確認できたこと: `.agent/setup.sh` を**ファイルごと削っても動く**（雛形が合わないときの案内どおり）、`.agent/conventions.md` を埋めた状態で 5 フェーズ通過、手番の案内コメント 2 本
+  - **副作用**: `compass-wiki` は `@v1` を検証するリポジトリになった。**main の開発を実機で確かめる先が無い**ので、R-2 で 2 つ目を作るときにどちらかを `@main` 用にする
 
 - [ ] A-48: **`.claude/**` の扱いをプロンプトで 2 点直す（実機 3 本目 / issue #11 の plan-reviewer の指摘）。** (1) **理由を計画に書かせる**。planner プロンプトは「書き込めない」という事実だけを渡しているため、planner が根拠なしに前提へ写し、レビュアーが「このリポジトリには `.claude/skills/**` など追跡済みファイルがあるのに、書けないというのは自明でない」と差し戻した。**レビュアーには成果物しか渡らない**（設計書 §3.3）ので、理由（Claude Code が sensitive file として拒否する / K-19）を前提に明示させないと同じ差し戻しが構造的に起き続ける。(2) **設置用の完成品を `agent-work/issue-<n>/` に置かせない**。現在の developer プロンプトは `staged/` に置くよう指示しているが、run ディレクトリは issue ごとに閉じるハーネスのスクラッチで、`state.json` / `runs/` / `reviews/` が同居する。**恒久的に参照される設置元は issue 番号に依存しない場所**（例: リポジトリ直下の `settings.example.json`）に置き、README に設置手順を書かせる — K-19、実機 3 本目
 - [ ] A-50: **App トークンの権限を実行単位で絞る（A-35 の残り）。** `create-github-app-token@v3` の `permission-*` 入力で、ジョブごとに必要な権限だけを取る（bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents、comment は contents / pull-requests）。App 自体の権限に加えて実行単位でも落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1
@@ -310,7 +313,9 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 
 ## 5. 展開
 
-- [ ] R-2: 配布先 2 つ目に展開し、`install/` の過不足を洗う
+- [ ] R-2: **配布先 2 つ目に展開し、`install/` の過不足を洗う。** 前提と狙い（2026-09-09 に更新）:
+  - `install.sh` 自体の確認は済んだ（`compass-wiki` を入れ直して一巡 / I-13 の記録）。**2 つ目で洗うのは「別の形のリポジトリ」で出る過不足** — テスト基盤があるリポジトリ（`.agent/setup.sh` が実際に必要）、`.agent/config.json` で上限やモデルを変える場合、組織アカウント配下（`approvers` に `MEMBER` が必要）
+  - **どちらか 1 つは `@main` を参照させる。** いま `compass-wiki` が `@v1` になったので、main の開発を実機で確かめる先が無い
 - [ ] R-3: 組織アカウント（`<org>`）へ移管する（K-1、K-6 の解除）。A-4 / A-5 で明示した箇所を Organization スコープに戻し、`approvers` に `MEMBER` を戻す。App を org にインストールし直す
 
 ---
