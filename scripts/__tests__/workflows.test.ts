@@ -184,6 +184,27 @@ describe("ワークフローの YAML", () => {
     }
   });
 
+  /**
+   * submodule は best-effort で取る（A-59）。`actions/checkout` の
+   * `submodules: recursive` にすると、submodule が別 org や private のとき checkout ごと
+   * 失敗して finish に到達せず、**state を書かないまま run が死ぬ**。
+   */
+  test("submodule の取得は continue-on-error で、checkout の入力にはしない", () => {
+    // 散文（コメント）ではなく、実際の入力を見る
+    for (const wf of all) {
+      for (const [job, cfg] of Object.entries(wf.doc.jobs ?? {})) {
+        for (const step of cfg.steps ?? []) {
+          expect(Object.keys(step.with ?? {}), `${wf.name} ${job}`).not.toContain("submodules");
+        }
+      }
+    }
+    const dispatch = all.find((w) => w.name === "agent-dispatch.yml");
+    const steps = Object.values(dispatch?.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
+    const step = steps.find((st) => st.run?.includes("git submodule update"));
+    expect(step?.name).toContain("submodule");
+    expect((step as { "continue-on-error"?: boolean })?.["continue-on-error"]).toBe(true);
+  });
+
   test("blocked で失敗させるステップは push より後", () => {
     // 先に失敗させると push とラベル更新がスキップされ、状態が git に載らないまま止まる
     for (const wf of all) {

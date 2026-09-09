@@ -85,6 +85,23 @@ jobs:
           token: ${{ steps.app.outputs.token }}
           fetch-depth: 0
 
+      # ---- submodule を best-effort で取得する（A-59）
+      # エージェントに submodule 配下も読ませたい。ただし **checkout の
+      # `submodules: recursive` にはしない** — submodule が別 org や private だと
+      # App トークンで読めず checkout ごと失敗し、finish に到達しないまま run が死ぬ
+      # （state を書かずに止まるのが最悪の形）。ここで失敗しても警告だけ出して続ける
+      - name: submodule を取得する（読めなければ空のまま続ける）
+        if: always() && needs.route.outputs.action != 'none'
+        continue-on-error: true
+        run: |
+          set -uo pipefail
+          [ -f .gitmodules ] || exit 0
+          if git submodule update --init --recursive --depth 1; then
+            echo "- submodule: 取得した（$(git config --file .gitmodules --get-regexp path | wc -l | tr -d ' ') 件）" >> "$GITHUB_STEP_SUMMARY"
+          else
+            echo "::warning title=submodule を取得できなかった::エージェントには空のまま渡る（App がその submodule のリポジトリにも入っている必要がある）"
+          fi
+
       - name: git identity を App の bot にする
         env:
           GH_TOKEN: ${{ steps.app.outputs.token }}

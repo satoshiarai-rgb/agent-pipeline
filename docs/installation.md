@@ -106,6 +106,10 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 - **`.agent/conventions.md`** には、命名・ディレクトリ構成・テストの置き場所など、守らせたい
   約束を書きます。パイプラインはあなたのリポジトリの流儀を知らないので、ここが唯一の伝え方です。
   **埋めなかった節は削ってください**（見出しだけが残ると、空の規約として渡ります）
+- **submodule を読ませたいなら、App をその submodule のリポジトリにも入れてください。**
+  パイプラインは checkout のあとに `git submodule update --init --recursive` を試しますが、
+  **失敗しても警告を出して続けます**（submodule 配下は空のままエージェントに渡ります）。
+  これは、読めない submodule のために run 全体を落とさないためです
 - **`.agent/setup.sh`** はエージェントを動かす直前に実行されます（無ければ何もしません）。
   受け入れ条件に書いたテストコマンドが走る状態を、ここで作ってください。
   実行の直後にそのまま成果物をコミットするので、**生成物が `.gitignore` で無視されているか

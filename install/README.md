@@ -34,6 +34,8 @@
   1 つ作れば使い回せます。本体リポジトリへのインストールは要りません（本体は public で、
   実行時の読み取りは `GITHUB_TOKEN` で足りるため）
 - Secrets に `AGENT_APP_CLIENT_ID` / `AGENT_APP_PRIVATE_KEY` / `CLAUDE_CODE_OAUTH_TOKEN`
+- submodule を持つリポジトリでその中身も読ませたいなら、**App をその submodule のリポジトリにも
+  入れておくこと**（取得に失敗しても run は続き、submodule 配下は空のまま渡ります）
 
 **起動ラベル `agent:go` は自分で作ります。**
 

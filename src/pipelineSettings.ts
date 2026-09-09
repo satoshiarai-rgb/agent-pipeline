@@ -68,9 +68,14 @@ export const defaultSettings: PipelineSettings = {
    * base-action は実行後に num_turns > max_turns を検査して**失敗**にするため、
    * 上限が足りないと完成した成果物ごと agent_failed になる。実測は
    * planner 18〜22 / plan-reviewer 13〜15 / developer 43。
+   *
+   * **planner だけ 100 ターン / 45 分と大きい。** 計画を詰める過程で計画者と回答者の
+   * サブエージェントを 3 ラウンド往復させるため（A-58）。**計画が重くなるのは想定どおり**で、
+   * ターンが足りないと成果物ごと捨てられるので、時間も合わせて上げている
+   * （timeout が 20 分のままだと step のタイムアウトで殺され、同じことになる）。
    */
   agents: {
-    planner: { max_turns: 35, timeout_minutes: 20, tools: "plan" },
+    planner: { max_turns: 100, timeout_minutes: 45, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
     developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },

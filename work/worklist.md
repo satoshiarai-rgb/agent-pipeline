@@ -321,7 +321,13 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - plan-reviewer は**問う側にしない**（役割を分けたまま）。代わりに「見るところ」に**判断の記録の裏取り**（根拠が実ファイルと合っているか、決めきれなかったことが前提に残っているか）を足した
   - 触ったもの: `prompts/planner.md` / `prompts/plan-reviewer.md` / `pipelineSettings.ts`（`plan` プロファイル）/ `install/config.json` / `effects/compose.ts`（planner に `decisions: true` と `DECISIONS`、plan-reviewer にも `DECISIONS`）/ `effects/validate.ts`（planner の記録の形式検査）/ `effects/explain.ts` / `docs/agent-contract.md`
   - **未検証**: 実機で往復が起きること（planner が `Task` を実際に使えるか、`max_turns 35` で足りるか）。次の live 実行で、**選択肢が複数ある要件をわざと含む issue** を投げて確かめる。ターン数が足りなければ `agents.planner.max_turns` を上げる
-- [ ] A-59: **配布先が submodule を持つ場合の checkout を決める。** `agent-dispatch.yml` の checkout は submodule を取らないので、`repos/**` のような submodule 配下は**空のまま**エージェントに渡る（2026-09-09、compass-wiki で実測。live 実行の issue はこれを避けて選んだ）。案: (a) 触らない（submodule を根拠にしない前提をプロンプトと `docs/` に明記する。いまここ） (b) `submodules: recursive` にする（全 run が遅くなる。private submodule だとトークンの権限も要る） (c) 配布先の `.agent/config.json` で選べるようにする（設定が増える）。**判断の前に、submodule を持つ配布先で実際に困るかを R-2 で確かめる**
+- [x] A-59: **決定（2026-09-09）。submodule は best-effort で取る。`actions/checkout` の `submodules: recursive` にはしない。**
+  - 理由: submodule が**別 org や private だと App トークンで読めず、checkout ごと失敗する**。checkout で落ちると `finish` に到達しないので、**state を書かないまま run が死ぬ**（一番避けたい形）。実測: `compass-wiki` の submodule は `creal/*`（別 org・private）で、App は個人アカウント配下にしか入っていない
+  - 形: checkout の直後に `git submodule update --init --recursive --depth 1` を `continue-on-error: true` で走らせ、失敗したら警告だけ出して続ける。**読めるときは読める、読めないときは空のまま渡る**
+  - プロンプト側は「submodule は取得できていれば読める。空なら根拠にしない」に変えた（推測で埋めさせない）
+  - `docs/installation.md` と `install/README.md` に前提を書いた（読ませたいなら App を submodule のリポジトリにも入れる）
+  - テストで固定した: どのワークフローの step も `with.submodules` を持たない / 取得の step は `continue-on-error`
+  - **planner の上限を上げた**（`max_turns` 35 → **100**、`timeout_minutes` 20 → **45**）。計画を詰める往復でターンを使うため。**時間も一緒に上げないと step のタイムアウトで殺され、完成した成果物ごと捨てられる**（K-20 の裏返し）。job の上限は 55 分になる
 
 - [ ] R-2: **配布先 2 つ目に展開し、`install/` の過不足を洗う。** 前提と狙い（2026-09-09 に更新）:
   - `install.sh` 自体の確認は済んだ（`compass-wiki` を入れ直して一巡 / I-13 の記録）。**2 つ目で洗うのは「別の形のリポジトリ」で出る過不足** — テスト基盤があるリポジトリ（`.agent/setup.sh` が実際に必要）、`.agent/config.json` で上限やモデルを変える場合、組織アカウント配下（`approvers` に `MEMBER` が必要）
