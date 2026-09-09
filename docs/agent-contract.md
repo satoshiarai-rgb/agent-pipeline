@@ -102,6 +102,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 |---|---|
 | 入力 | `issue.md`、`acceptance.json`（あれば）、`plan.md`（あれば）、`reviews/plan-*.md`（あれば） |
 | 出力（必須） | `plan.md` — `## 規模判定` 節を含む |
+| 出力（推奨） | `plan.md` の `## ユーザーストーリー` 節（誰の何が良くなるか）。**中央の既定プロンプトが書かせるが、ハーネスは検査しない** — プロンプトを差し替えるなら残すかどうかは配布先の判断 |
 | 出力（必須） | `acceptance.json` — `criteria[]`、各要素に `id` / `description` / `verification` / `status` |
 | 出力（任意） | なし |
 | 検証 | `plan.md` が存在し空でない。`## 規模判定` を含む。`acceptance.json` がスキーマを満たす |
