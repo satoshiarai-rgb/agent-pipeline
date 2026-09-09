@@ -233,10 +233,14 @@
   - `explain` の step は `route` が `none` でない run だけで走らせる（人間が push しただけの run で同じ案内を貼り直さないため）。入力に `--repo-slug`（`github.repository`）を足した
   - **実機で確認（2026-09-09。`compass-wiki` issue #19 / PR #20、dry run）**: 承認待ちと done の 2 つのコメントが実際に付き、リンク（`blob/claude/issue-19/agent-work/issue-19/plan.md` の形）も踏める。`agent-` prefix 後の 5 フェーズもここで通した
   - **この dry-run で 1 件バグが出た**（修正済み / `f15d092`）: `explain` が手番でない phase で `null` を返すと、`run-cli.sh` の `jq` が `null (null) has no keys` で **exit 5 → run が赤くなる**（状態の push とラベルは済んでいるので進行は止まらない）。`null` なら output を書かずに正常終了するようにし、同じ形を捕まえるテストを `scripts/__tests__/workflows.test.ts` に足した
-- [ ] I-13: **タグ `v1` / `v1.0.0` を打つ。** 前提と手順:
-  - **先に dry-run を 1 回**（`agent-` prefix 後の状態が実機で未通過）。`gh variable set AGENT_DRY_RUN --body true` → issue に `agent:go` → `/agent approve` → `done` まで → 変数を `false` に戻す
-  - タグを打ったら、配布先の参照を `@main` から `@v1` に変える手順を `docs/installation.md` に書く（いまは「`@main` を指定してください」と書いてある）
-  - `pipeline_version` は 2（イベントログに移した時点で上げた）。**タグ v1 = pipeline_version 2** という対応を決定記録に残す
+- [x] I-13: **完了（2026-09-09）。タグ `v1.0.0` と `v1` を打った**（どちらもコミット `21e69b9` を指す）。手順は `scripts/release.sh` に入れた（K-29）。
+  - **タグの中では中央の自己参照が `@v1`**（composite action・reusable workflow・中央の checkout の `ref:`）。配布先が `@v1` にピンすると、workflow とハーネス本体（`dist/cli.js`）が同じ版から来る（A-11 の版ずれをここで解消した）
+  - **main は `@main` のまま**。検証用リポジトリ（`compass-wiki`）は `@main` を参照しているので、常に最新を通す
+  - 配布物 `install/agent-pipeline.yml` は `@v1` を指す。`docs/installation.md` / `README.md` も「`@v1` を使う。固定したいなら `@v1.0.0`。`@main` は開発版」に更新
+  - **タグ `v1` = `pipeline_version` 2**。`pipeline_version` を上げる変更は major タグも上げる（K-29）
+  - release.sh で 2 つ踏んだので直した: 全角文字が `$VAR` に取り込まれて `set -u` で落ちる（`${VAR}` で囲む。install.sh で踏んだのと同じ形）／**失敗時の trap が書き換えを抱えたまま `git switch` して main に漏らした**（`git reset --hard` を先に置く。漏れた 3 行は `8f48299` で戻した）
+  - **未確認**: `@v1` にピンした配布先が実際に動くこと。これは R-2（2 つ目の配布先）で確かめる
+
 - [ ] A-48: **`.claude/**` の扱いをプロンプトで 2 点直す（実機 3 本目 / issue #11 の plan-reviewer の指摘）。** (1) **理由を計画に書かせる**。planner プロンプトは「書き込めない」という事実だけを渡しているため、planner が根拠なしに前提へ写し、レビュアーが「このリポジトリには `.claude/skills/**` など追跡済みファイルがあるのに、書けないというのは自明でない」と差し戻した。**レビュアーには成果物しか渡らない**（設計書 §3.3）ので、理由（Claude Code が sensitive file として拒否する / K-19）を前提に明示させないと同じ差し戻しが構造的に起き続ける。(2) **設置用の完成品を `agent-work/issue-<n>/` に置かせない**。現在の developer プロンプトは `staged/` に置くよう指示しているが、run ディレクトリは issue ごとに閉じるハーネスのスクラッチで、`state.json` / `runs/` / `reviews/` が同居する。**恒久的に参照される設置元は issue 番号に依存しない場所**（例: リポジトリ直下の `settings.example.json`）に置き、README に設置手順を書かせる — K-19、実機 3 本目
 - [ ] A-50: **App トークンの権限を実行単位で絞る（A-35 の残り）。** `create-github-app-token@v3` の `permission-*` 入力で、ジョブごとに必要な権限だけを取る（bootstrap は contents / issues / pull-requests、dispatch の `run` job は contents、comment は contents / pull-requests）。App 自体の権限に加えて実行単位でも落とせるため、K-4（Workflows 権限を持たせない）の裏付けが二重になる — 構成案 §5.1
 - [ ] A-34: **`log.md` の追記も同じ問題を持つ。** 追記専用でも同じ行域（末尾）を触るため、並行時は rebase で競合する（自動マージされて順序が入れ替わる可能性もある）。A-33 の `runs/` レコードがそのまま実行ログになるので、`log.md` は**ハーネスが書く実体ではなく、completing フェーズで `runs/` を時刻順に連結して生成する読み物**に変える。人間が PR で 1 ファイルとして読める利点は維持できる — A-33、設計書 §5.6
