@@ -142,10 +142,13 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     review(dir, "plan", 1);
 
     const { inputs } = compose(dir, "plan-reviewer");
+    // 判断の記録も成果物（前のラウンドで片付いた決定。同じことを問い直させない / grilling）。
+    // **渡さないのは生成側のセッションログや思考過程**で、コミットされた成果物は渡してよい
     expect(inputs).toEqual([
       join(dir, "issue.md"),
       join(dir, "plan.md"),
       join(dir, "acceptance.json"),
+      join(dir, "decision-records", "17293840112-1-session-ttl.md"),
     ]);
   });
 
@@ -197,10 +200,13 @@ describe("レビューの書き込み先（契約 §5）", () => {
     expect(compose(dir, "dev-reviewer").review_path).toBe(join(dir, "reviews", "dev-01.md"));
   });
 
-  test("planner には出力の節を作らない（ハーネスが名前を決めるものが無い）", () => {
+  test("planner の出力の節は判断の記録だけ（レビューは書かない）", () => {
     const { text, review_path } = compose(makeRun(), "planner");
     expect(review_path).toBeNull();
-    expect(text).not.toContain("## 出力");
+    // 計画レビューの問いに答えた記録を書く（grilling）。名前の prefix はハーネスが決める
+    expect(text).toContain("## 出力");
+    expect(text).toContain("判断の記録:");
+    expect(text).not.toContain("- レビュー:");
   });
 });
 
@@ -210,14 +216,14 @@ describe("決定記録の書き込み先（契約 §5）", () => {
     const { text, review_path } = compose(dir, "developer");
     expect(review_path).toBeNull();
     expect(text).toContain(
-      `- 実装中の判断: ${join(dir, "decision-records", "17293840112-1-<slug>.md")}`,
+      `- 判断の記録: ${join(dir, "decision-records", "17293840112-1-<slug>.md")}`,
     );
     // 役割プロンプトが差し替えられても残るよう、名前の規則はハーネス側に書く
     expect(text).toContain("判断 1 つにつき 1 ファイル");
   });
 
   test("developer 以外には書き込み先を伝えない（書くのは developer だけ）", () => {
-    expect(compose(makeRun(), "dev-reviewer").text).not.toContain("実装中の判断:");
+    expect(compose(makeRun(), "dev-reviewer").text).not.toContain("判断の記録:");
   });
 });
 

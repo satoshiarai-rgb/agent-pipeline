@@ -110,7 +110,13 @@ interface Contract {
 
 const CONTRACT: Record<AgentName, Contract> = {
   planner: {
-    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
+    // 決定記録は任意。書いたなら形式（1 ファイル 1 レコード・名前）を見る（grilling の記録）
+    checks: [
+      nonEmpty("plan.md"),
+      contains("plan.md", "## 規模判定"),
+      acceptanceSchema,
+      decisionRecords,
+    ],
     // 規模超過なら実装に進まず issue の分割を促す（設計書 §1）
     postProcess: ({ dir }) => {
       const text = readFileSync(join(dir, "plan.md"), "utf8");

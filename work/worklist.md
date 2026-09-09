@@ -313,6 +313,12 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 
 ## 5. 展開
 
+- [x] A-58: **grilling を取り込んだ（2026-09-09）。問うのは plan-reviewer、答えるのは planner、記録は `decision-records/`。**
+  - 元は Matt Pocock の `grilling` スキル（設計を木として見て、**前提が片付いた決定の集合（frontier）を 1 ラウンドにまとめて番号付きで問い、各問いに推奨答を添える**。事実調べは問う側の仕事、決定は答える側。frontier が空になったら完了）。**人間に問う代わりにエージェント同士で往復させ、片付いた決定を記録に残す**形に変えた
+  - **新しいフェーズは足していない。** 計画レビューの往復（`plan_review` ⇄ `planning`）がそのままラウンドになり、上限（`limits.plan_review_rounds` 既定 5）が interrogation の打ち切りになる。`verdict: request_changes` + `## 問い` で次のラウンド、frontier が空なら `approve`
+  - 触ったもの: `prompts/plan-reviewer.md`（`## 問い（grilling）` の節と形式、`request_changes` の本文は「差し戻す理由」か「問い」のどちらかでよい、**問いを残したまま approve してはいけない**）/ `prompts/planner.md`（問いに答え、**片付いた決定 1 つにつき記録 1 ファイル**。答えられないものは「前提」に「未確認」で残す）/ `effects/compose.ts`（planner に `decisions: true` と `DECISIONS` 入力、plan-reviewer にも `DECISIONS`）/ `effects/validate.ts`（planner の成果物にも決定記録の形式検査）/ `effects/explain.ts`（承認待ちのコメントに決定記録のリンクを足した）/ `docs/agent-contract.md`
+  - **意味の変化を 1 つ含む**: grilling の原型では「決定は人間のもの」だが、ここでは **planner が決める**。人間は承認時に記録（`type` と `reversibility` 付き）を読んで確かめる形になる。そのため `reversibility: hard` は「人間が承認時に重点確認する」とプロンプトに明記した
+  - **未検証**: 実機で往復が起きる形（`request_changes` + 問い → 記録）は通していない。次の live 実行で、わざと決めていないことを含む issue を投げて確かめる
 - [ ] R-2: **配布先 2 つ目に展開し、`install/` の過不足を洗う。** 前提と狙い（2026-09-09 に更新）:
   - `install.sh` 自体の確認は済んだ（`compass-wiki` を入れ直して一巡 / I-13 の記録）。**2 つ目で洗うのは「別の形のリポジトリ」で出る過不足** — テスト基盤があるリポジトリ（`.agent/setup.sh` が実際に必要）、`.agent/config.json` で上限やモデルを変える場合、組織アカウント配下（`approvers` に `MEMBER` が必要）
   - **どちらか 1 つは `@main` を参照させる。** いま `compass-wiki` が `@v1` になったので、main の開発を実機で確かめる先が無い

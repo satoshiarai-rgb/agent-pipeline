@@ -400,14 +400,14 @@ var latest = (label, kind) => ({
 var ISSUE = file("issue 本文", "issue.md");
 var PLAN = file("計画", "plan.md");
 var ACCEPTANCE = file("受け入れ条件", "acceptance.json");
-var DECISIONS = { label: "実装中の判断", find: decisionRecordPaths };
+var DECISIONS = { label: "判断の記録", find: decisionRecordPaths };
 var PLAN_REVIEW = latest("前回のレビュー", "plan");
 var DEV_REVIEW = latest("前回のレビュー", "dev");
 var ALL_REVIEWS = { label: "レビュー", find: (dir) => reviewPaths(dir) };
 var EVENTS = { label: "実行の記録", find: eventPaths };
 var CONTRACT = {
-  planner: { inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW] },
-  "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE], review: "plan" },
+  planner: { inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS], decisions: true },
+  "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
   developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
   "dev-reviewer": { inputs: [PLAN, ACCEPTANCE, DECISIONS], review: "dev" },
   completion: { inputs: [ACCEPTANCE, DECISIONS, ALL_REVIEWS, EVENTS] }
@@ -421,7 +421,7 @@ var outputSection = (input) => {
   const lines = [
     review ? `- レビュー: ${review}` : null,
     decisions ? [
-      `- 実装中の判断: ${decisionRecordPath(dir, run, "<slug>")}`,
+      `- 判断の記録: ${decisionRecordPath(dir, run, "<slug>")}`,
       "  （判断 1 つにつき 1 ファイル。`<slug>` はトピックを表す英小文字・数字・ハイフンで、",
       "  2〜5 語・40 字以内。ファイル名の他の部分は変えない）"
     ].join(`
@@ -892,6 +892,7 @@ var GUIDE = {
     files: (dir) => [
       join9(dir, "plan.md"),
       join9(dir, "acceptance.json"),
+      ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "plan").reverse(),
       join9(dir, "issue.md")
     ],
@@ -1100,7 +1101,12 @@ var noWorkflowChanges = ({ changed }) => {
 };
 var CONTRACT2 = {
   planner: {
-    checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
+    checks: [
+      nonEmpty("plan.md"),
+      contains("plan.md", "## 規模判定"),
+      acceptanceSchema,
+      decisionRecords
+    ],
     postProcess: ({ dir }) => {
       const text = readFileSync9(join10(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));

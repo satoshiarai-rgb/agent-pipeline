@@ -100,9 +100,10 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 
 | | 内容 |
 |---|---|
-| 入力 | `issue.md`、`acceptance.json`（あれば）、`plan.md`（あれば）、`reviews/plan-*.md`（あれば） |
+| 入力 | `issue.md`、`acceptance.json`（あれば）、`plan.md`（あれば）、`reviews/plan-*.md` の直近 1 通（あれば）、`decision-records/*.md`（あれば） |
 | 出力（必須） | `plan.md` — `## 規模判定` 節を含む |
 | 出力（推奨） | `plan.md` の `## ユーザーストーリー` 節（誰の何が良くなるか）。**中央の既定プロンプトが書かせるが、ハーネスは検査しない** — プロンプトを差し替えるなら残すかどうかは配布先の判断 |
+| 出力（任意） | `decision-records/<run_id>-<attempt>-<slug>.md` — **計画レビューの問いに答えた記録**（grilling）。書いたなら形式（1 ファイル 1 レコード、名前、frontmatter の 3 キー）を満たすこと |
 | 出力（必須） | `acceptance.json` — `criteria[]`、各要素に `id` / `description` / `verification` / `status` |
 | 出力（任意） | なし |
 | 検証 | `plan.md` が存在し空でない。`## 規模判定` を含む。`acceptance.json` がスキーマを満たす |
@@ -133,8 +134,8 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 
 | | 内容 |
 |---|---|
-| 入力 | `issue.md`、`plan.md`、`acceptance.json`。**planner の思考過程は渡さない**（設計書 §3.3） |
-| 出力（必須） | `reviews/plan-NN.md` — **番号 NN はハーネスが決めて入力に含める** |
+| 入力 | `issue.md`、`plan.md`、`acceptance.json`、`decision-records/*.md`（前のラウンドで片付いた決定。あれば）。**planner の思考過程は渡さない**（設計書 §3.3） |
+| 出力（必須） | `reviews/plan-NN.md` — **番号 NN はハーネスが決めて入力に含める**。`## 差し戻す理由` と `## 問い`（grilling。決まっていないことを推奨答つきで並べる）のどちらでも本文にできる |
 | 検証 | frontmatter に `verdict` が `approve` \| `request_changes` のいずれかで存在する |
 | 禁止 | `plan.md` と `acceptance.json` を直接書き換えない |
 

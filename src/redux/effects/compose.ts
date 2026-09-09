@@ -48,7 +48,7 @@ const latest = (label: string, kind: "plan" | "dev"): Input => ({
 const ISSUE = file("issue 本文", "issue.md");
 const PLAN = file("計画", "plan.md");
 const ACCEPTANCE = file("受け入れ条件", "acceptance.json");
-const DECISIONS: Input = { label: "実装中の判断", find: decisionRecordPaths };
+const DECISIONS: Input = { label: "判断の記録", find: decisionRecordPaths };
 const PLAN_REVIEW = latest("前回のレビュー", "plan");
 const DEV_REVIEW = latest("前回のレビュー", "dev");
 const ALL_REVIEWS: Input = { label: "レビュー", find: (dir) => reviewPaths(dir) };
@@ -70,8 +70,11 @@ interface Contract {
 }
 
 const CONTRACT: Record<AgentName, Contract> = {
-  planner: { inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW] },
-  "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE], review: "plan" },
+  // planner は決定記録を**書く**（計画レビューの問いに答えた記録 / grilling）。
+  // 前のラウンドで片付いた決定を読み直せるよう、入力にも入れる
+  planner: { inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS], decisions: true },
+  // 片付いた決定を渡す。同じことを問い直させないため
+  "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
   developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
   "dev-reviewer": { inputs: [PLAN, ACCEPTANCE, DECISIONS], review: "dev" },
   completion: { inputs: [ACCEPTANCE, DECISIONS, ALL_REVIEWS, EVENTS] },
@@ -103,7 +106,7 @@ const outputSection = (input: {
     review ? `- レビュー: ${review}` : null,
     decisions
       ? [
-          `- 実装中の判断: ${decisionRecordPath(dir, run, "<slug>")}`,
+          `- 判断の記録: ${decisionRecordPath(dir, run, "<slug>")}`,
           "  （判断 1 つにつき 1 ファイル。`<slug>` はトピックを表す英小文字・数字・ハイフンで、",
           "  2〜5 語・40 字以内。ファイル名の他の部分は変えない）",
         ].join("\n")
