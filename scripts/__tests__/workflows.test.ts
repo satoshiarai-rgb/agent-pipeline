@@ -125,10 +125,20 @@ describe("ワークフローの YAML", () => {
     }
   });
 
-  test("中央リポジトリの参照はすべて同じ ref を使う（A-11 の版ずれ防止）", () => {
-    const refs = new Set<string>();
-    for (const wf of all) {
+  /**
+   * 参照する ref は 2 種類しかない（A-11 の版ずれ防止 / 2026-09-09 の判断）。
+   *
+   *   配布先に置くラッパー（install/*.yml）  `@v1`  = 移動する major タグ（Q-3）
+   *   中央の自己参照（.github/workflows/*）   `@main` = 開発の最新
+   *
+   * **タグを打つときは `scripts/release.sh` が中央側を `@v1` に書き換えたコミットを作る**
+   * ので、配布先は `@v1` から自己完結した版（workflow + dist/cli.js）を引ける。
+   * main を `@main` のままにするのは、検証用リポジトリが常に最新を通すため。
+   */
+  test("参照する ref は 配布先が v1、中央が main の 2 種類だけ", () => {
+    const refsOf = (wf: Workflow) => {
       const text = readFileSync(wf.path, "utf8");
+      const refs = new Set<string>();
       // uses: owner/repo/...@ref の形
       for (const m of text.matchAll(/satoshiarai-rgb\/agent-pipeline\S*@(\S+)/g)) {
         refs.add(m[1] as string);
@@ -137,8 +147,14 @@ describe("ワークフローの YAML", () => {
       for (const m of text.matchAll(/repository: satoshiarai-rgb\/agent-pipeline\s+ref: (\S+)/g)) {
         refs.add(m[1] as string);
       }
+      return [...refs];
+    };
+    for (const wf of all.filter((w) => w.path.includes("/install/"))) {
+      expect(refsOf(wf), wf.name).toEqual(["v1"]);
     }
-    expect([...refs]).toEqual(["main"]);
+    for (const wf of all.filter((w) => w.path.includes("/.github/workflows/"))) {
+      expect(refsOf(wf), wf.name).toEqual(["main"]);
+    }
   });
 
   /**
