@@ -233,7 +233,7 @@ var DIR = "decision-records";
 var SHAPE = "<run_id>-<attempt>-<slug>.md";
 var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 var REVERSIBILITY = ["easy", "hard"];
-var STATUS = ["adopted", "open", "withdrawn"];
+var STATUS = ["adopted", "open", "dropped"];
 var TYPES = ["requirements", "design", "harness", "friction"];
 function decisionRecordsDir(dir) {
   return join3(dir, DIR);

@@ -38,9 +38,9 @@ const REVERSIBILITY = ["easy", "hard"];
  *
  *   adopted   採択した（計画や実装に反映した）
  *   open      未処理（決めきれなかった。`plan.md` の「前提」にも未確認として残る）
- *   withdrawn 取り下げた（問い自体が成立しなくなった。経緯として残す）
+ *   dropped   取り下げた（問いが成立しなくなった / 試して捨てた案。経緯として残す）
  */
-const STATUS = ["adopted", "open", "withdrawn"];
+const STATUS = ["adopted", "open", "dropped"];
 
 /**
  * 記録の種類（契約 §4）。「次に誰が受け取る記録か」だけで切る。

@@ -133,7 +133,7 @@ describe("契約（§4）の検査", () => {
       "session-ttl",
       RECORD.replace("reversibility: easy", "reversibility: easy\nstatus: 採択"),
     );
-    expect(decisionRecordProblems(ng)[0]).toContain("status は adopted | open | withdrawn");
+    expect(decisionRecordProblems(ng)[0]).toContain("status は adopted | open | dropped");
   });
 
   test("reversibility は easy か hard だけ", () => {
