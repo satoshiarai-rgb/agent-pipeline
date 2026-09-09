@@ -563,6 +563,47 @@ describe("scripts/run-cli.sh（action の実体）", () => {
     rmSync(dir, { recursive: true, force: true });
   });
 
+  /**
+   * 実際に踏んだ失敗（compass-wiki の run 34301459405）: `explain` は人間の手番でない
+   * phase では `null` を返すが、`jq` は null からキーを取れず `exit 5` でステップが落ちた。
+   * 状態の push は済んでいたので進行は止まらないが、run が赤くなる。
+   */
+  test("null を返すコマンドでも落ちず、output を書かない", () => {
+    const dir = mkdtempSync(join(tmpdir(), "run-cli-null-"));
+    const runDir = join(dir, "agent-work/issue-2");
+    spawnSync("mkdir", ["-p", join(runDir, "events")]);
+    // bootstrap だけの run は phase=planning。人間の手番ではないので explain は null
+    writeFileSync(
+      join(runDir, "events/0001-20260908T000000Z-1-1-bootstrap.json"),
+      JSON.stringify({
+        type: "agent-pipeline/BOOTSTRAP",
+        payload: {
+          timestamp: "20260908T000000Z",
+          by: "harness",
+          issue: 2,
+          branch: "claude/issue-2",
+          pipeline_version: 2,
+        },
+      }),
+    );
+    const out = join(dir, "output.txt");
+    const r = spawnSync("bash", [join(ROOT, "scripts/run-cli.sh")], {
+      encoding: "utf8",
+      env: {
+        ...process.env,
+        GITHUB_ACTION_PATH: ROOT,
+        GITHUB_OUTPUT: out,
+        CLI_COMMAND: "explain",
+        CLI_DIR: runDir,
+      },
+    });
+    expect(r.status).toBe(0);
+    expect(r.stdout.trim()).toBe("null");
+    // output の書き出しに到達しないので、ファイル自体ができない
+    expect(existsSync(out)).toBe(false);
+    rmSync(dir, { recursive: true, force: true });
+  });
+
   test("空の入力を引数に渡さない（CLI 側で未指定として扱わせる）", () => {
     const sh = readFileSync(join(ROOT, "scripts/run-cli.sh"), "utf8");
     // biome-ignore lint/suspicious/noTemplateCurlyInString: シェルの ${2:-} を文字列として検査する

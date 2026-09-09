@@ -30,6 +30,10 @@ add --out "${CLI_OUT:-${RUNNER_TEMP:-/tmp}/agent-prompt.md}"
 out=$(node "$GITHUB_ACTION_PATH/dist/cli.js" "${args[@]}")
 echo "$out"
 
+# 言うことが無いコマンドは null を返す（explain が人間の手番でないとき）。
+# jq は null からキーを取れないので、output を 1 つも書かずに正常終了する
+if [ "$out" = "null" ]; then exit 0; fi
+
 {
   echo "json=$(jq -c . <<<"$out")"
   # 改行を含む値（explain の markdown）はヒアドキュメント形式で渡す。
