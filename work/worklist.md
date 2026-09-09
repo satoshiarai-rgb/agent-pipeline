@@ -8,10 +8,10 @@
 
 ## 現在地（2026-09-08 夕）
 
-**次の一手: (1) `agent-` prefix を入れた状態で dry-run を 1 回 → (2) タグ `v1`（I-13）→ (3) 2 つ目の配布先（R-2）。**
-(1) を挟むのは、ワークフローのファイル名変更が 5 フェーズすべての `uses:` に効くため
-（今日の 2 回目の dry-run は prefix 変更**前**の状態で通した。変更後に確認したのは
-「参照が解決すること」だけ = 閉じた issue へのコメントで run が failure でなく skipped になること）。
+**次の一手: (1) タグ `v1`（I-13）→ (2) 2 つ目の配布先（R-2）。**
+`agent-` prefix と手番の案内コメント（A-57）を入れた状態の dry-run は 2026-09-09 に
+`compass-wiki` issue #19 で `done` まで通した（赤い run は、途中で見つけて直した
+`null` のバグの 1 本だけ）。**実装側でタグの前に必要な確認は済んでいる。**
 
 **フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
 状態の正は追記専用のイベントログで、状態の変更は Redux の store を通る（K-26 / A-53 は段取り 7 まで完了）。
@@ -230,6 +230,8 @@
   - **リンクはブランチを指す**（`blob/<branch>/<path>`）。マージしてブランチを消したあとは切れるが、PR を読んでいる間は生きているのでこれで足りる（コミット SHA に固定する案は、`finish` の時点で SHA が未 push なので採らない）
   - **`completing` ではなく `done` に置いた。** `completing` から `done` までは 1 分以内で、`completion.md` もまだ無く、その時点で人間に頼むことが無い
   - `explain` の step は `route` が `none` でない run だけで走らせる（人間が push しただけの run で同じ案内を貼り直さないため）。入力に `--repo-slug`（`github.repository`）を足した
+  - **実機で確認（2026-09-09。`compass-wiki` issue #19 / PR #20、dry run）**: 承認待ちと done の 2 つのコメントが実際に付き、リンク（`blob/claude/issue-19/agent-work/issue-19/plan.md` の形）も踏める。`agent-` prefix 後の 5 フェーズもここで通した
+  - **この dry-run で 1 件バグが出た**（修正済み / `f15d092`）: `explain` が手番でない phase で `null` を返すと、`run-cli.sh` の `jq` が `null (null) has no keys` で **exit 5 → run が赤くなる**（状態の push とラベルは済んでいるので進行は止まらない）。`null` なら output を書かずに正常終了するようにし、同じ形を捕まえるテストを `scripts/__tests__/workflows.test.ts` に足した
 - [ ] I-13: **タグ `v1` / `v1.0.0` を打つ。** 前提と手順:
   - **先に dry-run を 1 回**（`agent-` prefix 後の状態が実機で未通過）。`gh variable set AGENT_DRY_RUN --body true` → issue に `agent:go` → `/agent approve` → `done` まで → 変数を `false` に戻す
   - タグを打ったら、配布先の参照を `@main` から `@v1` に変える手順を `docs/installation.md` に書く（いまは「`@main` を指定してください」と書いてある）
