@@ -200,7 +200,13 @@ describe("レビューの書き込み先（契約 §5）", () => {
     expect(compose(dir, "dev-reviewer").review_path).toBe(join(dir, "reviews", "dev-01.md"));
   });
 
-  test("planner の出力の節は判断の記録だけ（レビューは書かない）", () => {
+  test("planner にはやり取りの記録の書き込み先も渡す（A-58）", () => {
+    const { text } = compose(makeRun(), "planner");
+    expect(text).toContain("やり取りの記録:");
+    expect(text).toContain("conversations/17293840112-1-round-<NN>.md");
+  });
+
+  test("planner の出力の節は判断の記録とやり取りの記録（レビューは書かない）", () => {
     const { text, review_path } = compose(makeRun(), "planner");
     expect(review_path).toBeNull();
     // 計画レビューの問いに答えた記録を書く（grilling）。名前の prefix はハーネスが決める

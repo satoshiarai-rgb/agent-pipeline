@@ -1,5 +1,6 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
+import { conversationPath } from "../../file/conversationFile.ts";
 import {
   decisionRecordPath,
   decisionRecordPaths,
@@ -67,12 +68,18 @@ interface Contract {
   review?: "plan" | "dev";
   /** 名前の prefix をハーネスが決める決定記録。書き込み先をプロンプトに書く（契約 §5） */
   decisions?: true;
+  /** エージェント同士のやり取りの保管先。planner だけが使う（A-58） */
+  conversations?: true;
 }
 
 const CONTRACT: Record<AgentName, Contract> = {
   // planner は決定記録を**書く**（計画レビューの問いに答えた記録 / grilling）。
   // 前のラウンドで片付いた決定を読み直せるよう、入力にも入れる
-  planner: { inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS], decisions: true },
+  planner: {
+    inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS],
+    decisions: true,
+    conversations: true,
+  },
   // 片付いた決定を渡す。同じことを問い直させないため
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
   developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
@@ -100,8 +107,9 @@ const outputSection = (input: {
   run: Execution;
   review: string | null;
   decisions?: true;
+  conversations?: true;
 }) => {
-  const { dir, run, review, decisions } = input;
+  const { dir, run, review, decisions, conversations } = input;
   const lines = [
     review ? `- レビュー: ${review}` : null,
     decisions
@@ -109,6 +117,13 @@ const outputSection = (input: {
           `- 判断の記録: ${decisionRecordPath(dir, run, "<slug>")}`,
           "  （判断 1 つにつき 1 ファイル。`<slug>` はトピックを表す英小文字・数字・ハイフンで、",
           "  2〜5 語・40 字以内。ファイル名の他の部分は変えない）",
+        ].join("\n")
+      : null,
+    conversations
+      ? [
+          `- やり取りの記録: ${conversationPath(dir, run, "<NN>")}`,
+          "  （エージェント同士のやり取り。1 ラウンドにつき 1 ファイルで、`<NN>` は",
+          "  ラウンド番号の 2 桁（`01` から）。ファイル名の他の部分は変えない）",
         ].join("\n")
       : null,
   ].filter((line): line is string => line !== null);
@@ -171,7 +186,13 @@ export function composeRun(input: {
     role.text,
     conventions ? section("このリポジトリの規約", conventions.text) : null,
     inputSection(dir, contract.inputs),
-    outputSection({ dir, run: { run_id, attempt }, review, decisions: contract.decisions }),
+    outputSection({
+      dir,
+      run: { run_id, attempt },
+      review,
+      decisions: contract.decisions,
+      conversations: contract.conversations,
+    }),
   ]
     .filter((s): s is string => s !== null)
     .join("\n\n");

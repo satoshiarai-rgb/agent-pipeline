@@ -124,7 +124,8 @@ PR を閉じて issue を分け直し、そのまま進めるなら何もしな�
 | `issue.md` | パイプライン | 起点になった issue 本文の写し |
 | `plan.md` / `acceptance.json` | planner | 計画と受け入れ条件 |
 | `reviews/plan-NN.md` / `reviews/dev-NN.md` | レビュアー、または差し戻したあなた | 先頭の `verdict` だけが進行の判断に使われ、本文は次のエージェントへの入力になります |
-| `decision-records/<run_id>-<attempt>-<slug>.md` | developer | 実装中の判断。判断 1 つにつき 1 ファイル |
+| `decision-records/<run_id>-<attempt>-<slug>.md` | planner / developer | 判断の記録。1 つにつき 1 ファイル（`status` が `adopted` / `open` / `dropped`） |
+| `conversations/<run_id>-<attempt>-round-NN.md` | planner のサブエージェント | **エージェント同士のやり取りの生ログ**（計画を詰めた往復）。決定そのものは判断の記録にあります |
 | `completion.md` | completion | 完了報告 |
 
 エージェントは `events/` と `state.json` を書きません。状態を書くのはパイプラインだけで、

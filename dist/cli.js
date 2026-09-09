@@ -208,11 +208,21 @@ function parseTimestamp(timestamp) {
 
 // src/redux/effects/compose.ts
 import { existsSync as existsSync6 } from "node:fs";
-import { join as join7 } from "node:path";
+import { join as join8 } from "node:path";
+
+// src/file/conversationFile.ts
+import { join as join3 } from "node:path";
+var DIR = "conversations";
+function conversationsDir(dir) {
+  return join3(dir, DIR);
+}
+function conversationPath(dir, run, round) {
+  return join3(conversationsDir(dir), `${run.run_id}-${run.attempt}-round-${round}.md`);
+}
 
 // src/file/decisionRecords.ts
 import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync3 } from "node:fs";
-import { basename, join as join3 } from "node:path";
+import { basename, join as join4 } from "node:path";
 
 // src/utils/frontmatter.ts
 var BLOCK = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/;
@@ -229,23 +239,23 @@ function parseFrontmatter(text) {
 }
 
 // src/file/decisionRecords.ts
-var DIR = "decision-records";
+var DIR2 = "decision-records";
 var SHAPE = "<run_id>-<attempt>-<slug>.md";
 var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 var REVERSIBILITY = ["easy", "hard"];
 var STATUS = ["adopted", "open", "dropped"];
 var TYPES = ["requirements", "design", "harness", "friction"];
 function decisionRecordsDir(dir) {
-  return join3(dir, DIR);
+  return join4(dir, DIR2);
 }
 function decisionRecordPath(dir, run, slug) {
-  return join3(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
+  return join4(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
 }
 function decisionRecordPaths(dir) {
   const base = decisionRecordsDir(dir);
   if (!existsSync2(base))
     return [];
-  return readdirSync(base).sort(byExecution).map((name) => join3(base, name));
+  return readdirSync(base).sort(byExecution).map((name) => join4(base, name));
 }
 function decisionRecordProblems(dir) {
   return decisionRecordPaths(dir).flatMap((path) => fileProblems(basename(path), readFileSync3(path, "utf8")));
@@ -280,8 +290,8 @@ var execution = (name) => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);
 
 // src/file/eventLog.ts
 import { existsSync as existsSync3, mkdirSync, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
-import { join as join4 } from "node:path";
-var eventsDir = (dir) => join4(dir, "events");
+import { join as join5 } from "node:path";
+var eventsDir = (dir) => join5(dir, "events");
 function suffixOf(type) {
   const last = type.split("/").at(-1) ?? type;
   return last.toLowerCase();
@@ -294,7 +304,7 @@ function eventFileName(action, invocation, sequence) {
   return `${seq}-${timestamp}-${invocation.run_id ?? "0"}-${invocation.attempt}-${suffixOf(action.type)}.json`;
 }
 function appendEvent(dir, action, invocation) {
-  const path = join4(eventsDir(dir), eventFileName(action, invocation, eventPaths(dir).length + 1));
+  const path = join5(eventsDir(dir), eventFileName(action, invocation, eventPaths(dir).length + 1));
   mkdirSync(eventsDir(dir), { recursive: true });
   const event = { type: action.type, payload: action.payload };
   if (action.error)
@@ -306,7 +316,7 @@ function eventPaths(dir) {
   const base = eventsDir(dir);
   if (!existsSync3(base))
     return [];
-  return readdirSync2(base).filter((name) => name.endsWith(".json")).sort().map((name) => join4(base, name));
+  return readdirSync2(base).filter((name) => name.endsWith(".json")).sort().map((name) => join5(base, name));
 }
 function readEvents(dir) {
   return eventPaths(dir).map((path) => {
@@ -319,11 +329,11 @@ function readEvents(dir) {
 
 // src/file/promptFile.ts
 import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
-import { dirname, join as join5 } from "node:path";
+import { dirname, join as join6 } from "node:path";
 function promptCandidates(agent, roots) {
   return [
-    join5(roots.repo, ".agent", "prompts", `${agent}.md`),
-    join5(roots.central, "prompts", `${agent}.md`)
+    join6(roots.repo, ".agent", "prompts", `${agent}.md`),
+    join6(roots.central, "prompts", `${agent}.md`)
   ];
 }
 function readPrompt(agent, roots) {
@@ -335,7 +345,7 @@ function readPrompt(agent, roots) {
   return { path, text: readFileSync5(path, "utf8").trim() };
 }
 function readConventions(repo) {
-  const path = join5(repo, ".agent", "conventions.md");
+  const path = join6(repo, ".agent", "conventions.md");
   if (!existsSync4(path))
     return null;
   const text = readFileSync5(path, "utf8").trim();
@@ -350,7 +360,7 @@ function writeComposedPrompt(path, text) {
 
 // src/file/reviewFile.ts
 import { existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
-import { join as join6 } from "node:path";
+import { join as join7 } from "node:path";
 function renderReview(input) {
   const { verdict, round, reviewer, body } = input;
   return `---
@@ -363,28 +373,28 @@ ${body.trim()}
 `;
 }
 function nextReviewNumber(dir, kind) {
-  const reviews = join6(dir, "reviews");
+  const reviews = join7(dir, "reviews");
   if (!existsSync5(reviews))
     return 1;
   return readdirSync3(reviews).filter((n) => n.startsWith(`${kind}-`) && n.endsWith(".md")).length + 1;
 }
 function reviewPath(dir, kind, round) {
-  return join6(dir, "reviews", `${kind}-${String(round).padStart(2, "0")}.md`);
+  return join7(dir, "reviews", `${kind}-${String(round).padStart(2, "0")}.md`);
 }
 function saveReview(input) {
   const { dir, kind, verdict, reviewer, body } = input;
   const round = nextReviewNumber(dir, kind);
   const path = reviewPath(dir, kind, round);
-  mkdirSync3(join6(dir, "reviews"), { recursive: true });
+  mkdirSync3(join7(dir, "reviews"), { recursive: true });
   writeFileSync4(path, renderReview({ verdict, round, reviewer, body }));
   return path;
 }
 function reviewPaths(dir, kind) {
-  const reviews = join6(dir, "reviews");
+  const reviews = join7(dir, "reviews");
   if (!existsSync5(reviews))
     return [];
   const prefix = kind ? `${kind}-` : "";
-  return readdirSync3(reviews).filter((n) => n.startsWith(prefix) && n.endsWith(".md")).sort().map((n) => join6(reviews, n));
+  return readdirSync3(reviews).filter((n) => n.startsWith(prefix) && n.endsWith(".md")).sort().map((n) => join7(reviews, n));
 }
 function latestReviewPath(dir, kind) {
   return reviewPaths(dir, kind).at(-1) ?? null;
@@ -397,7 +407,7 @@ function readVerdict(path) {
 // src/redux/effects/compose.ts
 var file = (label, rel) => ({
   label,
-  find: (dir) => existsSync6(join7(dir, rel)) ? [join7(dir, rel)] : []
+  find: (dir) => existsSync6(join8(dir, rel)) ? [join8(dir, rel)] : []
 });
 var latest = (label, kind) => ({
   label,
@@ -415,7 +425,11 @@ var DEV_REVIEW = latest("前回のレビュー", "dev");
 var ALL_REVIEWS = { label: "レビュー", find: (dir) => reviewPaths(dir) };
 var EVENTS = { label: "実行の記録", find: eventPaths };
 var CONTRACT = {
-  planner: { inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS], decisions: true },
+  planner: {
+    inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS],
+    decisions: true,
+    conversations: true
+  },
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
   developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
   "dev-reviewer": { inputs: [PLAN, ACCEPTANCE, DECISIONS], review: "dev" },
@@ -426,13 +440,19 @@ var section = (title, body) => `## ${title}
 
 ${body}`;
 var outputSection = (input) => {
-  const { dir, run, review, decisions } = input;
+  const { dir, run, review, decisions, conversations } = input;
   const lines = [
     review ? `- レビュー: ${review}` : null,
     decisions ? [
       `- 判断の記録: ${decisionRecordPath(dir, run, "<slug>")}`,
       "  （判断 1 つにつき 1 ファイル。`<slug>` はトピックを表す英小文字・数字・ハイフンで、",
       "  2〜5 語・40 字以内。ファイル名の他の部分は変えない）"
+    ].join(`
+`) : null,
+    conversations ? [
+      `- やり取りの記録: ${conversationPath(dir, run, "<NN>")}`,
+      "  （エージェント同士のやり取り。1 ラウンドにつき 1 ファイルで、`<NN>` は",
+      "  ラウンド番号の 2 桁（`01` から）。ファイル名の他の部分は変えない）"
     ].join(`
 `) : null
   ].filter((line) => line !== null);
@@ -453,7 +473,13 @@ function composeRun(input) {
     role.text,
     conventions ? section("このリポジトリの規約", conventions.text) : null,
     inputSection(dir, contract.inputs),
-    outputSection({ dir, run: { run_id, attempt }, review, decisions: contract.decisions })
+    outputSection({
+      dir,
+      run: { run_id, attempt },
+      review,
+      decisions: contract.decisions,
+      conversations: contract.conversations
+    })
   ].filter((s) => s !== null).join(`
 
 `);
@@ -467,13 +493,13 @@ function composeRun(input) {
 
 // src/redux/effects/explain.ts
 import { existsSync as existsSync8 } from "node:fs";
-import { join as join9 } from "node:path";
+import { join as join10 } from "node:path";
 
 // src/file/acceptanceFile.ts
 import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
-import { join as join8 } from "node:path";
+import { join as join9 } from "node:path";
 function acceptancePath(dir) {
-  return join8(dir, "acceptance.json");
+  return join9(dir, "acceptance.json");
 }
 function readAcceptance(dir) {
   const raw = parseJson(readFileSync7(acceptancePath(dir), "utf8"), "acceptance.json");
@@ -899,11 +925,11 @@ var GUIDE = {
   awaiting_human: {
     title: "計画ができました",
     files: (dir) => [
-      join9(dir, "plan.md"),
-      join9(dir, "acceptance.json"),
+      join10(dir, "plan.md"),
+      join10(dir, "acceptance.json"),
       ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "plan").reverse(),
-      join9(dir, "issue.md")
+      join10(dir, "issue.md")
     ],
     body: `**この PR にコメント**してください。
 
@@ -915,9 +941,9 @@ var GUIDE = {
   done: {
     title: "実装が終わりました",
     files: (dir) => [
-      join9(dir, "completion.md"),
-      join9(dir, "staged", "README.md"),
-      join9(dir, "acceptance.json"),
+      join10(dir, "completion.md"),
+      join10(dir, "staged", "README.md"),
+      join10(dir, "acceptance.json"),
       ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "dev").reverse(),
       ...reviewPaths(dir, "plan").reverse()
@@ -1048,7 +1074,7 @@ ${advice.body(dir)}`
 
 // src/redux/effects/validate.ts
 import { existsSync as existsSync10, readFileSync as readFileSync9 } from "node:fs";
-import { join as join10 } from "node:path";
+import { join as join11 } from "node:path";
 
 // src/file/executionLog.ts
 import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
@@ -1080,10 +1106,10 @@ function readApiErrorStatus(path) {
 
 // src/redux/effects/validate.ts
 var nonEmpty = (rel) => ({ dir }) => {
-  const path = join10(dir, rel);
+  const path = join11(dir, rel);
   return existsSync10(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
 };
-var contains = (rel, needle) => ({ dir }) => readFileSync9(join10(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var contains = (rel, needle) => ({ dir }) => readFileSync9(join11(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
 var acceptanceSchema = ({ dir }) => {
   if (!hasAcceptance(dir))
     return "acceptance.json が無い";
@@ -1118,7 +1144,7 @@ var CONTRACT2 = {
       decisionRecords
     ],
     postProcess: ({ dir }) => {
-      const text = readFileSync9(join10(dir, "plan.md"), "utf8");
+      const text = readFileSync9(join11(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));
       return scale.includes("上限超過") ? { oversize: true } : {};
     }

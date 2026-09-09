@@ -341,6 +341,12 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - **書いてあれば検査するが、無くても違反にしない。** 必須にすると、`status` を持たない記録が残っている進行中の run や既存の配布先が、次のフェーズで `invalid` になって止まる（この判断をした時点で `compass-wiki` issue #25 が進行中だった）。中央の既定プロンプトは必ず書かせる
   - **`open` の記録を残すようにしたのが実質的な変更**。それまでは「決めきれなかった問いは記録を作らず前提に 1 行」だったので、選択肢と推奨が失われていた。いまは記録が残り、承認待ちの PR コメントからリンクされる（A-57）
   - 触ったもの: `src/file/decisionRecords.ts`（`STATUS` と検査 1 つ）/ `prompts/{planner,developer,dev-reviewer,completion}.md`（書かせる・見る）/ `docs/agent-contract.md` §5 の表
+- [x] A-61: **エージェント同士のやり取りを `conversations/` に保管する（2026-09-09）。書くのは回答側のサブエージェント。**
+  - `agent-work/issue-<n>/conversations/<run_id>-<attempt>-round-<NN>.md` に**1 ラウンドにつき 1 ファイル**。形式は問い / 推奨 / 回答 / 根拠（`src/file/conversationFile.ts`）
+  - **ハーネスは名前を渡すだけ**で、中身は読まないし検査もしない（遷移に関わらない保管）。名前の prefix をハーネスが決めるのは決定記録と同じ理由（実行をまたいだ上書きを構造的に防ぐ）
+  - **決定記録との役割分担**: `decision-records/` は片付いた決定の要約（次のエージェントと人間が読む契約の一部）、`conversations/` はそこに至るやり取りそのもの（後から経緯を追うための保管）
+  - サブエージェントに書かせるのは**この 1 種類だけ**（`plan.md` / `acceptance.json` / 判断の記録は planner が書く。計画者側は問いをテキストで返すだけ）
+  - `compose` は planner にだけ書き込み先を渡す（`conversations: true`）。`docs/agent-contract.md` §4 と `docs/troubleshooting.md` の作業ディレクトリの表にも載せた
 - [ ] R-2: **配布先 2 つ目に展開し、`install/` の過不足を洗う。** 前提と狙い（2026-09-09 に更新）:
   - `install.sh` 自体の確認は済んだ（`compass-wiki` を入れ直して一巡 / I-13 の記録）。**2 つ目で洗うのは「別の形のリポジトリ」で出る過不足** — テスト基盤があるリポジトリ（`.agent/setup.sh` が実際に必要）、`.agent/config.json` で上限やモデルを変える場合、組織アカウント配下（`approvers` に `MEMBER` が必要）
   - **どちらか 1 つは `@main` を参照させる。** いま `compass-wiki` が `@v1` になったので、main の開発を実機で確かめる先が無い
