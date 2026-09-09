@@ -98,7 +98,7 @@ jobs:
       # run の最初のイベントを書く。**状態の正はイベントログ**で、state.json は
       # その畳み込みのスナップショット（K-26）。識別子はこのイベントが確定する
       - if: steps.authorize.outputs.skip != 'true' && steps.branch.outputs.skip != 'true'
-        uses: satoshiarai-rgb/agent-pipeline@main
+        uses: satoshiarai-rgb/agent-pipeline@v1
         with:
           command: bootstrap
           dir: agent-work/issue-${{ inputs.issue }}
@@ -165,7 +165,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: satoshiarai-rgb/agent-pipeline
-          ref: main
+          ref: v1
           path: .pipeline
 
       # 起動用ラベル（agent:go）が外れて agent:planning が付く
