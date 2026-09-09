@@ -37,7 +37,9 @@ bun run check:dist
 
 TMP="release-$VERSION"
 git switch --quiet --create "$TMP"
-trap 'git switch --quiet "$BRANCH"; git branch --quiet -D "$TMP" 2>/dev/null || true' EXIT
+# 失敗しても書き換えを main に持ち出さない。**reset を先に置く** —
+# 変更を抱えたまま switch すると、その変更が main の作業ツリーに移る（実際に踏んだ）
+trap 'git reset --hard --quiet; git switch --quiet "${BRANCH}"; git branch --quiet -D "${TMP}" 2>/dev/null || true' EXIT
 
 # 中央の自己参照だけを書き換える（配布先のラッパー install/*.yml は既に @v1 を指している）。
 # perl のスクリプトは単一引用符で渡し、版は環境変数で渡す（$1 をシェルに食わせない）。

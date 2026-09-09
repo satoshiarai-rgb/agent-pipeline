@@ -165,7 +165,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: satoshiarai-rgb/agent-pipeline
-          ref: v1
+          ref: main
           path: .pipeline
 
       # 起動用ラベル（agent:go）が外れて agent:planning が付く
