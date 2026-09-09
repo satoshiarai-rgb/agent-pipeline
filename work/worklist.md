@@ -224,6 +224,12 @@
   - (2) **公開 IF の barrel は 1 段にした。** `src/redux/index.ts` を削除し、`src/index.ts` は実際に外から import される 3 つ（`defaults` / `Config` / `validateRun`）だけにした。`src/__tests__/index.test.ts` は「export の集合がこの 2 名前と一致する」ことを見る形に変え、増やすときに「誰が import するか」を先に決めさせる
   - (3) **`labels` は上書き不可にした。** `mergeSettings.ts` の `OVERRIDABLE` から外し、`install/config.json` の雛形からも落とした。理由は、起動ラベルが配布先のラッパーの `if:` に直書きなので `trigger` を変えても黙って無視され、`prefix` を変えると起動ラベルが prefix 外になって bootstrap 後に外れなくなること。`docs/installation.md` と `CLAUDE.md` の「上書きできるもの」の一覧からも削除し、`settings.ts` の該当キーに理由を書いた
 
+- [x] A-57: **人間に手番が回ったら PR に案内をコメントする（2026-09-09）。** `blocked` だけでなく **`awaiting_human`（計画の承認待ち）と `done`（実装の完了）**でも、その時点で読む価値のある成果物へのリンクを添えたコメントを出す。
+  - **`explain` を広げただけ**（新しいコマンドもワークフローの step も増やしていない）。`GUIDE` は「人間に手番が回る phase だけ」を持つ表で、ここに無い phase では null を返す → **コメントするかどうかの判断は CLI 側**にあり、ワークフローは markdown が空でなければ貼るだけ
+  - リンクは `reviewPaths` / `decisionRecordPaths` の既存の一覧関数から作り、**存在するものだけ**を並べる。表示名は run ディレクトリからの相対パス（`reviews/plan-01.md`）
+  - **リンクはブランチを指す**（`blob/<branch>/<path>`）。マージしてブランチを消したあとは切れるが、PR を読んでいる間は生きているのでこれで足りる（コミット SHA に固定する案は、`finish` の時点で SHA が未 push なので採らない）
+  - **`completing` ではなく `done` に置いた。** `completing` から `done` までは 1 分以内で、`completion.md` もまだ無く、その時点で人間に頼むことが無い
+  - `explain` の step は `route` が `none` でない run だけで走らせる（人間が push しただけの run で同じ案内を貼り直さないため）。入力に `--repo-slug`（`github.repository`）を足した
 - [ ] I-13: **タグ `v1` / `v1.0.0` を打つ。** 前提と手順:
   - **先に dry-run を 1 回**（`agent-` prefix 後の状態が実機で未通過）。`gh variable set AGENT_DRY_RUN --body true` → issue に `agent:go` → `/agent approve` → `done` まで → 変数を `false` に戻す
   - タグを打ったら、配布先の参照を `@main` から `@v1` に変える手順を `docs/installation.md` に書く（いまは「`@main` を指定してください」と書いてある）

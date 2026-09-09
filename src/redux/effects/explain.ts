@@ -1,13 +1,22 @@
+import { existsSync } from "node:fs";
+import { join } from "node:path";
 import { hasAcceptance, readAcceptance } from "../../file/acceptanceFile.ts";
+import { decisionRecordPaths } from "../../file/decisionRecords.ts";
+import { reviewPaths } from "../../file/reviewFile.ts";
 import type { PipelineSettings } from "../../pipelineSettings.ts";
+import type { Phase } from "../../types.ts";
 import type { RootState } from "../store/createStore.ts";
 import { selectStatus } from "../store/global/selectors.ts";
 
 /**
- * 止まった理由と次の一手を markdown で返す（`blocked` になったとき PR に貼る）。
+ * **人間に手番が回ったときの案内**を markdown で返す（PR に貼る）。手番は 3 つある。
  *
- * 設計書 §5.5 の「`blocked` になったら理由と復旧方法を人間に届ける」の実体。
- * 状態を読むだけで何も書かないので、ワークフローは出力をコメントするだけでよい。
+ *   blocked         止まった理由と復旧の手順（設計書 §5.5）
+ *   awaiting_human  計画の承認 / 差し戻し。読むべき成果物へのリンクを添える
+ *   done            PR のレビュー。完了報告・受け入れ条件・判断の記録へのリンクを添える
+ *
+ * それ以外の phase では null を返す（**コメントするかどうかの判断はここが持ち**、
+ * ワークフローは markdown が空でなければ貼るだけ）。状態を読むだけで何も書かない。
  */
 
 /**
@@ -41,6 +50,76 @@ function pendingCriteria(dir: string): string {
     "",
   ].join("\n");
 }
+
+/**
+ * 成果物 1 つへのリンク。**ブランチを指す**ので PR を読んでいる間は生きている
+ * （マージしてブランチを消したあとは PR の Files changed で見る / 2026-09-09 の判断）。
+ */
+function link(path: string, dir: string, branch: string | null, slug: string | null): string {
+  // 表示名は run ディレクトリからの相対パス（`reviews/plan-01.md` のように読める）
+  const name = path.slice(dir.length + 1);
+  // URL を組むのは dir がリポジトリ相対のときだけ（ワークフローは agent-work/issue-<n> を渡す）。
+  // 手元で絶対パスを渡したときはパスだけ出す
+  if (!slug || !branch || dir.startsWith("/")) return `\`${name}\``;
+  return `[\`${name}\`](https://github.com/${slug}/blob/${branch}/${path})`;
+}
+
+/** 存在する成果物だけを箇条書きにする。無いものは黙って落とす */
+function artifacts(
+  paths: string[],
+  dir: string,
+  branch: string | null,
+  slug: string | null,
+): string {
+  const rows = paths
+    .filter((path) => existsSync(path))
+    .map((path) => `- ${link(path, dir, branch, slug)}`);
+  if (rows.length === 0) return "";
+  return `\n${rows.join("\n")}\n`;
+}
+
+/**
+ * phase ごとの案内。**人間に手番が回る phase だけ**を持ち、ここに無い phase では黙る。
+ * `files` は「その時点で読む価値がある成果物」を上から並べる（無いものは落ちる）。
+ */
+interface Guide {
+  title: string;
+  files: (dir: string) => string[];
+  body: string;
+}
+
+const GUIDE: Partial<Record<Phase, Guide>> = {
+  awaiting_human: {
+    title: "計画ができました",
+    files: (dir) => [
+      join(dir, "plan.md"),
+      join(dir, "acceptance.json"),
+      ...reviewPaths(dir, "plan").reverse(),
+      join(dir, "issue.md"),
+    ],
+    body: `**この PR にコメント**してください。
+
+| コメント | 動作 |
+|---|---|
+| \`/agent approve\` | 計画を承認して実装に進む |
+| \`/agent request-changes <理由>\` | 計画を差し戻す（理由がレビューとして残り、次の計画の入力になります） |`,
+  },
+
+  done: {
+    title: "実装が終わりました",
+    files: (dir) => [
+      join(dir, "completion.md"),
+      join(dir, "acceptance.json"),
+      ...decisionRecordPaths(dir),
+      ...reviewPaths(dir, "dev").reverse(),
+      ...reviewPaths(dir, "plan").reverse(),
+    ],
+    body: `PR の draft を外しました。**ここから先は通常の PR レビュー**です
+（差し戻しのコマンドはありません。直してほしいことがあれば、この PR に普通のレビューを付けてください）。
+
+判断の記録には**計画と違えた理由**が残っています。`,
+  },
+};
 
 const retryLine = "PR に `/agent retry` とコメントする（直前のフェーズからやり直します）";
 
@@ -151,9 +230,23 @@ export function explainRun(
   dir: string,
   settings: PipelineSettings,
   config_error: string | null = null,
+  repo_slug: string | null = null,
 ): { markdown: string; reason: string } | null {
   const status = selectStatus(root, settings, config_error);
-  if (status.blocked_reason === null) return null;
+  const branch = root.info.branch;
+
+  if (status.blocked_reason === null) {
+    const guide = GUIDE[status.phase];
+    if (!guide) return null;
+    const links = artifacts(guide.files(dir), dir, branch, repo_slug);
+    return {
+      reason: status.phase,
+      markdown: `## ${guide.title}
+
+${guide.body}
+${links}`,
+    };
+  }
 
   const reason = status.blocked_reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;

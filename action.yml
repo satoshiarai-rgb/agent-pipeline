@@ -34,6 +34,8 @@ inputs:
   repo: { description: "compose: 配布先のチェックアウト（既定はカレント）", required: false }
   central: { description: "compose: 中央リポジトリのパス（既定は action 自身の展開先）", required: false }
   out: { description: "compose: 組み立てたプロンプトの書き出し先（既定は $RUNNER_TEMP/agent-prompt.md）", required: false }
+  # explain
+  repo-slug: { description: "explain: owner/repo（成果物へのリンクを組むのに使う。github.repository を渡す）", required: false }
   # approve / request-changes / retry
   association: { description: "コメント投稿者の author_association", required: false }
   body: { description: "request-changes: コメント本文", required: false }
@@ -105,6 +107,7 @@ runs:
         CLI_ATTEMPT: ${{ inputs.attempt }}
         CLI_MODEL: ${{ inputs.model }}
         CLI_SESSION_ID: ${{ inputs.session-id }}
+        CLI_REPO_SLUG: ${{ inputs.repo-slug }}
         CLI_ASSOCIATION: ${{ inputs.association }}
         CLI_BODY: ${{ inputs.body }}
         CLI_AGENT_FAILED: ${{ inputs.agent-failed }}

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, test } from "bun:test";
 import { mkdirSync, writeFileSync } from "node:fs";
-import { join } from "node:path";
+import { basename, dirname, join } from "node:path";
 import { settings } from "../../../__tests__/helpers.ts";
 import {
   cleanupRuns,
@@ -25,9 +25,10 @@ const acceptance = (dir: string, criteria: unknown[]) => {
   writeFileSync(join(dir, "acceptance.json"), JSON.stringify({ criteria }));
 };
 
-describe("blocked のときだけ案内を返す", () => {
-  test("blocked でなければ null（コメントしない）", () => {
+describe("人間に手番が回ったときだけ案内を返す", () => {
+  test("エージェントが走っている途中は null（コメントしない）", () => {
     expect(explain(makeRun("planning"))).toBeNull();
+    expect(explain(makeRun("dev_review"))).toBeNull();
   });
 
   test("理由をそのまま載せる（人間が追えるように）", () => {
@@ -116,5 +117,56 @@ describe("実際の停止と繋がっている", () => {
     const md = explain(dir)?.markdown ?? "";
     expect(md).toContain("acceptance_not_passed");
     expect(md).toContain("`AC-1`");
+  });
+});
+
+/**
+ * 人間の手番は blocked のほかに 2 つある。**その時点で読む価値のある成果物**を
+ * リンクにして添える（無いものは落ちる）。
+ */
+describe("承認待ちと完了の案内（成果物へのリンク）", () => {
+  const explainAt = (dir: string, slug: string | null = "owner/repo") =>
+    cli("explain", { dir, "repo-slug": slug ?? undefined }, c) as {
+      markdown: string;
+      reason: string;
+    } | null;
+
+  test("awaiting_human: 計画・受け入れ条件・レビューを並べ、使えるコマンドを出す", () => {
+    const guide = explainAt(makeRun("awaiting_human"));
+    expect(guide?.reason).toBe("awaiting_human");
+    expect(guide?.markdown).toContain("計画ができました");
+    expect(guide?.markdown).toContain("/agent approve");
+    expect(guide?.markdown).toContain("/agent request-changes");
+    // plan-reviewer が書いたレビューと planner の成果物がリンクになる
+    expect(guide?.markdown).toContain("plan.md");
+    expect(guide?.markdown).toContain("acceptance.json");
+    expect(guide?.markdown).toContain("reviews/plan-01.md");
+  });
+
+  test("done: 完了報告と判断の記録を並べ、差し戻しが無いことを書く", () => {
+    const guide = explainAt(makeRun("done"));
+    expect(guide?.reason).toBe("done");
+    expect(guide?.markdown).toContain("実装が終わりました");
+    expect(guide?.markdown).toContain("completion.md");
+    expect(guide?.markdown).toContain("reviews/dev-01.md");
+    expect(guide?.markdown).toContain("通常の PR レビュー");
+  });
+
+  test("リンクはブランチを指す。repo-slug が無いか絶対パスならパスだけ出す", () => {
+    const dir = makeRun("awaiting_human");
+    // 表示名は run ディレクトリからの相対パス
+    expect(explainAt(dir)?.markdown).toContain("- `plan.md`");
+    expect(explainAt(dir, null)?.markdown).not.toContain("https://github.com");
+    // ワークフローが渡すのはリポジトリ相対の dir（agent-work/issue-<n>）。その形なら URL になる
+    const cwd = process.cwd();
+    try {
+      process.chdir(dirname(dir));
+      const guide = explainAt(basename(dir));
+      expect(guide?.markdown).toContain(
+        `https://github.com/owner/repo/blob/claude/issue-123/${basename(dir)}/plan.md`,
+      );
+    } finally {
+      process.chdir(cwd);
+    }
   });
 });

@@ -21,6 +21,7 @@ add --body "${CLI_BODY:-}"
 add --execution-file "${CLI_EXECUTION_FILE:-}"
 add --changed-files "${CLI_CHANGED_FILES:-}"
 add --repo "${CLI_REPO:-}"
+add --repo-slug "${CLI_REPO_SLUG:-}"
 # 中央のプロンプトは action 自身の展開先にある。書き出し先はランナーの作業領域
 add --central "${CLI_CENTRAL:-$GITHUB_ACTION_PATH}"
 add --out "${CLI_OUT:-${RUNNER_TEMP:-/tmp}/agent-prompt.md}"

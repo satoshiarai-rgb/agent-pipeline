@@ -456,6 +456,10 @@ function composeRun(input) {
   };
 }
 
+// src/redux/effects/explain.ts
+import { existsSync as existsSync8 } from "node:fs";
+import { join as join9 } from "node:path";
+
 // src/file/acceptanceFile.ts
 import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
 import { join as join8 } from "node:path";
@@ -867,6 +871,52 @@ function pendingCriteria(dir) {
   ].join(`
 `);
 }
+function link(path, dir, branch, slug) {
+  const name = path.slice(dir.length + 1);
+  if (!slug || !branch || dir.startsWith("/"))
+    return `\`${name}\``;
+  return `[\`${name}\`](https://github.com/${slug}/blob/${branch}/${path})`;
+}
+function artifacts(paths, dir, branch, slug) {
+  const rows = paths.filter((path) => existsSync8(path)).map((path) => `- ${link(path, dir, branch, slug)}`);
+  if (rows.length === 0)
+    return "";
+  return `
+${rows.join(`
+`)}
+`;
+}
+var GUIDE = {
+  awaiting_human: {
+    title: "計画ができました",
+    files: (dir) => [
+      join9(dir, "plan.md"),
+      join9(dir, "acceptance.json"),
+      ...reviewPaths(dir, "plan").reverse(),
+      join9(dir, "issue.md")
+    ],
+    body: `**この PR にコメント**してください。
+
+| コメント | 動作 |
+|---|---|
+| \`/agent approve\` | 計画を承認して実装に進む |
+| \`/agent request-changes <理由>\` | 計画を差し戻す（理由がレビューとして残り、次の計画の入力になります） |`
+  },
+  done: {
+    title: "実装が終わりました",
+    files: (dir) => [
+      join9(dir, "completion.md"),
+      join9(dir, "acceptance.json"),
+      ...decisionRecordPaths(dir),
+      ...reviewPaths(dir, "dev").reverse(),
+      ...reviewPaths(dir, "plan").reverse()
+    ],
+    body: `PR の draft を外しました。**ここから先は通常の PR レビュー**です
+（差し戻しのコマンドはありません。直してほしいことがあれば、この PR に普通のレビューを付けてください）。
+
+判断の記録には**計画と違えた理由**が残っています。`
+  }
+};
 var retryLine = "PR に `/agent retry` とコメントする（直前のフェーズからやり直します）";
 var ADVICE = [
   {
@@ -887,7 +937,7 @@ var ADVICE = [
   {
     when: "invalid_artifacts",
     title: "成果物が契約を満たしていません",
-    body: (dir) => `理由は上の \`blocked_reason\` に出ています（\`work/agent-contract.md\` §4 の検証列に対応します）。
+    body: (dir) => `理由は上の \`blocked_reason\` に出ています（\`docs/agent-contract.md\` §4 の検証列に対応します）。
 
 1. 足りない成果物を確かめる（\`${dir}/\` の中身）
 2. プロンプトや設定に原因があれば直す
@@ -955,10 +1005,22 @@ var FALLBACK = {
 2. 原因を直す
 3. ${retryLine}`
 };
-function explainRun(root, dir, settings, config_error = null) {
+function explainRun(root, dir, settings, config_error = null, repo_slug = null) {
   const status = selectStatus(root, settings, config_error);
-  if (status.blocked_reason === null)
-    return null;
+  const branch = root.info.branch;
+  if (status.blocked_reason === null) {
+    const guide = GUIDE[status.phase];
+    if (!guide)
+      return null;
+    const links = artifacts(guide.files(dir), dir, branch, repo_slug);
+    return {
+      reason: status.phase,
+      markdown: `## ${guide.title}
+
+${guide.body}
+${links}`
+    };
+  }
   const reason = status.blocked_reason;
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   return {
@@ -974,13 +1036,13 @@ ${advice.body(dir)}`
 }
 
 // src/redux/effects/validate.ts
-import { existsSync as existsSync9, readFileSync as readFileSync9 } from "node:fs";
-import { join as join9 } from "node:path";
+import { existsSync as existsSync10, readFileSync as readFileSync9 } from "node:fs";
+import { join as join10 } from "node:path";
 
 // src/file/executionLog.ts
-import { existsSync as existsSync8, readFileSync as readFileSync8 } from "node:fs";
+import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
 function readResultEvent(path) {
-  if (!existsSync8(path))
+  if (!existsSync9(path))
     return null;
   const parsed = parseJson(readFileSync8(path, "utf8"), "execution_file");
   const events = Array.isArray(parsed) ? parsed : [parsed];
@@ -1007,10 +1069,10 @@ function readApiErrorStatus(path) {
 
 // src/redux/effects/validate.ts
 var nonEmpty = (rel) => ({ dir }) => {
-  const path = join9(dir, rel);
-  return existsSync9(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+  const path = join10(dir, rel);
+  return existsSync10(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
 };
-var contains = (rel, needle) => ({ dir }) => readFileSync9(join9(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var contains = (rel, needle) => ({ dir }) => readFileSync9(join10(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
 var acceptanceSchema = ({ dir }) => {
   if (!hasAcceptance(dir))
     return "acceptance.json が無い";
@@ -1040,7 +1102,7 @@ var CONTRACT2 = {
   planner: {
     checks: [nonEmpty("plan.md"), contains("plan.md", "## 規模判定"), acceptanceSchema],
     postProcess: ({ dir }) => {
-      const text = readFileSync9(join9(dir, "plan.md"), "utf8");
+      const text = readFileSync9(join10(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));
       return scale.includes("上限超過") ? { oversize: true } : {};
     }
@@ -1068,14 +1130,14 @@ function validateRun(input) {
     return { result: "api_error", api_error_status: apiError };
   if (agent_failed && !completedCleanly(execution_file))
     return { result: "agent_failed" };
-  const artifacts = { dir, changed: changed_files };
+  const artifacts2 = { dir, changed: changed_files };
   const contract = CONTRACT2[agent];
   for (const check of contract.checks) {
-    const detail = check(artifacts);
+    const detail = check(artifacts2);
     if (detail)
       return { result: "invalid", detail };
   }
-  return { result: "ok", ...contract.postProcess?.(artifacts) };
+  return { result: "ok", ...contract.postProcess?.(artifacts2) };
 }
 function readLatestVerdict(dir, kind) {
   const path = latestReviewPath(dir, kind);
@@ -1648,6 +1710,7 @@ var CLI_OPTIONS = {
   "changed-files": { type: "string" },
   body: { type: "string" },
   repo: { type: "string" },
+  "repo-slug": { type: "string" },
   central: { type: "string" },
   out: { type: "string" }
 };
@@ -1693,8 +1756,9 @@ function runCommand(command, args, settings, configError = null) {
     return selectNextAction(state(), settings, configError);
   if (command === "label")
     return selectLabel(state(), settings);
-  if (command === "explain")
-    return explainRun(state(), dir, settings, configError);
+  if (command === "explain") {
+    return explainRun(state(), dir, settings, configError, args["repo-slug"] ?? null);
+  }
   if (command === "snapshot") {
     const snapshot2 = selectSnapshot(state(), settings, configError);
     writeStateFile(dir, snapshot2, new Date);

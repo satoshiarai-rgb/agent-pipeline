@@ -45,6 +45,7 @@ export const CLI_OPTIONS = {
   "changed-files": { type: "string" },
   body: { type: "string" },
   repo: { type: "string" },
+  "repo-slug": { type: "string" },
   central: { type: "string" },
   out: { type: "string" },
 } as const;
@@ -117,7 +118,10 @@ export function runCommand(
   // 読むだけの 3 つ。selector を読み、何も書かない
   if (command === "route") return selectNextAction(state(), settings, configError);
   if (command === "label") return selectLabel(state(), settings);
-  if (command === "explain") return explainRun(state(), dir, settings, configError);
+  if (command === "explain") {
+    // 成果物のリンクを組むのに owner/repo が要る（ブランチは state が持っている）
+    return explainRun(state(), dir, settings, configError, args["repo-slug"] ?? null);
+  }
 
   // 状態を変えずにスナップショットを書き直す。**`blocked` は action ではなく導出される状態**
   // なので、止まったことを記録するには「いまの状態を書き出す」だけでよい（K-26）
