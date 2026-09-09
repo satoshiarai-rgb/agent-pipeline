@@ -39,15 +39,23 @@ TMP="release-$VERSION"
 git switch --quiet --create "$TMP"
 trap 'git switch --quiet "$BRANCH"; git branch --quiet -D "$TMP" 2>/dev/null || true' EXIT
 
-# 中央の自己参照だけを書き換える（配布先のラッパー install/*.yml は既に @v1 を指している）
+# 中央の自己参照だけを書き換える（配布先のラッパー install/*.yml は既に @v1 を指している）。
+# perl のスクリプトは単一引用符で渡し、版は環境変数で渡す（$1 をシェルに食わせない）。
+# 中央のワークフローに出てくる @main はすべて自分自身への参照なので、まとめて置き換えてよい
 for f in .github/workflows/*.yml; do
-  perl -pi -e "s{(satoshiarai-rgb/agent-pipeline\\S*)\\\@main}{\$1\\\@$MAJOR}g" "$f"
-  perl -pi -e "s{^(\\s*)ref: main\$}{\$1ref: $MAJOR}g" "$f"
+  MAJOR="${MAJOR}" perl -pi -e \
+    's/\@main\b/\@$ENV{MAJOR}/g; s/^(\s*)ref: main$/$1ref: $ENV{MAJOR}/g' "$f"
 done
-git diff --stat -- .github/workflows
+git --no-pager diff --stat -- .github/workflows
 
-git commit --quiet --all --message "release: $VERSION（中央の自己参照を @$MAJOR にする）"
-git tag --annotate "$VERSION" --message "$VERSION"
-git tag --annotate --force "$MAJOR" --message "$MAJOR（$VERSION を指す）"
-git push --quiet origin "refs/tags/$VERSION" "refs/tags/$MAJOR" --force
-echo "打ちました: $VERSION と $MAJOR（$(git rev-parse --short HEAD)）"
+# 書き換え漏れがあればここで止める（漏れたまま出荷すると版ずれが残る）
+if grep -rn "@main\|ref: main" .github/workflows/*.yml; then
+  echo "エラー: 中央の自己参照が残っています" >&2
+  exit 1
+fi
+
+git commit --quiet --all --message "release: ${VERSION}（中央の自己参照を @${MAJOR} にする）"
+git tag --annotate "${VERSION}" --message "${VERSION}"
+git tag --annotate --force "${MAJOR}" --message "${MAJOR}（${VERSION} を指す）"
+git push --quiet origin "refs/tags/${VERSION}" "refs/tags/${MAJOR}" --force
+echo "打ちました: ${VERSION} と ${MAJOR}（$(git rev-parse --short HEAD)）"

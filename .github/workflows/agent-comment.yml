@@ -170,7 +170,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: satoshiarai-rgb/agent-pipeline
-          ref: main
+          ref: v1
           path: .pipeline
 
       - name: ラベルを phase に合わせる
