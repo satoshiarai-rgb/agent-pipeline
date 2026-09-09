@@ -35,7 +35,7 @@ describe("selectNextAction: 何を起動するか", () => {
 
   test("planner の実行パラメータを解決する", () => {
     const r = next({ phase: "planning" });
-    expect(r.run?.tools).toBe("Read,Glob,Grep,Write");
+    expect(r.run?.tools).toBe("Read,Glob,Grep,Write,Task");
     expect(r.run?.max_turns).toBe(c.agents.planner.max_turns);
   });
 

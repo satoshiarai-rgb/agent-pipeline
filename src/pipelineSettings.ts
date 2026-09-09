@@ -54,6 +54,12 @@ export const defaultSettings: PipelineSettings = {
    */
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write",
+    /**
+     * planner だけ `Task`（サブエージェント）を持つ。計画を作る過程で
+     * **計画者と回答者を自分の中で往復させる**ため（grilling / A-58）。
+     * 3 プロファイルにしたのは、レビュアーに使わない道具を見せないため（A-30 の趣旨は保つ）
+     */
+    plan: "Read,Glob,Grep,Write,Task",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
   },
 
@@ -64,7 +70,7 @@ export const defaultSettings: PipelineSettings = {
    * planner 18〜22 / plan-reviewer 13〜15 / developer 43。
    */
   agents: {
-    planner: { max_turns: 35, timeout_minutes: 20, tools: "readonly" },
+    planner: { max_turns: 35, timeout_minutes: 20, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
     developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },

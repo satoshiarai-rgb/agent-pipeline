@@ -1,7 +1,7 @@
 {
   "models": { "default": null, "reviewer": null },
   "limits": { "plan_review_rounds": null, "dev_review_rounds": null, "total_steps": null },
-  "tool_profiles": { "readonly": null, "exec": null },
+  "tool_profiles": { "readonly": null, "plan": null, "exec": null },
   "agents": {
     "planner": { "max_turns": null, "timeout_minutes": null, "tools": null },
     "plan-reviewer": { "max_turns": null, "timeout_minutes": null, "tools": null },

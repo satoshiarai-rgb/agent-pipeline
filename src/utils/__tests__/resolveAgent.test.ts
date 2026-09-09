@@ -8,7 +8,7 @@ describe("resolveAgent", () => {
   const c = settings();
 
   test("tool_profiles を実体に展開する", () => {
-    expect(resolveAgent(c, "planner").tools).toBe("Read,Glob,Grep,Write");
+    expect(resolveAgent(c, "planner").tools).toBe("Read,Glob,Grep,Write,Task");
     expect(resolveAgent(c, "developer").tools).toBe("Read,Glob,Grep,Write,Edit,Bash");
   });
 

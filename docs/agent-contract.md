@@ -103,7 +103,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 | 入力 | `issue.md`、`acceptance.json`（あれば）、`plan.md`（あれば）、`reviews/plan-*.md` の直近 1 通（あれば）、`decision-records/*.md`（あれば） |
 | 出力（必須） | `plan.md` — `## 規模判定` 節を含む |
 | 出力（推奨） | `plan.md` の `## ユーザーストーリー` 節（誰の何が良くなるか）。**中央の既定プロンプトが書かせるが、ハーネスは検査しない** — プロンプトを差し替えるなら残すかどうかは配布先の判断 |
-| 出力（任意） | `decision-records/<run_id>-<attempt>-<slug>.md` — **計画レビューの問いに答えた記録**（grilling）。書いたなら形式（1 ファイル 1 レコード、名前、frontmatter の 3 キー）を満たすこと |
+| 出力（任意） | `decision-records/<run_id>-<attempt>-<slug>.md` — **計画を詰める過程で片付いた決定の記録**（planner が自分の中で計画者と回答者を往復させる / grilling）。書いたなら形式（1 ファイル 1 レコード、名前、frontmatter の 3 キー）を満たすこと |
 | 出力（必須） | `acceptance.json` — `criteria[]`、各要素に `id` / `description` / `verification` / `status` |
 | 出力（任意） | なし |
 | 検証 | `plan.md` が存在し空でない。`## 規模判定` を含む。`acceptance.json` がスキーマを満たす |
@@ -135,7 +135,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 | | 内容 |
 |---|---|
 | 入力 | `issue.md`、`plan.md`、`acceptance.json`、`decision-records/*.md`（前のラウンドで片付いた決定。あれば）。**planner の思考過程は渡さない**（設計書 §3.3） |
-| 出力（必須） | `reviews/plan-NN.md` — **番号 NN はハーネスが決めて入力に含める**。`## 差し戻す理由` と `## 問い`（grilling。決まっていないことを推奨答つきで並べる）のどちらでも本文にできる |
+| 出力（必須） | `reviews/plan-NN.md` — **番号 NN はハーネスが決めて入力に含める** |
 | 検証 | frontmatter に `verdict` が `approve` \| `request_changes` のいずれかで存在する |
 | 禁止 | `plan.md` と `acceptance.json` を直接書き換えない |
 
@@ -245,7 +245,7 @@ refresh token に揃えて 24h にした。
 | 状態 | `events/*.json`（状態の正）と `state.json`（その射影）を書くのはハーネスだけ。エージェントは書かない（設計書 §7.1 / K-26） |
 | レビュー番号 | `reviews/<kind>-NN.md` の NN はハーネスが決め、入力に含める。エージェントは `rounds` を知らない |
 | 決定記録の名前 | `decision-records/` のファイル名の prefix（`<run_id>-<attempt>`）はハーネスが決め、`## 出力` で渡す。エージェントが決めるのは `<slug>` だけ |
-| ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30） |
+| ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**planner だけ `Task`**（計画を詰めるためにサブエージェントを立てる / A-58）。サブエージェントも同じ許可の下で動くので、コマンド実行はできない |
 | 上限 | `max_turns` と `timeout_minutes` はハーネスが渡す。エージェントは変更できない |
 | 失敗の分類 | 実行の失敗（`agent_failed`）、API エラー（`api_error` + ステータス）、検証の失敗（`invalid_artifacts`）を区別して `blocked_reason` に残す（A-31） |
 | 認証 | エージェントには GitHub のトークンを渡さない。GitHub の操作はハーネスが行う（A-25） |

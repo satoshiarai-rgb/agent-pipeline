@@ -21,10 +21,11 @@ var defaultSettings = {
   },
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write",
+    plan: "Read,Glob,Grep,Write,Task",
     exec: "Read,Glob,Grep,Write,Edit,Bash"
   },
   agents: {
-    planner: { max_turns: 35, timeout_minutes: 20, tools: "readonly" },
+    planner: { max_turns: 35, timeout_minutes: 20, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
     developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },

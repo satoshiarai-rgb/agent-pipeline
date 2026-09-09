@@ -21,10 +21,19 @@ describe("defaultSettings", () => {
     expect(total_steps).toBeGreaterThan(worst);
   });
 
-  test("ツールプロファイルは 2 本だけ（A-30）", () => {
-    expect(Object.keys(defaultSettings.tool_profiles)).toEqual(["readonly", "exec"]);
+  // 3 本だけ（A-30 の趣旨は「エージェントごとに集合を変えない」こと）。
+  // plan は planner だけが使う（サブエージェントを立てて計画を詰めるため / A-58）
+  test("ツールプロファイルは 3 本。書き込みと実行の境界を保つ", () => {
+    expect(Object.keys(defaultSettings.tool_profiles)).toEqual(["readonly", "plan", "exec"]);
     expect(defaultSettings.tool_profiles.readonly).not.toContain("Bash");
+    expect(defaultSettings.tool_profiles.plan).not.toContain("Bash");
+    expect(defaultSettings.tool_profiles.plan).toContain("Task");
     expect(defaultSettings.tool_profiles.exec).toContain("Bash");
+    // Task を持つのは planner だけ（レビュアーに使わない道具を見せない）
+    const withTask = Object.entries(defaultSettings.agents)
+      .filter(([, a]) => defaultSettings.tool_profiles[a.tools]?.includes("Task"))
+      .map(([name]) => name);
+    expect(withTask).toEqual(["planner"]);
   });
 
   test("エージェント 5 種すべてに上限とツールがある", () => {

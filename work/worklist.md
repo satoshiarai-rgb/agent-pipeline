@@ -313,12 +313,16 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 
 ## 5. 展開
 
-- [x] A-58: **grilling を取り込んだ（2026-09-09）。問うのは plan-reviewer、答えるのは planner、記録は `decision-records/`。**
-  - 元は Matt Pocock の `grilling` スキル（設計を木として見て、**前提が片付いた決定の集合（frontier）を 1 ラウンドにまとめて番号付きで問い、各問いに推奨答を添える**。事実調べは問う側の仕事、決定は答える側。frontier が空になったら完了）。**人間に問う代わりにエージェント同士で往復させ、片付いた決定を記録に残す**形に変えた
-  - **新しいフェーズは足していない。** 計画レビューの往復（`plan_review` ⇄ `planning`）がそのままラウンドになり、上限（`limits.plan_review_rounds` 既定 5）が interrogation の打ち切りになる。`verdict: request_changes` + `## 問い` で次のラウンド、frontier が空なら `approve`
-  - 触ったもの: `prompts/plan-reviewer.md`（`## 問い（grilling）` の節と形式、`request_changes` の本文は「差し戻す理由」か「問い」のどちらかでよい、**問いを残したまま approve してはいけない**）/ `prompts/planner.md`（問いに答え、**片付いた決定 1 つにつき記録 1 ファイル**。答えられないものは「前提」に「未確認」で残す）/ `effects/compose.ts`（planner に `decisions: true` と `DECISIONS` 入力、plan-reviewer にも `DECISIONS`）/ `effects/validate.ts`（planner の成果物にも決定記録の形式検査）/ `effects/explain.ts`（承認待ちのコメントに決定記録のリンクを足した）/ `docs/agent-contract.md`
-  - **意味の変化を 1 つ含む**: grilling の原型では「決定は人間のもの」だが、ここでは **planner が決める**。人間は承認時に記録（`type` と `reversibility` 付き）を読んで確かめる形になる。そのため `reversibility: hard` は「人間が承認時に重点確認する」とプロンプトに明記した
-  - **未検証**: 実機で往復が起きる形（`request_changes` + 問い → 記録）は通していない。次の live 実行で、わざと決めていないことを含む issue を投げて確かめる
+- [x] A-58: **grilling を取り込んだ（2026-09-09）。planner の実行の中で、計画者と回答者のサブエージェントを往復させる。planner は状況管理。**
+  - 元は Matt Pocock の `grilling` スキル（設計を木として見て、**前提が片付いた決定の集合（frontier）を 1 ラウンドにまとめて問い、各問いに推奨答を添える**。事実調べは問う側の仕事、決定は答える側。frontier が空になったら完了）。**人間に問う代わりに、1 回の planner 実行の中でエージェント同士を往復させる**形に変えた
+  - **フェーズも往復も増やしていない。** GitHub Actions の run は 1 本のまま（`planning` の中で完結）。ラウンド上限は**プロンプトが 3 回と定め、planner 自身が守る**（1 実行の中なのでハーネスは数えられない）。3 回で片付かない決定は `plan.md` の「前提」に「未確認」として残り、人間の承認に委ねる
+  - **`Task` を planner だけに開けた**（`tool_profiles.plan = "Read,Glob,Grep,Write,Task"`）。プロファイルは 3 本になったが、A-30 の趣旨（エージェントごとに集合を変えない・レビュアーに使わない道具を見せない）は保っている。サブエージェントも同じ許可で動くので `Bash` は無く、**submodule の中身も取得されない**ので、そこを根拠にさせないようプロンプトに書いた
+  - **決まった内容は `decision-records/` に 1 件 1 ファイル**（問い / 決めたこと / なぜ / 採らなかった案。`type` は `requirements` か `design`、`reversibility` の `hard` は人間が承認時に重点確認）。developer / dev-reviewer / completion に渡り、**承認待ちの PR コメントからもリンクされる**（A-57 に追加）
+  - plan-reviewer は**問う側にしない**（役割を分けたまま）。代わりに「見るところ」に**判断の記録の裏取り**（根拠が実ファイルと合っているか、決めきれなかったことが前提に残っているか）を足した
+  - 触ったもの: `prompts/planner.md` / `prompts/plan-reviewer.md` / `pipelineSettings.ts`（`plan` プロファイル）/ `install/config.json` / `effects/compose.ts`（planner に `decisions: true` と `DECISIONS`、plan-reviewer にも `DECISIONS`）/ `effects/validate.ts`（planner の記録の形式検査）/ `effects/explain.ts` / `docs/agent-contract.md`
+  - **未検証**: 実機で往復が起きること（planner が `Task` を実際に使えるか、`max_turns 35` で足りるか）。次の live 実行で、**選択肢が複数ある要件をわざと含む issue** を投げて確かめる。ターン数が足りなければ `agents.planner.max_turns` を上げる
+- [ ] A-59: **配布先が submodule を持つ場合の checkout を決める。** `agent-dispatch.yml` の checkout は submodule を取らないので、`repos/**` のような submodule 配下は**空のまま**エージェントに渡る（2026-09-09、compass-wiki で実測。live 実行の issue はこれを避けて選んだ）。案: (a) 触らない（submodule を根拠にしない前提をプロンプトと `docs/` に明記する。いまここ） (b) `submodules: recursive` にする（全 run が遅くなる。private submodule だとトークンの権限も要る） (c) 配布先の `.agent/config.json` で選べるようにする（設定が増える）。**判断の前に、submodule を持つ配布先で実際に困るかを R-2 で確かめる**
+
 - [ ] R-2: **配布先 2 つ目に展開し、`install/` の過不足を洗う。** 前提と狙い（2026-09-09 に更新）:
   - `install.sh` 自体の確認は済んだ（`compass-wiki` を入れ直して一巡 / I-13 の記録）。**2 つ目で洗うのは「別の形のリポジトリ」で出る過不足** — テスト基盤があるリポジトリ（`.agent/setup.sh` が実際に必要）、`.agent/config.json` で上限やモデルを変える場合、組織アカウント配下（`approvers` に `MEMBER` が必要）
   - **どちらか 1 つは `@main` を参照させる。** いま `compass-wiki` が `@v1` になったので、main の開発を実機で確かめる先が無い
