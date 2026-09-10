@@ -539,6 +539,31 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
   });
 });
 
+/**
+ * planner は計画を出す前に自己点検し、plan-reviewer は**同じ一覧**で見る（2026-09-10）。
+ * 一覧を 2 つのプロンプトに写しているので、片方だけ直ると点検が食い違う。
+ */
+describe("計画の点検リスト（planner と plan-reviewer で同じもの）", () => {
+  const between = (text: string) => {
+    const start = text.indexOf("<!-- checklist:start -->");
+    const end = text.indexOf("<!-- checklist:end -->");
+    expect(start, "checklist の開始マーカーが無い").toBeGreaterThan(-1);
+    expect(end, "checklist の終了マーカーが無い").toBeGreaterThan(start);
+    return text.slice(start, end);
+  };
+
+  test("2 つのプロンプトで一致している", () => {
+    const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
+    const reviewer = readFileSync(join(ROOT, "prompts/plan-reviewer.md"), "utf8");
+    expect(between(reviewer)).toBe(between(planner));
+  });
+
+  test("項目が 7 つある（増減したらここも直す）", () => {
+    const planner = between(readFileSync(join(ROOT, "prompts/planner.md"), "utf8"));
+    expect(planner.match(/^\d+\. /gm)?.length).toBe(7);
+  });
+});
+
 describe("scripts/run-cli.sh（action の実体）", () => {
   test("シェル構文が通る", () => {
     const r = spawnSync("bash", ["-n", join(ROOT, "scripts/run-cli.sh")], { encoding: "utf8" });
