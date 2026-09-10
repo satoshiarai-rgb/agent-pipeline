@@ -1,15 +1,21 @@
 #!/usr/bin/env bash
 # 版を切る。使い方: scripts/release.sh v1.0.0
 #
-# **タグの中では中央の自己参照を @<major> に書き換える。** 配布先が `@v1` にピンしたとき、
-# reusable workflow だけでなくハーネス本体（`dist/cli.js` を持つ composite action）も
-# 同じ版から来るようにするため（A-11 の版ずれ）。書き換えたコミットを作り、そこにタグを
-# 置く。main は `@main` のままなので、開発と検証（compass-wiki は @main を参照）は
-# 常に最新を通す。
+# **配布先は正確な版を参照する**（`@v1.0.3` のようなパッチまで含むタグ / 2026-09-10 の判断）。
+# そのため 2 か所を書き換える。
+#
+#   1. main の `install/agent-pipeline.yml`（配布物の正）の参照を `@<version>` にして push
+#   2. タグの中の**中央の自己参照**（composite action・reusable workflow・中央の checkout）も
+#      `@<version>` にする
+#
+# 2 が必要なのは、配布先が `@v1.0.3` にピンしても reusable workflow の中が `@main` や `@v1` の
+# ままだと、ハーネス本体（`dist/cli.js` を持つ composite action）が別の版から来てしまうため
+# （A-11 の版ずれ）。書き換えたコミットを作り、そこにタグを置く。main の中央側は `@main` の
+# ままなので、開発と検証は常に最新を通せる。
 #
 # タグは 2 本:
-#   v1.0.0  動かない。この時点の中身を指す
-#   v1      移動する。パッチを入れたらここを付け替える（配布先はこれを参照する / Q-3）
+#   v1.0.3  動かない。**配布先が参照するのはこれ**
+#   v1      移動する。最新の v1 系を指すだけの目印（自動追随したい場合に使える）
 set -euo pipefail
 
 VERSION=${1:?使い方: scripts/release.sh v1.0.0}
@@ -35,6 +41,16 @@ bunx tsc --noEmit
 bun test
 bun run check:dist
 
+# 配布物（install/agent-pipeline.yml）の参照をこの版にする。**これは main に載せる** —
+# install.sh は main から取るので、以降の導入はこの版を指す
+VERSION="${VERSION}" perl -pi -e \
+  's{(satoshiarai-rgb/agent-pipeline/\S+)\@v[0-9.]+}{$1\@$ENV{VERSION}}g' install/agent-pipeline.yml
+if ! git diff --quiet -- install/agent-pipeline.yml; then
+  git --no-pager diff --stat -- install/agent-pipeline.yml
+  git commit --quiet -m "release: 配布物の参照を ${VERSION} にする" -- install/agent-pipeline.yml
+  git push --quiet origin main
+fi
+
 TMP="release-$VERSION"
 git switch --quiet --create "$TMP"
 # 失敗しても書き換えを main に持ち出さない。**reset を先に置く** —
@@ -45,8 +61,8 @@ trap 'git reset --hard --quiet; git switch --quiet "${BRANCH}"; git branch --qui
 # perl のスクリプトは単一引用符で渡し、版は環境変数で渡す（$1 をシェルに食わせない）。
 # 中央のワークフローに出てくる @main はすべて自分自身への参照なので、まとめて置き換えてよい
 for f in .github/workflows/*.yml; do
-  MAJOR="${MAJOR}" perl -pi -e \
-    's/\@main\b/\@$ENV{MAJOR}/g; s/^(\s*)ref: main$/$1ref: $ENV{MAJOR}/g' "$f"
+  VERSION="${VERSION}" perl -pi -e \
+    's/\@main\b/\@$ENV{VERSION}/g; s/^(\s*)ref: main$/$1ref: $ENV{VERSION}/g' "$f"
 done
 git --no-pager diff --stat -- .github/workflows
 

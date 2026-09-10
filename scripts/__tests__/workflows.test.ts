@@ -128,14 +128,14 @@ describe("ワークフローの YAML", () => {
   /**
    * 参照する ref は 2 種類しかない（A-11 の版ずれ防止 / 2026-09-09 の判断）。
    *
-   *   配布先に置くラッパー（install/*.yml）  `@v1`  = 移動する major タグ（Q-3）
-   *   中央の自己参照（.github/workflows/*）   `@main` = 開発の最新
+   *   配布先に置くラッパー（install/*.yml）  `@v1.2.3` = **正確な版**（2026-09-10 の判断）
+   *   中央の自己参照（.github/workflows/*）   `@main`   = 開発の最新
    *
-   * **タグを打つときは `scripts/release.sh` が中央側を `@v1` に書き換えたコミットを作る**
-   * ので、配布先は `@v1` から自己完結した版（workflow + dist/cli.js）を引ける。
-   * main を `@main` のままにするのは、検証用リポジトリが常に最新を通すため。
+   * **タグを打つときは `scripts/release.sh` が中央側もその版に書き換えたコミットを作る**
+   * ので、配布先は 1 つのタグから自己完結した版（workflow + dist/cli.js + prompts）を引ける。
+   * main の中央側を `@main` のままにするのは、開発と検証が常に最新を通すため。
    */
-  test("参照する ref は 配布先が v1、中央が main の 2 種類だけ", () => {
+  test("参照する ref は 配布先が正確な版、中央が main", () => {
     const refsOf = (wf: Workflow) => {
       const text = readFileSync(wf.path, "utf8");
       const refs = new Set<string>();
@@ -150,7 +150,11 @@ describe("ワークフローの YAML", () => {
       return [...refs];
     };
     for (const wf of all.filter((w) => w.path.includes("/install/"))) {
-      expect(refsOf(wf), wf.name).toEqual(["v1"]);
+      const refs = refsOf(wf);
+      expect(refs.length, wf.name).toBe(1);
+      expect(refs[0], `${wf.name} は v<major>.<minor>.<patch> を指すこと`).toMatch(
+        /^v\d+\.\d+\.\d+$/,
+      );
     }
     for (const wf of all.filter((w) => w.path.includes("/.github/workflows/"))) {
       expect(refsOf(wf), wf.name).toEqual(["main"]);
