@@ -6,13 +6,20 @@
 
 ---
 
-## 現在地（2026-09-08 夕）
+## 現在地（2026-09-10）
 
-**次の一手: R-2（2 つ目の配布先）。** タグ `v1` / `v1.0.0` は打ち終わり（I-13）、
-`compass-wiki` を入れ直して `@v1` のピンが端まで効くことも実機で確認した。
-`agent-` prefix と手番の案内コメント（A-57）を入れた状態の dry-run は 2026-09-09 に
-`compass-wiki` issue #19 で `done` まで通した（赤い run は、途中で見つけて直した
-`null` のバグの 1 本だけ）。**実装側でタグの前に必要な確認は済んでいる。**
+**次の一手: R-2（`creal/compass` への導入）。**
+
+- タグは **`v1.0.3`** まで。**配布先は正確な版を参照する**形（K-30 / K-31。上げるのは `uses:` の
+  4 行で、自動化は Dependabot）に切り替え、`install/dependabot.yml` を配布物に足した
+- `compass-wiki` は `@v1.0.3` に固定して **dry-run 一巡を確認**（issue #28、赤い run ゼロ。
+  **submodule の best-effort 取得が別 org の private でも run を止めない**ことも確認した）
+- 本物のエージェントでの確認も済んでいる: issue #23（索引の不整合。決定記録 1 件）と
+  issue #25（grilling が 8 件の記録を書き、計画レビューの往復も起きた）。**PR #24 / #26 は
+  実際に価値のある変更なので開いたまま**（マージは人の判断）
+- `creal/compass` の事前確認は完了（ファイル名の衝突なし / Actions のポリシーは `all` /
+  `claude.yml` とトリガが重ならない / deploy は暴発しない / 既定ブランチ `develop` は対応済み /
+  Dependabot の `github-actions` が既にある）。**足りないのは App のインストールと Secrets 2 つ**
 
 **フェーズ A〜D は実機で完走した。issue から `done`（PR が ready for review）まで到達済み。**
 状態の正は追記専用のイベントログで、状態の変更は Redux の store を通る（K-26 / A-53 は段取り 7 まで完了）。
