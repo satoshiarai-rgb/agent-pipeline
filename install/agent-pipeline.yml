@@ -48,7 +48,7 @@ jobs:
   # 入口: agent:go ラベルで起動します（ラベルを付けるには write / triage 権限が要ります）
   agent-bootstrap:
     if: github.event_name == 'issues' && github.event.label.name == 'agent:go'
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-bootstrap.yml@v1.0.3
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-bootstrap.yml@v1.0.4
     with:
       issue: ${{ github.event.issue.number }}
       actor: ${{ github.actor }}
@@ -63,7 +63,7 @@ jobs:
       github.event.issue.pull_request != null &&
       github.event.comment.user.type != 'Bot' &&
       startsWith(github.event.comment.body, '/agent ')
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-comment.yml@v1.0.3
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-comment.yml@v1.0.4
     with:
       pr: ${{ github.event.issue.number }}
       body: ${{ github.event.comment.body }}
@@ -75,14 +75,14 @@ jobs:
   # リポジトリ変数で行います（with: の中では式を使えません）
   agent-run:
     if: github.event_name == 'push' && vars.AGENT_DRY_RUN != 'false'
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1.0.3
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1.0.4
     with:
       dry_run: true
     secrets: inherit
 
   agent-run-live:
     if: github.event_name == 'push' && vars.AGENT_DRY_RUN == 'false'
-    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1.0.3
+    uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1.0.4
     with:
       dry_run: false
     secrets: inherit
