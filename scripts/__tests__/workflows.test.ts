@@ -536,6 +536,7 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
       "conventions.md",
       "setup.sh",
       "issue-template.yml",
+      "dependabot.yml",
     ]) {
       expect(text, f).toContain(f);
     }

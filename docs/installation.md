@@ -185,3 +185,31 @@ gh variable set AGENT_DRY_RUN --body false
 
 使い方は [overview.md の「使い方」](overview.md#使い方) にまとめてあります。
 最初の 1 件は、変更範囲の小さい issue で試すことをおすすめします。
+
+## 7. 版を上げる
+
+配布先は**正確な版**（`@v1.0.3` のようなタグ）を参照しています。上げる作業は
+**`.github/workflows/agent-pipeline.yml` の `uses:` の版を書き換えて PR にする**だけです（4 行）。
+
+**`install.sh --force` は使わないでください。** `.agent/conventions.md` や `.agent/setup.sh` まで
+雛形に戻ります（あなたが書いた内容が消えます）。上げるのはワークフローの版だけです。
+
+**自動で PR を作らせるなら Dependabot** を使います（`install.sh` が
+[`dependabot.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/dependabot.yml)
+を置きます。既に `.github/dependabot.yml` があるなら、次の項目だけ足してください）。
+
+```yaml
+- package-ecosystem: github-actions
+  directory: "/"
+  schedule:
+    interval: weekly
+```
+
+上げる前に見るところ:
+
+- **中央のタグ間の差分**（`https://github.com/satoshiarai-rgb/agent-pipeline/compare/v1.0.3...v1.0.4`）
+- **`pipeline_version` が上がっていないか。** 上がっている版に切り替えると、**進行中の run は
+  `pipeline_version_mismatch` で止まります**（噛み合わない状態で続けて状態を失わないための設計です）。
+  進行中の run が無いタイミング（`agent:` ラベルの付いた issue が無い状態）で上げてください。
+  止まってしまった issue は、新しい issue で立て直します
+- パッチ（`v1.0.x`）で `pipeline_version` は上げません。上げるときは major タグも上がります

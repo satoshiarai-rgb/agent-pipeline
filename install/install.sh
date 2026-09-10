@@ -28,6 +28,7 @@ agent-pipeline.yml|.github/workflows/agent-pipeline.yml|
 conventions.md|.agent/conventions.md|
 setup.sh|.agent/setup.sh|x
 issue-template.yml|.github/ISSUE_TEMPLATE/agent-task.yml|
+dependabot.yml|.github/dependabot.yml|
 "
 
 ROOT=$(git rev-parse --show-toplevel 2>/dev/null) || {
@@ -75,6 +76,8 @@ cat <<'NEXT'
        gh secret set CLAUDE_CODE_OAUTH_TOKEN      # 手元で claude setup-token
   3. .agent/conventions.md を埋める（埋めない節は削る）。.agent/setup.sh にテストの準備を書く。
      使わない雛形はファイルごと削ってよい（無くても動く）
+     .github/dependabot.yml が既にあって skip された場合は、github-actions の項目を足す
+     （パイプラインの版を上げる PR が自動で来るようにするため）
   4. .gitignore を確認する（setup.sh の実行後に、そのまま成果物をコミットするため）
   5. 起動ラベルを作る（状態のラベルはパイプラインが作るが、これだけは自分で）
        gh label create agent:go --description "エージェントパイプラインを起動する" --color 1f883d

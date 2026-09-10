@@ -1,0 +1,17 @@
+# 置き場所: あなたのリポジトリの .github/dependabot.yml
+#
+# エージェントパイプラインの参照（`.github/workflows/agent-pipeline.yml` の `uses:` の版）を
+# 自動で上げる PR を作らせます。配布先は**正確な版**（`@v1.2.3`）を参照するので、上げないと
+# 新しい修正が届きません。逆に、上げる PR が来れば差分を見てから受け入れられます。
+#
+# **既に `.github/dependabot.yml` がある場合、`install.sh` はこのファイルを置きません**
+# （既存の設定を壊さないため）。その場合は `github-actions` の項目だけを足してください。
+#
+# パイプライン以外の依存（bundler / npm など）はこのリポジトリの流儀で決めてください。
+version: 2
+updates:
+  - package-ecosystem: github-actions
+    directory: "/"
+    schedule:
+      interval: weekly
+    open-pull-requests-limit: 5
