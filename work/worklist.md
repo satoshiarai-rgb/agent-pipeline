@@ -365,6 +365,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - **`command` は予言である**（テストを書くのは developer）。名前が変わったら **developer が直して判断の記録（`type: requirements`）に「元 / 直した / なぜ」を残す**。黙って書き換えない
   - **走らせられない事情があるなら `manual` にする。** このパイプラインは `automated` を自分で実行しない（Q-5 は未決）。DB やサービスが必要でエージェントの実行環境に無い場合は `manual` にし、**`evidence` に「どこで走らせた結果を引くか」（PR の CI の run）を条件の中に書く**
   - `evidence` は **「コマンド + 走らせた場所 + 結果」**（「確認した」だけは不可）。契約 §4 の developer の行にも書いた
+- [x] A-64: **`setup.sh` に「どのエージェントのための準備か」を渡す（2026-09-10。R-2 で必要になった）。**
+  - `AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` を環境変数で渡す。**重い準備（DB の起動、イメージのビルド）を必要なフェーズだけに絞れる**ようにするため（読むだけの planner / plan-reviewer では飛ばす）。絞らないと 5 フェーズ全部が同じ準備を払う
+  - あわせて雛形（`install/setup.sh`）を「**失敗させない**」形に書き直した（非ゼロで終わるとそのフェーズが `agent_failed` になる。準備できなければ警告を出して `exit 0`）。この落とし穴は compass の導入で気付いた
+  - **サービスコンテナは配布先から足せない**（`services:` はジョブ定義側）ので、必要なら `setup.sh` の中で `docker compose` などで自前に立てる、と契約 §5 に書いた
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、版を上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: **配布先がサービスコンテナ（MySQL）を必要とする場合、エージェントの実行環境ではテストを走らせられない**。`services:` はジョブ定義（中央のワークフロー）にしか書けず、配布先の `setup.sh` からは足せない。対処は「テストと lint は PR の既存 CI に委ね、受け入れ条件は `manual` + `evidence` に CI の結果を引く」と規約に書くこと。**中央に足すべきものは無い**と判断した（`services` を配布先から注入する機構は、GitHub の仕様上きれいに書けない）

@@ -258,6 +258,7 @@ refresh token に揃えて 24h にした。
 | レビュー番号 | `reviews/<kind>-NN.md` の NN はハーネスが決め、入力に含める。エージェントは `rounds` を知らない |
 | 決定記録の名前 | `decision-records/` のファイル名の prefix（`<run_id>-<attempt>`）はハーネスが決め、`## 出力` で渡す。エージェントが決めるのは `<slug>` だけ |
 | ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**planner だけ `Task`**（計画を詰めるためにサブエージェントを立てる / A-58）。サブエージェントも同じ許可の下で動くので、コマンド実行はできない |
+| 実行環境 | 配布先の `.agent/setup.sh` が用意する（中央はツールチェーンを知らない）。**`AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` が環境変数で渡る**ので、重い準備は必要なフェーズだけに絞れる。サービスコンテナ（DB など）はジョブ定義側にしか書けないため、**必要なら `setup.sh` の中で `docker compose` などで自前に立てる** |
 | 上限 | `max_turns` と `timeout_minutes` はハーネスが渡す。エージェントは変更できない |
 | 失敗の分類 | 実行の失敗（`agent_failed`）、API エラー（`api_error` + ステータス）、検証の失敗（`invalid_artifacts`）を区別して `blocked_reason` に残す（A-31） |
 | 認証 | エージェントには GitHub のトークンを渡さない。GitHub の操作はハーネスが行う（A-25） |

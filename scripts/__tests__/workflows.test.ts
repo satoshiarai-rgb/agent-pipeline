@@ -209,6 +209,19 @@ describe("ワークフローの YAML", () => {
     expect((step as { "continue-on-error"?: boolean })?.["continue-on-error"]).toBe(true);
   });
 
+  /**
+   * 配布先の `setup.sh` は重い準備（DB の起動、イメージのビルド）をフェーズで絞れる
+   * 必要があるので、どのエージェントのための準備かを環境変数で渡す（A-64）。
+   */
+  test("setup.sh の step は AGENT_NAME / AGENT_PHASE を渡す", () => {
+    const dispatch = all.find((w) => w.name === "agent-dispatch.yml");
+    const steps = Object.values(dispatch?.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
+    const step = steps.find((st) => st.name === "setup.sh") as
+      | { env?: Record<string, string> }
+      | undefined;
+    expect(Object.keys(step?.env ?? {})).toEqual(["AGENT_NAME", "AGENT_PHASE", "AGENT_RUN_DIR"]);
+  });
+
   test("blocked で失敗させるステップは push より後", () => {
     // 先に失敗させると push とラベル更新がスキップされ、状態が git に載らないまま止まる
     for (const wf of all) {

@@ -112,6 +112,11 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
   **失敗しても警告を出して続けます**（submodule 配下は空のままエージェントに渡ります）。
   これは、読めない submodule のために run 全体を落とさないためです
 - **`.agent/setup.sh`** はエージェントを動かす直前に実行されます（無ければ何もしません）。
+  **`AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` が環境変数で渡る**ので、重い準備
+  （DB の起動、イメージのビルド）を必要なフェーズだけに絞れます（読むだけの planner /
+  plan-reviewer では飛ばす、など）。**失敗させないでください** — 非ゼロで終わるとその
+  フェーズが `agent_failed` で止まります。準備できなかったときは警告を出して `exit 0` にし、
+  受け入れ条件の `evidence` に「走らせられなかった」と残すのが安全です。
   受け入れ条件に書いたテストコマンドが走る状態を、ここで作ってください。
   実行の直後にそのまま成果物をコミットするので、**生成物が `.gitignore` で無視されているか
   確認してください**（→

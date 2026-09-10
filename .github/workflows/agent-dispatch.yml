@@ -152,8 +152,14 @@ jobs:
           git push
 
       # ---- 配布先のツールチェーンを用意する（中央はツールチェーンを知らない / 設計書 §4.2）
+      # 環境変数で**どのエージェントのための準備か**を渡す。重い準備（DB の起動、
+      # イメージのビルド）を必要なフェーズだけに絞れるようにするため（A-64）
       - name: setup.sh
         if: needs.route.outputs.action == 'run'
+        env:
+          AGENT_NAME: ${{ needs.route.outputs.agent }}
+          AGENT_PHASE: ${{ needs.route.outputs.phase }}
+          AGENT_RUN_DIR: ${{ needs.route.outputs.dir }}
         run: |
           set -euo pipefail
           if [ -f .agent/setup.sh ]; then
