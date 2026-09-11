@@ -87,8 +87,8 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 | `claude/**` ブランチへの `agent-work/**` の push | 次のフェーズを起動する（フェーズの連鎖はこれで起きます） |
 
 呼び出す側より広い権限は要求できないため、このワークフローが `contents` / `pull-requests` /
-`issues` の write を宣言します（`id-token: write` も書いてありますが、これは将来の認証方式
-（Workload Identity Federation）用で、現時点では使っていません）。作業ブランチへの push は
+`issues` の write を宣言します（**使っていない権限は与えません**。認証方式を Workload Identity
+Federation に切り替えるときに `id-token: write` を足します）。作業ブランチへの push は
 `concurrency` で直列化されます（理由はファイル内のコメントに書いてあります）。
 
 参照先は **`@v1.0.3` のような正確な版**です（`install.sh` が置くファイルはそうなっています）。

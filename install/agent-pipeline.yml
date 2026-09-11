@@ -35,7 +35,8 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
-  id-token: write # 将来の認証方式（Workload Identity Federation）で必要になります
+# 認証方式を Workload Identity Federation に切り替えるときは `id-token: write` を足します
+# （いまは使っていないので与えません）
 
 # 作業ブランチへの push を直列化します（実行中のものは止めず、順番待ちにします）。
 # キーはイベントごとに変わるため、ラベルや PR コメントの入口はこれとは別のグループに

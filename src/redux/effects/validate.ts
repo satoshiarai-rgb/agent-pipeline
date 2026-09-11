@@ -91,10 +91,21 @@ const decisionRecords: Check = ({ dir }) => {
   return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
 };
 
-/** K-4: エージェントは自身の起動条件を書き換えられない */
-const noWorkflowChanges: Check = ({ changed }) => {
-  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
-  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
+/**
+ * **エージェントが自分の動き方を書き換えられないようにする。**
+ *
+ *   .github/workflows/  起動条件（K-4。App に Workflows 権限を与えない理由と同じ）
+ *   .agent/             自分に課された設定（`config.json` の approvers と上限、
+ *                       `conventions.md` の規約、実行直前に走る `setup.sh`）
+ *
+ * ここを変える必要があるときは、完成品を `staged/` に置いて人間に設置を依頼する（A-48）。
+ */
+const PROTECTED = [".github/workflows/", ".agent/"];
+
+const noProtectedChanges: Check = ({ changed }) => {
+  const hits = changed.filter((f) => PROTECTED.some((prefix) => f.startsWith(prefix)));
+  if (hits.length === 0) return null;
+  return `触ってはいけない領域を変更している: ${hits.join(", ")}`;
 };
 
 // ------------------------------------------------------------------ 契約の表
@@ -131,7 +142,7 @@ const CONTRACT: Record<AgentName, Contract> = {
   },
 
   developer: {
-    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords],
+    checks: [hasDiff, noProtectedChanges, acceptanceSchema, decisionRecords],
   },
 
   "dev-reviewer": {

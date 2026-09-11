@@ -239,14 +239,21 @@ describe("developer", () => {
     ).toContain("差分");
   });
 
-  test(".github/workflows を触っていれば invalid（K-4）", () => {
+  // エージェントが自分の動き方（起動条件と、自分に課された設定）を書き換えられないようにする
+  test.each([
+    [".github/workflows/ci.yml", "起動条件"],
+    [".agent/config.json", "承認者と上限"],
+    [".agent/conventions.md", "規約"],
+    [".agent/setup.sh", "実行前の準備"],
+  ])("%s を触っていれば invalid（%s / K-4）", (path) => {
     const r = validateRun({
       dir: setup(),
       settings: c,
       agent: "developer",
-      changed_files: ["src/auth.ts", ".github/workflows/ci.yml"],
+      changed_files: ["src/auth.ts", path],
     });
-    expect(r.detail).toContain(".github/workflows");
+    expect(r.result).toBe("invalid");
+    expect(r.detail).toContain(path);
   });
 
   test("passed にした項目に evidence が無ければ invalid", () => {

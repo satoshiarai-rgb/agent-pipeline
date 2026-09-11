@@ -213,6 +213,16 @@ describe("ワークフローの YAML", () => {
    * 配布先の `setup.sh` は重い準備（DB の起動、イメージのビルド）をフェーズで絞れる
    * 必要があるので、どのエージェントのための準備かを環境変数で渡す（A-64）。
    */
+  /**
+   * 使っていない権限は配布先に与えない（2026-09-11 のレビュー指摘）。
+   * WIF に切り替えるときは、どのみち caller の `uses:` の版を上げるので、そのついでに足す。
+   */
+  test("配布先のラッパーは id-token を宣言しない", () => {
+    for (const wf of all.filter((w) => w.path.includes("/install/"))) {
+      expect(Object.keys(wf.doc.permissions ?? {}), wf.name).not.toContain("id-token");
+    }
+  });
+
   test("setup.sh の step は AGENT_NAME / AGENT_PHASE を渡す", () => {
     const dispatch = all.find((w) => w.name === "agent-dispatch.yml");
     const steps = Object.values(dispatch?.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);

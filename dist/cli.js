@@ -1131,9 +1131,12 @@ var decisionRecords = ({ dir }) => {
   const problems = decisionRecordProblems(dir);
   return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
 };
-var noWorkflowChanges = ({ changed }) => {
-  const hits = changed.filter((f) => f.startsWith(".github/workflows/"));
-  return hits.length > 0 ? `.github/workflows を変更している: ${hits.join(", ")}` : null;
+var PROTECTED = [".github/workflows/", ".agent/"];
+var noProtectedChanges = ({ changed }) => {
+  const hits = changed.filter((f) => PROTECTED.some((prefix) => f.startsWith(prefix)));
+  if (hits.length === 0)
+    return null;
+  return `触ってはいけない領域を変更している: ${hits.join(", ")}`;
 };
 var CONTRACT2 = {
   planner: {
@@ -1154,7 +1157,7 @@ var CONTRACT2 = {
     postProcess: ({ dir }) => ({ verdict: readLatestVerdict(dir, "plan") })
   },
   developer: {
-    checks: [hasDiff, noWorkflowChanges, acceptanceSchema, decisionRecords]
+    checks: [hasDiff, noProtectedChanges, acceptanceSchema, decisionRecords]
   },
   "dev-reviewer": {
     checks: [reviewWithVerdict("dev")],

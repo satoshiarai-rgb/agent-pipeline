@@ -163,7 +163,7 @@ reviewer: plan-reviewer
 | 出力（必須） | `acceptance.json` の `status` 更新。`passed` にした項目は `evidence` を非空にする（**コマンド + 走らせた場所 + 結果**。エージェントの実行環境で走らせられないテストは PR の CI の結果を引く） |
 | 出力（任意） | `decision-records/<run_id>-<attempt>-<slug>.md` を追加（計画に無い判断をしたとき） |
 | 検証 | 差分が存在する。`acceptance.json` がスキーマを満たす。`status: passed` の項目に `evidence` がある。`decision-records/` にファイルがあれば全ファイルが名前と frontmatter の形を満たす |
-| 禁止 | `.github/workflows/**` の変更（K-4）。差分に含まれていれば `blocked` |
+| 禁止 | `.github/workflows/**`（自身の起動条件 / K-4）と `.agent/**`（自分に課された設定 — 承認者・上限・規約・実行前の準備）の変更。差分に含まれていれば `blocked`。直す必要があるなら完成品を `staged/` に置いて人間に依頼する（A-48） |
 | 禁止 | `plan.md` の要件部分の書き換え |
 
 決定記録の形式（判断 1 つにつき 1 ファイル、追加のみ）:

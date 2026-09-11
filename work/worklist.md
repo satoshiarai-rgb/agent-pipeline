@@ -369,6 +369,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - `AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` を環境変数で渡す。**重い準備（DB の起動、イメージのビルド）を必要なフェーズだけに絞れる**ようにするため（読むだけの planner / plan-reviewer では飛ばす）。絞らないと 5 フェーズ全部が同じ準備を払う
   - あわせて雛形（`install/setup.sh`）を「**失敗させない**」形に書き直した（非ゼロで終わるとそのフェーズが `agent_failed` になる。準備できなければ警告を出して `exit 0`）。この落とし穴は compass の導入で気付いた
   - **サービスコンテナは配布先から足せない**（`services:` はジョブ定義側）ので、必要なら `setup.sh` の中で `docker compose` などで自前に立てる、と契約 §5 に書いた
+- [x] A-65: **`.agent/**` の変更をハーネスが弾く / 配布物から `id-token: write` を落とす（2026-09-11。`creal/compass` のレビュー指摘）。**
+  - **エージェントが自分の動き方を書き換えられないようにする。** `.github/workflows/**`（起動条件 / K-4）だけを見ていたが、**`.agent/**` は誰も止めていなかった** — `config.json` の承認者と上限、`conventions.md` の規約、実行直前に走る `setup.sh` を、エージェント自身が書き換えられる状態だった。`validate` の検査を `PROTECTED` の表（2 つの prefix）にまとめ、差分に含まれたら `invalid` にする。プロンプト（planner / developer / plan-reviewer の点検リスト）・雛形の規約・契約 §4 にも書いた。**直す必要があるときは `staged/` に置いて人間に依頼**（A-48 の形）
+  - **使っていない権限は配布先に与えない。** `install/agent-pipeline.yml` の `id-token: write` を落とした（WIF に切り替えるときは、どのみち caller の `uses:` の版を上げるので、そのついでに足せる）。テストで「配布先のラッパーは `id-token` を宣言しない」を固定
+  - 指摘のうち「中央リポジトリを `creal` org へ移す」は**今回は見送り**（配布先が増えたら再検討。属人性の論点は残っている）
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、版を上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）
