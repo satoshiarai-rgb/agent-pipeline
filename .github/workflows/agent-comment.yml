@@ -118,7 +118,7 @@ jobs:
       # ---- /agent approve
       - id: approve
         if: steps.parse.outputs.command == 'approve'
-        uses: satoshiarai-rgb/agent-pipeline@main
+        uses: satoshiarai-rgb/agent-pipeline@v1.0.5
         with:
           command: approve
           dir: ${{ steps.parse.outputs.dir }}
@@ -129,7 +129,7 @@ jobs:
       # ---- /agent request-changes <理由>
       - id: request_changes
         if: steps.parse.outputs.command == 'request-changes'
-        uses: satoshiarai-rgb/agent-pipeline@main
+        uses: satoshiarai-rgb/agent-pipeline@v1.0.5
         with:
           command: request-changes
           dir: ${{ steps.parse.outputs.dir }}
@@ -141,7 +141,7 @@ jobs:
       # ---- /agent retry（blocked からの復旧 / K-23）
       - id: retry
         if: steps.parse.outputs.command == 'retry'
-        uses: satoshiarai-rgb/agent-pipeline@main
+        uses: satoshiarai-rgb/agent-pipeline@v1.0.5
         with:
           command: retry
           dir: ${{ steps.parse.outputs.dir }}
@@ -170,7 +170,7 @@ jobs:
         uses: actions/checkout@v7
         with:
           repository: satoshiarai-rgb/agent-pipeline
-          ref: main
+          ref: v1.0.5
           path: .pipeline
 
       - name: ラベルを phase に合わせる
