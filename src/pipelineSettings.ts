@@ -69,13 +69,19 @@ export const defaultSettings: PipelineSettings = {
    * 上限が足りないと完成した成果物ごと agent_failed になる。実測は
    * planner 18〜22 / plan-reviewer 13〜15 / developer 43。
    *
-   * **planner だけ 100 ターン / 45 分と大きい。** 計画を詰める過程で計画者と回答者の
+   * **planner だけ 100 ターン / 90 分と大きい。** 計画を詰める過程で計画者と回答者の
    * サブエージェントを 3 ラウンド往復させるため（A-58）。**計画が重くなるのは想定どおり**で、
    * ターンが足りないと成果物ごと捨てられるので、時間も合わせて上げている
    * （timeout が 20 分のままだと step のタイムアウトで殺され、同じことになる）。
+   *
+   * 45 分では足りなかった（2026-09-14、creal/compass issue #276 で実測: 往復が
+   * 25 分を超えても計画が出ない）。**縛っているのはターン数ではなく実時間**で、
+   * サブエージェントの内部ターンは親の num_turns に積まれないため、90 分に伸ばす。
+   * リポジトリ固有の事情（重い setup.sh など）で足りないぶんは、配布先の
+   * `.agent/config.json` の `agents.<name>` で上書きできる（A-19）。
    */
   agents: {
-    planner: { max_turns: 100, timeout_minutes: 45, tools: "plan" },
+    planner: { max_turns: 100, timeout_minutes: 90, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
     developer: { max_turns: 60, timeout_minutes: 45, tools: "exec" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
