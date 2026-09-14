@@ -6,7 +6,7 @@
 # ここはイベントを受けて呼び分けるだけなので、原則そのままコピーして使えます。
 #
 # 前提: Secrets に AGENT_APP_CLIENT_ID / AGENT_APP_PRIVATE_KEY / CLAUDE_CODE_OAUTH_TOKEN
-#       （secrets: inherit で中央の reusable workflow に渡ります）
+#       （下の jobs で中央の reusable workflow に明示的に渡します）
 #
 # 導入手順の全体は docs/installation.md を参照してください。
 
@@ -45,6 +45,11 @@ concurrency:
   group: agent-${{ github.event.issue.number || github.ref_name }}
   cancel-in-progress: false
 
+# 各ジョブはシークレットを**明示的に渡します**。`secrets: inherit` は、呼び先が別オーナーの
+# リポジトリだと渡らないことがあります（2026-09-14 に creal/compass で実測: `client-id` が
+# 空になって App トークンを発行できなかった）。何が要るかは中央の各ワークフローが
+# `workflow_call.secrets` で宣言しています。
+
 jobs:
   # 入口: agent:go ラベルで起動します（ラベルを付けるには write / triage 権限が要ります）
   agent-bootstrap:
@@ -53,7 +58,9 @@ jobs:
     with:
       issue: ${{ github.event.issue.number }}
       actor: ${{ github.actor }}
-    secrets: inherit
+    secrets:
+      AGENT_APP_CLIENT_ID: ${{ secrets.AGENT_APP_CLIENT_ID }}
+      AGENT_APP_PRIVATE_KEY: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
 
   # 入口: PR のコメントで承認・差し戻し・再開を受けます
   # （/agent approve、/agent request-changes <理由>、/agent retry）。
@@ -69,7 +76,9 @@ jobs:
       pr: ${{ github.event.issue.number }}
       body: ${{ github.event.comment.body }}
       association: ${{ github.event.comment.author_association }}
-    secrets: inherit
+    secrets:
+      AGENT_APP_CLIENT_ID: ${{ secrets.AGENT_APP_CLIENT_ID }}
+      AGENT_APP_PRIVATE_KEY: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
 
   # 作業ブランチへの push が次のフェーズを起動します。
   # push イベントでは入力を受け取れないので、お試し実行との切り替えは
@@ -79,11 +88,17 @@ jobs:
     uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1.0.5
     with:
       dry_run: true
-    secrets: inherit
+    secrets:
+      AGENT_APP_CLIENT_ID: ${{ secrets.AGENT_APP_CLIENT_ID }}
+      AGENT_APP_PRIVATE_KEY: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
   agent-run-live:
     if: github.event_name == 'push' && vars.AGENT_DRY_RUN == 'false'
     uses: satoshiarai-rgb/agent-pipeline/.github/workflows/agent-dispatch.yml@v1.0.5
     with:
       dry_run: false
-    secrets: inherit
+    secrets:
+      AGENT_APP_CLIENT_ID: ${{ secrets.AGENT_APP_CLIENT_ID }}
+      AGENT_APP_PRIVATE_KEY: ${{ secrets.AGENT_APP_PRIVATE_KEY }}
+      CLAUDE_CODE_OAUTH_TOKEN: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}

@@ -15,6 +15,16 @@ on:
         required: false
         default: false
         type: boolean
+    secrets:
+      AGENT_APP_CLIENT_ID:
+        description: GitHub App の Client ID
+        required: true
+      AGENT_APP_PRIVATE_KEY:
+        description: GitHub App の秘密鍵（PEM 全体）
+        required: true
+      CLAUDE_CODE_OAUTH_TOKEN:
+        description: Claude のサブスクリプション認証トークン（dry run では使わない）
+        required: false
 
 # ラベルとコメントは GITHUB_TOKEN で操作する（K-22）。
 # GITHUB_TOKEN が起こしたイベントは新しい workflow run を作らないため、
@@ -24,7 +34,6 @@ permissions:
   contents: write
   issues: write
   pull-requests: write
-
 jobs:
   # ------------------------------------------------- 次に何をするか決める
   route:

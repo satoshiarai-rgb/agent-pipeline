@@ -1,7 +1,8 @@
 # 中央: issue を起点に run を作る（reusable workflow）
 #
 # 配布先の薄いラッパーから jobs.<id>.uses で呼ばれる。
-# 認証は secrets: inherit で受け取るため、ここで secrets を宣言しない。
+# 必要な secrets は下で明示的に宣言する（`inherit` は呼び出し元と
+# オーナーが違うと渡らないことがあるため / 2026-09-14）。
 
 name: agent-bootstrap
 
@@ -25,6 +26,13 @@ on:
         required: false
         default: ""
         type: string
+    secrets:
+      AGENT_APP_CLIENT_ID:
+        description: GitHub App の Client ID（連鎖させる push に使うトークンの発行元）
+        required: true
+      AGENT_APP_PRIVATE_KEY:
+        description: GitHub App の秘密鍵（PEM 全体）
+        required: true
 
 # ラベルとコメントは GITHUB_TOKEN で操作する（K-22）。
 # GITHUB_TOKEN が起こしたイベントは新しい workflow run を作らないため、
@@ -33,7 +41,6 @@ on:
 permissions:
   contents: write
   issues: write
-
 jobs:
   bootstrap:
     runs-on: ubuntu-latest

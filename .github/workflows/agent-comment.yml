@@ -28,6 +28,13 @@ on:
         description: コメント投稿者の author_association
         required: true
         type: string
+    secrets:
+      AGENT_APP_CLIENT_ID:
+        description: GitHub App の Client ID
+        required: true
+      AGENT_APP_PRIVATE_KEY:
+        description: GitHub App の秘密鍵（PEM 全体）
+        required: true
 
 # ラベルとコメントは GITHUB_TOKEN で操作する（K-22）。
 # GITHUB_TOKEN が起こしたイベントは新しい workflow run を作らないため、
@@ -37,7 +44,6 @@ permissions:
   contents: write
   pull-requests: write
   issues: write
-
 jobs:
   comment:
     runs-on: ubuntu-latest
