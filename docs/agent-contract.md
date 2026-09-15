@@ -102,7 +102,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 |---|---|
 | 入力 | `issue.md`、`acceptance.json`（あれば）、`plan.md`（あれば）、`reviews/plan-*.md` の直近 1 通（あれば）、`decision-records/*.md`（あれば） |
 | 出力（必須） | `plan.md` — `## 規模判定` 節を含む |
-| 出力（推奨） | `plan.md` の `## ユーザーストーリー` 節（`US-<n>`。誰の何が良くなるか）と、`## 受け入れ条件` の**ストーリーと `AC` の対応表**。**中央の既定プロンプトが書かせるが、ハーネスは検査しない** — プロンプトを差し替えるなら残すかどうかは配布先の判断 |
+| 出力（推奨） | `plan.md` の `## ユーザーストーリー`（`US-<issue>-<n>`。誰の何が良くなるか）・`## 対象の画面`（`S-<issue>-<n>`。どこに出るか）・`## ユースケース`（`UC-<issue>-<n>`。操作するとどうなるか）の 3 節と、`## 受け入れ条件` の**ストーリーと `AC` の対応表**。**中央の既定プロンプトが書かせるが、ハーネスは検査しない** — プロンプトを差し替えるなら残すかどうかは配布先の判断 |
 | 出力（任意） | `decision-records/<run_id>-<attempt>-<slug>.md` — **計画を詰める過程で片付いた決定の記録**（planner が自分の中で計画者と回答者を往復させる / grilling）。書いたなら形式（1 ファイル 1 レコード、名前、frontmatter の 4 キー）を満たすこと |
 | 出力（任意） | `conversations/<run_id>-<attempt>-round-<NN>.md` — **エージェント同士のやり取りの生ログ**（回答者が 1 ラウンドにつき 1 ファイル書く）。**ハーネスは名前を渡すだけで、中身は読まないし検査もしない**（遷移に関わらない保管） |
 | 出力（必須） | `acceptance.json` — `criteria[]`、各要素に `id` / `description` / `verification` / `status` |
@@ -116,7 +116,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 {
   "criteria": [
     {
-      "id": "AC-1",
+      "id": "AC-12-1",
       "description": "未ログインで /settings にアクセスするとログイン画面へ遷移する",
       "verification": "automated",
       "command": "npm test -- auth-redirect",
@@ -127,7 +127,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 }
 ```
 
-- `id` は `AC-<n>`。developer と dev-reviewer が同じ id を参照する
+- `id` は `AC-<issue>-<n>`（issue #12 なら `AC-12-1`）。developer と dev-reviewer が同じ id を参照する。**issue 番号を含めるのは、run の外に出たときに通し番号に見えないようにするため**（形式はハーネスが強制しない。見ているのは「id があること」と「重複が無いこと」だけ）
 - `verification` は `automated` | `manual`。`automated` なら `command` 必須
 - `status` は `pending` | `passed` | `failed`。planner は `pending` で書く
 

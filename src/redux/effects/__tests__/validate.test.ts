@@ -29,7 +29,8 @@ const acceptance = (over: Record<string, unknown> = {}) =>
     ],
   });
 
-const plan = "# 計画\n\n## 規模判定\n\n- 変更ファイル数見込み: 2\n- 上限（10）以内: yes\n";
+const plan =
+  "# 計画\n\n## 規模判定\n\n- 変更ファイル数見込み: 2\n- 上限（テスト除き 20 / 込み 40）以内: yes\n";
 
 describe("実行そのものの失敗", () => {
   test("step が失敗していれば agent_failed", () => {
@@ -122,7 +123,7 @@ describe("planner", () => {
     write(
       dir,
       "plan.md",
-      "# 計画\n\n## 規模判定\n\n- 上限（10）以内: no（上限超過）\n\n分割案: …\n",
+      "# 計画\n\n## 規模判定\n\n- 上限（テスト除き 20 / 込み 40）以内: no（上限超過）\n\n分割案: …\n",
     );
     write(dir, "acceptance.json", acceptance());
     expect(validateRun({ dir, settings: c, agent: "planner" })).toEqual({

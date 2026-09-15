@@ -28,7 +28,7 @@
 | エージェント | 各フェーズを担当する Claude Code。役割ごとにプロンプトが分かれています |
 | 作業ブランチ | パイプラインが作る `claude/issue-<n>` ブランチ。ここへの push が次のフェーズを起動します |
 | 作業ディレクトリ | 作業ブランチ上の `agent-work/issue-<n>/`。計画・受け入れ条件・レビューなどの成果物が積み上がります |
-| 受け入れ条件 | 「何を満たせば完了か」を `AC-1`, `AC-2`… という id で並べたもの（`acceptance.json`） |
+| 受け入れ条件 | 「何を満たせば完了か」を `AC-<issue>-1`, `AC-<issue>-2`… という id で並べたもの（`acceptance.json`）。id に issue 番号を含めるのは、PR や記録に引用されたときにアプリ共通の通し番号に見えないようにするため |
 | agent-pipeline 本体 | このパイプラインの実体があるリポジトリ。あなたのリポジトリは実行時にここを呼びます |
 
 フェーズには 3 系統の名前が出てきます。混乱したらこの対応表を見てください。
@@ -91,7 +91,7 @@ flowchart LR
 agent-work/issue-42/
 ├── issue.md            起点になった issue 本文（データとして保存したもの）
 ├── plan.md             計画: 要件の解釈・前提・変更対象・実装方針・規模判定
-├── acceptance.json     受け入れ条件 AC-1..N（検証方法・コマンド・結果・根拠）
+├── acceptance.json     受け入れ条件 AC-<issue>-1..N（検証方法・コマンド・結果・根拠）
 ├── decision-records/   実装中の判断（判断 1 つにつき 1 ファイル。種類と後戻りの容易さ付き）
 ├── reviews/            plan-01.md, plan-02.md, dev-01.md ...（各レビューの判定と指摘）
 ├── completion.md       完了報告（やったこと・条件の結果・確認してほしいこと）
@@ -99,7 +99,7 @@ agent-work/issue-42/
 └── state.json          現在の状態
 ```
 
-受け入れ条件の id（`AC-1` など）は planner が決め、developer と dev-reviewer が同じ id を
+受け入れ条件の id（`AC-12-1` など）は planner が決め、developer と dev-reviewer が同じ id を
 参照します。「どの条件について話しているか」がずれないための共通言語です。
 
 ## 使い方

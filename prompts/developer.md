@@ -36,7 +36,7 @@
 
 ```json
 {
-  "id": "AC-1",
+  "id": "AC-12-1",
   "description": "未ログインで /settings にアクセスするとログイン画面へ遷移する",
   "verification": "automated",
   "command": "npm test -- auth-redirect",

@@ -602,9 +602,9 @@ describe("計画の点検リスト（planner と plan-reviewer で同じもの�
     expect(between(reviewer)).toBe(between(planner));
   });
 
-  test("項目が 7 つある（増減したらここも直す）", () => {
+  test("項目が 8 つある（増減したらここも直す）", () => {
     const planner = between(readFileSync(join(ROOT, "prompts/planner.md"), "utf8"));
-    expect(planner.match(/^- \[ \] /gm)?.length).toBe(7);
+    expect(planner.match(/^- \[ \] /gm)?.length).toBe(8);
   });
 });
 

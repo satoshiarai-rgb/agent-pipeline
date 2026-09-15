@@ -53,7 +53,7 @@ reviewer: dev-reviewer
 
 ## 差し戻す理由
 
-- AC-2 が passed だが evidence が「確認した」のみで、何を確認したか分からない
+- AC-12-2 が passed だが evidence が「確認した」のみで、何を確認したか分からない
 - src/auth/session.ts の変更で src/api/login.ts の呼び出しが壊れている
 
 ## 任意の指摘

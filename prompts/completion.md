@@ -36,8 +36,8 @@ run ディレクトリに `completion.md` を書く（例: `agent-work/issue-12/
 
 | id | 内容 | 検証 | 結果 |
 |---|---|---|---|
-| AC-1 | 未ログインで /settings にアクセスするとログイン画面へ遷移する | automated | passed（npm test -- auth-redirect: 3 passed） |
-| AC-2 | 既存セッションの挙動が変わらない | manual | passed（既存の 2 経路を手で確認） |
+| AC-12-1 | 未ログインで /settings にアクセスするとログイン画面へ遷移する | automated | passed（npm test -- auth-redirect: 3 passed） |
+| AC-12-2 | 既存セッションの挙動が変わらない | manual | passed（既存の 2 経路を手で確認） |
 
 ## 人間に確認してほしいこと
 
@@ -47,7 +47,7 @@ run ディレクトリに `completion.md` を書く（例: `agent-work/issue-12/
 
 ## 経緯
 
-- 計画は 2 回目のレビューで承認（1 回目は AC-2 の検証方法で差し戻し）
+- 計画は 2 回目のレビューで承認（1 回目は AC-12-2 の検証方法で差し戻し）
 - 実装は 1 回で承認
 ```
 
