@@ -377,6 +377,37 @@ jobs:
           export PR
           bash "${{ github.workspace }}/.pipeline/scripts/project-labels.sh"
 
+      # ---- PR 本文を staged/pr-body.md に差し替える
+      #
+      # **PR 本文を書けるのはハーネスだけ。** エージェントはファイルしか書けないので、
+      # bootstrap が書いた初期の本文が最後まで残る。そのせいで「PR 本文に引き継ぎを書く」
+      # という受け入れ条件を誰も満たせず、completion が acceptance_not_passed で止まった
+      # （2026-09-15、creal/compass issue #276）。エージェントが置いた本文を流し込む。
+      #
+      # `Closes #<issue>` は必ず残す（落とすと merge しても issue が閉じない）。
+      # GITHUB_TOKEN で行うので issue_comment / pull_request は連鎖しない（K-22）
+      - name: PR 本文を差し替える
+        if: always() && needs.route.outputs.action != 'none'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RUN_DIR: ${{ needs.route.outputs.dir }}
+        run: |
+          set -uo pipefail
+          BODY="$RUN_DIR/staged/pr-body.md"
+          [ -f "$BODY" ] || exit 0
+          PR=$(gh pr list --repo "$GITHUB_REPOSITORY" --head "$GITHUB_REF_NAME" --json number -q '.[0].number' 2>/dev/null || true)
+          [ -n "$PR" ] || exit 0
+          N="${RUN_DIR##*issue-}"
+          OUT="$RUNNER_TEMP/pr-body.md"
+          if grep -qi "closes #$N" "$BODY"; then
+            cp "$BODY" "$OUT"
+          else
+            { printf 'Closes #%s\n\n' "$N"; cat "$BODY"; } > "$OUT"
+          fi
+          gh pr edit "$PR" --repo "$GITHUB_REPOSITORY" --body-file "$OUT" 2>/dev/null ||
+            { echo "::warning::PR 本文の差し替えに失敗した（状態には影響しない）"; exit 0; }
+          echo "::notice title=PR 本文::$BODY を PR #$PR に反映した"
+
       # ---- 規模超過は止めずに PR へ警告を残す（K-21）
       # 上限（1 PR あたり 5〜10 ファイル）は目安であって停止条件ではない。
       # 分割するかどうかは、この警告と plan.md を見た人間が決める

@@ -232,6 +232,22 @@ describe("ワークフローの YAML", () => {
     expect(Object.keys(step?.env ?? {})).toEqual(["AGENT_NAME", "AGENT_PHASE", "AGENT_RUN_DIR"]);
   });
 
+  /**
+   * PR 本文を書けるのはハーネスだけなので、エージェントが置いた `staged/pr-body.md` を
+   * 反映する。**`Closes #<issue>` を落とすと merge しても issue が閉じない**ので、
+   * 無ければ足す（2026-09-15、creal/compass issue #276 で踏んだ穴）。
+   */
+  test("PR 本文の差し替えは staged/pr-body.md を読み、Closes を残す", () => {
+    const dispatch = all.find((w) => w.name === "agent-dispatch.yml");
+    const steps = Object.values(dispatch?.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
+    const step = steps.find((st) => st.name === "PR 本文を差し替える");
+    expect(step?.run).toContain("staged/pr-body.md");
+    expect(step?.run).toContain("gh pr edit");
+    expect(step?.run).toContain("Closes #");
+    // 連鎖させたくない操作なので GITHUB_TOKEN で行う（K-22）
+    expect((step as { env?: Record<string, string> })?.env?.GH_TOKEN).toContain("GITHUB_TOKEN");
+  });
+
   test("blocked で失敗させるステップは push より後", () => {
     // 先に失敗させると push とラベル更新がスキップされ、状態が git に載らないまま止まる
     for (const wf of all) {
