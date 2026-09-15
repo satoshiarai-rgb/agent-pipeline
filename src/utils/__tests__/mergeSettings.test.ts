@@ -50,8 +50,8 @@ describe("mergeSettings（書いたキーだけを上書きする）", () => {
 
   test("上書きしても既定値そのものは変わらない", () => {
     merged({ agents: { developer: { max_turns: 80 } } });
-    expect(defaultSettings.agents.developer.max_turns).toBe(60);
-    expect(base.agents.developer.max_turns).toBe(60);
+    expect(defaultSettings.agents.developer.max_turns).toBe(120);
+    expect(base.agents.developer.max_turns).toBe(120);
   });
 
   test("上書きが無ければ既定がそのまま返る", () => {

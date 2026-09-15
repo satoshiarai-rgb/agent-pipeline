@@ -161,7 +161,7 @@ describe("selectContinueChain / selectSnapshot", () => {
 
 /**
  * 死んだ実行の判定（I-8）。上限は**エージェントごと**のジョブの上限
- * （`timeout_minutes` + 10）で、developer は 45 + 10 = 55 分。
+ * （`timeout_minutes` + 10）で、developer は 90 + 10 = 100 分。
  */
 describe("selectStale: 実行が死んでいるか", () => {
   const inFlight = {
@@ -172,11 +172,11 @@ describe("selectStale: 実行が死んでいるか", () => {
   };
 
   test("ジョブの上限内なら死んでいない", () => {
-    expect(selectStale(rootOf(inFlight), c, "20260908T005400Z")).toBe(false);
+    expect(selectStale(rootOf(inFlight), c, "20260908T013900Z")).toBe(false);
   });
 
   test("上限を過ぎたら死んでいる", () => {
-    expect(selectStale(rootOf(inFlight), c, "20260908T005501Z")).toBe(true);
+    expect(selectStale(rootOf(inFlight), c, "20260908T014001Z")).toBe(true);
   });
 
   test("実行中でなければ常に false", () => {
