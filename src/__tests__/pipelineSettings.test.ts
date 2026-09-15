@@ -21,19 +21,27 @@ describe("defaultSettings", () => {
     expect(total_steps).toBeGreaterThan(worst);
   });
 
-  // 3 本だけ（A-30 の趣旨は「エージェントごとに集合を変えない」こと）。
-  // plan は planner だけが使う（サブエージェントを立てて計画を詰めるため / A-58）
-  test("ツールプロファイルは 3 本。書き込みと実行の境界を保つ", () => {
-    expect(Object.keys(defaultSettings.tool_profiles)).toEqual(["readonly", "plan", "exec"]);
+  // 4 本だけ（A-30 の趣旨は「エージェントごとに集合を変えない」こと）。
+  // Task を持つのは自分の中でチームを回す 2 つ（planner の grilling とレビューチーム、
+  // developer のレビューチーム / A-58）。exec と build の違いは Task の有無だけ
+  test("ツールプロファイルは 4 本。書き込みと実行の境界を保つ", () => {
+    expect(Object.keys(defaultSettings.tool_profiles)).toEqual([
+      "readonly",
+      "plan",
+      "exec",
+      "build",
+    ]);
     expect(defaultSettings.tool_profiles.readonly).not.toContain("Bash");
     expect(defaultSettings.tool_profiles.plan).not.toContain("Bash");
     expect(defaultSettings.tool_profiles.plan).toContain("Task");
     expect(defaultSettings.tool_profiles.exec).toContain("Bash");
-    // Task を持つのは planner だけ（レビュアーに使わない道具を見せない）
+    expect(defaultSettings.tool_profiles.exec).not.toContain("Task");
+    expect(defaultSettings.tool_profiles.build).toContain("Task");
+    // Task を持つのは planner と developer だけ（レビュアーに使わない道具を見せない）
     const withTask = Object.entries(defaultSettings.agents)
       .filter(([, a]) => defaultSettings.tool_profiles[a.tools]?.includes("Task"))
       .map(([name]) => name);
-    expect(withTask).toEqual(["planner"]);
+    expect(withTask).toEqual(["planner", "developer"]);
   });
 
   test("エージェント 5 種すべてに上限とツールがある", () => {

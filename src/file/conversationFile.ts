@@ -3,9 +3,13 @@ import { join } from "node:path";
 import type { Execution } from "./decisionRecords.ts";
 
 /**
- * `conversations/<run_id>-<attempt>-round-<NN>.md` の 1 ファイル。
- * **エージェント同士のやり取りの生ログ**で、planner が計画を詰める過程で
- * 計画者と回答者を往復させたときに、**回答者が 1 ラウンドにつき 1 ファイル書く**（A-58）。
+ * `conversations/<run_id>-<attempt>-<agent>-<NN>-<slug>.md` の 1 ファイル。
+ * **エージェント同士のやり取りの生ログ**で、1 往復につき 1 ファイル書く（A-58）。
+ *
+ * 名前に `<agent>` と `<slug>` を入れるのは、**どのフェーズの誰と誰のやり取りか**を
+ * 一覧で見分けるため（`...-planner-02-leader-performance.md`）。run の中には
+ * 種類の違う往復が混ざる — planner の grilling（計画者 ⇄ 回答者）、レビューチームへの相談、
+ * 成果物レビューの取りまとめ。番号だけでは後から追えない。
  *
  * 決定記録（`decision-records/`）との違い:
  *
@@ -23,9 +27,19 @@ export function conversationsDir(dir: string): string {
   return join(dir, DIR);
 }
 
-/** エージェントに伝える書き込み先。ラウンド番号だけをエージェントに任せる */
-export function conversationPath(dir: string, run: Execution, round: string): string {
-  return join(conversationsDir(dir), `${run.run_id}-${run.attempt}-round-${round}.md`);
+/**
+ * エージェントに伝える書き込み先。**通し番号と相手の名前（slug）をエージェントに任せる**。
+ * prefix（`<run_id>-<attempt>-<agent>`）をハーネスが決めるのは決定記録と同じ理由で、
+ * 実行をまたいだ上書きが構造的に起きないようにするため。
+ */
+export function conversationPath(
+  dir: string,
+  run: Execution,
+  agent: string,
+  round: string,
+  slug: string,
+): string {
+  return join(conversationsDir(dir), `${run.run_id}-${run.attempt}-${agent}-${round}-${slug}.md`);
 }
 
 /** 保管されているやり取りを名前順に返す。ディレクトリが無ければ空 */

@@ -22,12 +22,13 @@ var defaultSettings = {
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write",
     plan: "Read,Glob,Grep,Write,Task",
-    exec: "Read,Glob,Grep,Write,Edit,Bash"
+    exec: "Read,Glob,Grep,Write,Edit,Bash",
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task"
   },
   agents: {
-    planner: { max_turns: 100, timeout_minutes: 90, tools: "plan" },
+    planner: { max_turns: 150, timeout_minutes: 120, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
-    developer: { max_turns: 300, timeout_minutes: 90, tools: "exec" },
+    developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
     completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" }
   },
@@ -216,8 +217,8 @@ var DIR = "conversations";
 function conversationsDir(dir) {
   return join3(dir, DIR);
 }
-function conversationPath(dir, run, round) {
-  return join3(conversationsDir(dir), `${run.run_id}-${run.attempt}-round-${round}.md`);
+function conversationPath(dir, run, agent, round, slug) {
+  return join3(conversationsDir(dir), `${run.run_id}-${run.attempt}-${agent}-${round}-${slug}.md`);
 }
 
 // src/file/decisionRecords.ts
@@ -431,7 +432,11 @@ var CONTRACT = {
     conversations: true
   },
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
-  developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
+  developer: {
+    inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS],
+    decisions: true,
+    conversations: true
+  },
   "dev-reviewer": { inputs: [PLAN, ACCEPTANCE, DECISIONS], review: "dev" },
   completion: { inputs: [ACCEPTANCE, DECISIONS, ALL_REVIEWS, EVENTS] }
 };
@@ -440,7 +445,7 @@ var section = (title, body) => `## ${title}
 
 ${body}`;
 var outputSection = (input) => {
-  const { dir, run, review, decisions, conversations } = input;
+  const { dir, run, agent, review, decisions, conversations } = input;
   const lines = [
     review ? `- レビュー: ${review}` : null,
     decisions ? [
@@ -450,9 +455,10 @@ var outputSection = (input) => {
     ].join(`
 `) : null,
     conversations ? [
-      `- やり取りの記録: ${conversationPath(dir, run, "<NN>")}`,
-      "  （エージェント同士のやり取り。1 ラウンドにつき 1 ファイルで、`<NN>` は",
-      "  ラウンド番号の 2 桁（`01` から）。ファイル名の他の部分は変えない）"
+      `- やり取りの記録: ${conversationPath(dir, run, agent, "<NN>", "<slug>")}`,
+      "  （エージェント同士のやり取り。1 往復につき 1 ファイル。`<NN>` は通し番号の 2 桁",
+      "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`grilling` /",
+      "  `leader-performance` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）"
     ].join(`
 `) : null
   ].filter((line) => line !== null);
@@ -476,6 +482,7 @@ function composeRun(input) {
     outputSection({
       dir,
       run: { run_id, attempt },
+      agent,
       review,
       decisions: contract.decisions,
       conversations: contract.conversations

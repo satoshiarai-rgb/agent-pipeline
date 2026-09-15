@@ -68,7 +68,7 @@ interface Contract {
   review?: "plan" | "dev";
   /** 名前の prefix をハーネスが決める決定記録。書き込み先をプロンプトに書く（契約 §5） */
   decisions?: true;
-  /** エージェント同士のやり取りの保管先。planner だけが使う（A-58） */
+  /** エージェント同士のやり取りの保管先。planner と developer が使う（A-58） */
   conversations?: true;
 }
 
@@ -82,7 +82,11 @@ const CONTRACT: Record<AgentName, Contract> = {
   },
   // 片付いた決定を渡す。同じことを問い直させないため
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
-  developer: { inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS], decisions: true },
+  developer: {
+    inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS],
+    decisions: true,
+    conversations: true,
+  },
   "dev-reviewer": { inputs: [PLAN, ACCEPTANCE, DECISIONS], review: "dev" },
   completion: { inputs: [ACCEPTANCE, DECISIONS, ALL_REVIEWS, EVENTS] },
 };
@@ -105,11 +109,12 @@ const section = (title: string, body: string) => `## ${title}\n\n${body}`;
 const outputSection = (input: {
   dir: string;
   run: Execution;
+  agent: AgentName;
   review: string | null;
   decisions?: true;
   conversations?: true;
 }) => {
-  const { dir, run, review, decisions, conversations } = input;
+  const { dir, run, agent, review, decisions, conversations } = input;
   const lines = [
     review ? `- レビュー: ${review}` : null,
     decisions
@@ -121,9 +126,10 @@ const outputSection = (input: {
       : null,
     conversations
       ? [
-          `- やり取りの記録: ${conversationPath(dir, run, "<NN>")}`,
-          "  （エージェント同士のやり取り。1 ラウンドにつき 1 ファイルで、`<NN>` は",
-          "  ラウンド番号の 2 桁（`01` から）。ファイル名の他の部分は変えない）",
+          `- やり取りの記録: ${conversationPath(dir, run, agent, "<NN>", "<slug>")}`,
+          "  （エージェント同士のやり取り。1 往復につき 1 ファイル。`<NN>` は通し番号の 2 桁",
+          "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`grilling` /",
+          "  `leader-performance` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）",
         ].join("\n")
       : null,
   ].filter((line): line is string => line !== null);
@@ -189,6 +195,7 @@ export function composeRun(input: {
     outputSection({
       dir,
       run: { run_id, attempt },
+      agent,
       review,
       decisions: contract.decisions,
       conversations: contract.conversations,

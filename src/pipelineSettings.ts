@@ -55,12 +55,15 @@ export const defaultSettings: PipelineSettings = {
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write",
     /**
-     * planner だけ `Task`（サブエージェント）を持つ。計画を作る過程で
-     * **計画者と回答者を自分の中で往復させる**ため（grilling / A-58）。
-     * 3 プロファイルにしたのは、レビュアーに使わない道具を見せないため（A-30 の趣旨は保つ）
+     * `Task`（サブエージェント）を持つのは planner と developer だけ。どちらも
+     * **自分の中でチームを回す**ため — planner は計画者と回答者の往復（grilling / A-58）と
+     * レビューチームへの相談、developer はレビューチームへの相談と完了時の点検。
+     * **レビュアー（plan-reviewer / dev-reviewer / completion）には渡さない**。
+     * 使わない道具を見せないため（A-30 の趣旨）で、プロファイルを分ける費用はこれで払う
      */
     plan: "Read,Glob,Grep,Write,Task",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task",
   },
 
   /**
@@ -88,9 +91,9 @@ export const defaultSettings: PipelineSettings = {
    * **planner は時間側、developer は回数側で上限が決まる**（V-18 の実測）。
    */
   agents: {
-    planner: { max_turns: 100, timeout_minutes: 90, tools: "plan" },
+    planner: { max_turns: 150, timeout_minutes: 120, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
-    developer: { max_turns: 300, timeout_minutes: 90, tools: "exec" },
+    developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
     completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" },
   },

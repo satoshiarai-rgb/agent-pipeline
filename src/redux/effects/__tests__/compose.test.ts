@@ -203,7 +203,18 @@ describe("レビューの書き込み先（契約 §5）", () => {
   test("planner にはやり取りの記録の書き込み先も渡す（A-58）", () => {
     const { text } = compose(makeRun(), "planner");
     expect(text).toContain("やり取りの記録:");
-    expect(text).toContain("conversations/17293840112-1-round-<NN>.md");
+    expect(text).toContain("conversations/17293840112-1-planner-<NN>-<slug>.md");
+  });
+
+  test("developer にもやり取りの記録の書き込み先を渡す（レビューチーム）", () => {
+    const { text } = compose(makeRun(), "developer");
+    expect(text).toContain("conversations/17293840112-1-developer-<NN>-<slug>.md");
+  });
+
+  test("レビュアーにはやり取りの記録を渡さない（チームを立てない）", () => {
+    for (const agent of ["plan-reviewer", "dev-reviewer", "completion"] as const) {
+      expect(compose(makeRun(), agent).text).not.toContain("やり取りの記録:");
+    }
   });
 
   test("planner の出力の節は判断の記録とやり取りの記録（レビューは書かない）", () => {
