@@ -304,10 +304,17 @@ jobs:
 
           # developer の「差分がある」は agent-work/ を除いたコードの差分で見る
           # （acceptance.json の更新だけでは実装したことにならない）。
+          # **作業ツリーだけでなくブランチ全体を見る。** 実行が失敗しても成果物は
+          # push されるので（K-20）、やり直しでは前の run の実装がコミット済みで
+          # 作業ツリーが綺麗なまま「差分が無い」になってしまう（実機で踏んだ /
+          # creal/compass issue #276）。既定ブランチとの比較は dev-reviewer と同じ形。
           # cut -c4- はポーセリン形式の XY を落とす。空白入りのパスでも壊れない
+          BASE=$(git rev-parse --abbrev-ref origin/HEAD 2>/dev/null || echo origin/main)
           CHANGED="$RUNNER_TEMP/changed-files.txt"
-          git -c core.quotePath=false status --porcelain -uall -- . ':!agent-work' \
-            | cut -c4- > "$CHANGED"
+          {
+            git -c core.quotePath=false diff --name-only "$BASE...HEAD" -- . ':!agent-work'
+            git -c core.quotePath=false status --porcelain -uall -- . ':!agent-work' | cut -c4-
+          } | sort -u > "$CHANGED"
           echo "changed=$CHANGED" >> "$GITHUB_OUTPUT"
           echo "- outcome=\`$O\` 変更ファイル数=\`$(wc -l < "$CHANGED" | tr -d ' ')\`" >> "$GITHUB_STEP_SUMMARY"
 
