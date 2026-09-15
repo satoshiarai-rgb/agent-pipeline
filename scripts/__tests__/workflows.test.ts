@@ -244,6 +244,8 @@ describe("ワークフローの YAML", () => {
     expect(step?.run).toContain("staged/pr-body.md");
     expect(step?.run).toContain("gh pr edit");
     expect(step?.run).toContain("Closes #");
+    // この PR だけでは閉じられない計画では `Refs #<n>` を尊重する（勝手に Closes に戻さない）
+    expect(step?.run).toContain("(closes|refs) #");
     // 連鎖させたくない操作なので GITHUB_TOKEN で行う（K-22）
     expect((step as { env?: Record<string, string> })?.env?.GH_TOKEN).toContain("GITHUB_TOKEN");
   });
@@ -602,9 +604,9 @@ describe("計画の点検リスト（planner と plan-reviewer で同じもの�
     expect(between(reviewer)).toBe(between(planner));
   });
 
-  test("項目が 8 つある（増減したらここも直す）", () => {
+  test("項目が 9 つある（増減したらここも直す）", () => {
     const planner = between(readFileSync(join(ROOT, "prompts/planner.md"), "utf8"));
-    expect(planner.match(/^- \[ \] /gm)?.length).toBe(8);
+    expect(planner.match(/^- \[ \] /gm)?.length).toBe(9);
   });
 });
 

@@ -384,7 +384,10 @@ jobs:
       # という受け入れ条件を誰も満たせず、completion が acceptance_not_passed で止まった
       # （2026-09-15、creal/compass issue #276）。エージェントが置いた本文を流し込む。
       #
-      # `Closes #<issue>` は必ず残す（落とすと merge しても issue が閉じない）。
+      # `Closes #<issue>` は既定で残す（落とすと merge しても issue が閉じない）。
+      # **`Refs #<issue>` と書かれていればそちらを尊重する** — この PR だけでは issue を閉じ切れない
+      # 計画（後片付けを次の PR に回す等）で merge が issue を閉じると、残作業が宙に浮くため。
+      # どちらも無いときだけ `Closes` を足す。
       # GITHUB_TOKEN で行うので issue_comment / pull_request は連鎖しない（K-22）
       - name: PR 本文を差し替える
         if: always() && needs.route.outputs.action != 'none'
@@ -399,7 +402,7 @@ jobs:
           [ -n "$PR" ] || exit 0
           N="${RUN_DIR##*issue-}"
           OUT="$RUNNER_TEMP/pr-body.md"
-          if grep -qi "closes #$N" "$BODY"; then
+          if grep -qiE "(closes|refs) #$N" "$BODY"; then
             cp "$BODY" "$OUT"
           else
             { printf 'Closes #%s\n\n' "$N"; cat "$BODY"; } > "$OUT"
