@@ -83,12 +83,14 @@ export const defaultSettings: PipelineSettings = {
    * **developer は逆にターンが足りなかった**（同じ run で `error_max_turns`。
    * 60 ターンを 7 分で使い切り、12 ファイルの実装をほぼ終えたところで捨てられた）。
    * 実測 43 は compass-wiki という小さなリポジトリのもので、実アプリでは
-   * テストを回すたびに 1 ターン消える。120 ターン / 90 分にする。
+   * **ファイルを 1 つ編集すれば 1 ターン、テストを 1 回回せば 1 ターン**消える。
+   * 1 ターン 7 秒のペースなので、300 ターンでも 90 分の枠に収まる。
+   * **planner は時間側、developer は回数側で上限が決まる**（V-18 の実測）。
    */
   agents: {
     planner: { max_turns: 100, timeout_minutes: 90, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
-    developer: { max_turns: 120, timeout_minutes: 90, tools: "exec" },
+    developer: { max_turns: 300, timeout_minutes: 90, tools: "exec" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
     completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" },
   },
