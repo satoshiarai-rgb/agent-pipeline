@@ -318,9 +318,10 @@ describe("シェルスクリプトの書き方", () => {
    * `set -u` だと「未割り当ての変数」で落ちる。日本語のメッセージを書く以上
    * 繰り返し踏むので、`${VAR}` と書く規則にして検査する（release.sh と run-local.sh で 2 回踏んだ）
    */
-  const FULL_WIDTH_AFTER_BARE_VAR = /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/;
+  // 全角の記号・かな・漢字（CJK と全角形）だけを見る。制御文字やタブは対象外
+  const FULL_WIDTH_AFTER_BARE_VAR = /\$[A-Za-z_][A-Za-z0-9_]*[\u3000-\u9fff\uff00-\uffef]/;
 
-  test("$VAR の直後に全角文字を置かない（${VAR} と書く）", () => {
+  test("$VAR の直後に全角文字を置かない（波括弧で囲む）", () => {
     for (const name of readdirSync(join(ROOT, "scripts")).filter((n) => n.endsWith(".sh"))) {
       const text = readFileSync(join(ROOT, "scripts", name), "utf8");
       const hit = text.split("\n").find((line) => FULL_WIDTH_AFTER_BARE_VAR.test(line));
