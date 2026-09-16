@@ -250,6 +250,24 @@ describe("ワークフローの YAML", () => {
     expect((step as { env?: Record<string, string> })?.env?.GH_TOKEN).toContain("GITHUB_TOKEN");
   });
 
+  /**
+   * ローカル実行（`scripts/run-local.sh`）は CI と同じ CLI・同じ判定を使う。
+   * 連鎖のさせ方（push か while ループか）だけが違う、という状態を保つ。
+   */
+  test("ローカル実行は CI と同じコマンドと差分の見方を使う", () => {
+    const local = readFileSync(join(ROOT, "scripts/run-local.sh"), "utf8");
+    for (const command of ["route", "start", "compose", "finish", "bootstrap", "approve"]) {
+      expect(local, command).toContain(`cli ${command}`);
+    }
+    // 差分は CI と同じくブランチ全体 + 作業ツリーで見る（agent-work は除く）
+    expect(local).toContain("':!agent-work'");
+    expect(local).toContain('"$BASE...HEAD"');
+    // フェーズごとに別プロセス（レビュアーに生成側の文脈を渡さない / 設計書 §7）
+    expect(local).toContain("claude -p");
+    // 失敗しても finish を呼んで状態を残す
+    expect(local).toContain("--agent-failed");
+  });
+
   test("blocked で失敗させるステップは push より後", () => {
     // 先に失敗させると push とラベル更新がスキップされ、状態が git に載らないまま止まる
     for (const wf of all) {

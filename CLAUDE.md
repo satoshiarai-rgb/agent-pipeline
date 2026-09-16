@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## リポジトリの現状
 
-ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使う。実行時の依存は `redux` 1 本で、`dist/cli.js` にバンドルするのでランナーでは install しない。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。シェルスクリプトは `scripts/run-cli.sh`（action の実体）と `scripts/project-labels.sh`（ラベルの用意）の 2 本だけ。
+ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使う。実行時の依存は `redux` 1 本で、`dist/cli.js` にバンドルするのでランナーでは install しない。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。シェルスクリプトは `scripts/run-cli.sh`（action の実体）、`scripts/project-labels.sh`（ラベルの用意）、`scripts/release.sh`（版を切る）、`scripts/run-local.sh`（**ローカルでパイプラインを回す開発用**。CI と同じ CLI・同じ判定を使い、連鎖だけを while ループに置き換える）の 4 本。
 
 ```bash
 bun test              # 状態機械・契約・ワークフローの検査（git も GitHub API も触らない）
