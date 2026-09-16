@@ -264,6 +264,9 @@ describe("ワークフローの YAML", () => {
     expect(local).toContain("claude -p");
     // 失敗しても finish を呼んで状態を残す
     expect(local).toContain("--agent-failed");
+    // run_id は数値。判断の記録の名前の検査も並び替えも数値前提（実機で踏んだ）
+    expect(local).toContain('RUN_ID="$(date -u +%Y%m%d%H%M%S)"');
+    expect(local).not.toContain('RUN_ID="local-');
   });
 
   test("blocked で失敗させるステップは push より後", () => {
@@ -307,6 +310,23 @@ describe("run: ブロックのシェル構文", () => {
       expect(r.status).toBe(0);
     });
   }
+});
+
+describe("シェルスクリプトの書き方", () => {
+  /**
+   * `$VAR` の直後に全角文字を置くと、bash が**変数名の一部として読む**。
+   * `set -u` だと「未割り当ての変数」で落ちる。日本語のメッセージを書く以上
+   * 繰り返し踏むので、`${VAR}` と書く規則にして検査する（release.sh と run-local.sh で 2 回踏んだ）
+   */
+  const FULL_WIDTH_AFTER_BARE_VAR = /\$[A-Za-z_][A-Za-z0-9_]*[^\x00-\x7F]/;
+
+  test("$VAR の直後に全角文字を置かない（${VAR} と書く）", () => {
+    for (const name of readdirSync(join(ROOT, "scripts")).filter((n) => n.endsWith(".sh"))) {
+      const text = readFileSync(join(ROOT, "scripts", name), "utf8");
+      const hit = text.split("\n").find((line) => FULL_WIDTH_AFTER_BARE_VAR.test(line));
+      expect(hit, name).toBeUndefined();
+    }
+  });
 });
 
 describe("dry run のダミーエージェント", () => {

@@ -42,7 +42,7 @@ for l in $CURRENT; do
   esac
 done
 
-echo "- ラベル: \`$TARGET\`（issue #$ISSUE）" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
+echo "- ラベル: \`${TARGET}\`（issue #${ISSUE}）" >> "${GITHUB_STEP_SUMMARY:-/dev/null}"
 
 # 完了したら draft を外して人間のレビューに回す（設計書 §6.3）
 if [ "$PHASE" = "done" ] && [ -n "${PR:-}" ]; then

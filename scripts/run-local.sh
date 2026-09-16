@@ -53,9 +53,13 @@ if [ ! -d "$DIR/events" ]; then
   [ -n "$ISSUE" ] || { echo "エラー: 新しい run には --issue が要ります" >&2; exit 2; }
   mkdir -p "$DIR"
   [ -f "$DIR/issue.md" ] || { echo "エラー: $DIR/issue.md に issue 本文を置いてください" >&2; exit 2; }
-  cli bootstrap --issue "$ISSUE" --branch "claude/issue-$ISSUE" \
-    --run-id "local-$(date -u +%Y%m%dT%H%M%SZ)" --attempt 1 > /dev/null
-  echo "▶ bootstrap: $DIR"
+  # CI の bootstrap は作業ブランチを作ってそこで作業する。記録と実体を合わせる
+  BR="claude/issue-$ISSUE"
+  git rev-parse --verify --quiet "$BR" > /dev/null || git checkout -q -b "$BR"
+  [ "$(git branch --show-current)" = "$BR" ] || git checkout -q "$BR"
+  cli bootstrap --issue "$ISSUE" --branch "$BR" \
+    --run-id "$(date -u +%Y%m%d%H%M%S)" --attempt 1 > /dev/null
+  echo "▶ bootstrap: ${DIR}（${BR}）"
 fi
 
 while :; do
@@ -70,7 +74,10 @@ while :; do
 
   AGENT=$(jq -r .run.agent <<<"$ROUTE")
   ARGS=$(jq -r .run.claude_args <<<"$ROUTE")
-  RUN_ID="local-$(date -u +%Y%m%dT%H%M%SZ)"
+  # **run_id は数値にする。** ハーネスは GitHub の run id を数値として扱っていて、
+  # 判断の記録の名前の検査（`<run_id>-<attempt>-<slug>.md`）も並び替えも数値前提。
+  # `local-…` のような文字列を使うと成果物ごと invalid になる（実機で踏んだ）
+  RUN_ID="$(date -u +%Y%m%d%H%M%S)"
   echo "▶ ${PHASE} / ${AGENT}（${ARGS}）"
   if [ "$DRY" = true ]; then exit 0; fi
 

@@ -30,7 +30,7 @@ cd "$ROOT"
 
 [ -z "$(git status --porcelain)" ] || { echo "エラー: 作業ツリーがクリーンではありません" >&2; exit 1; }
 BRANCH=$(git rev-parse --abbrev-ref HEAD)
-[ "$BRANCH" = "main" ] || { echo "エラー: main で実行してください（いま $BRANCH）" >&2; exit 1; }
+[ "$BRANCH" = "main" ] || { echo "エラー: main で実行してください（いま ${BRANCH}）" >&2; exit 1; }
 git fetch origin --quiet
 [ "$(git rev-parse HEAD)" = "$(git rev-parse origin/main)" ] ||
   { echo "エラー: origin/main と一致していません（先に push するか取り込んでください）" >&2; exit 1; }
