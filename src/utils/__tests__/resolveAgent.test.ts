@@ -29,6 +29,14 @@ describe("resolveAgent", () => {
     expect(resolveAgent(c, "plan-reviewer").job_timeout_minutes).toBe(25);
   });
 
+  test("central を渡すと中央を plugin として読ませる（agent 定義と hooks / K-32）", () => {
+    expect(resolveAgent(c, "planner", "/opt/agent-pipeline").claude_args).toContain(
+      "--plugin-dir /opt/agent-pipeline",
+    );
+    // 渡さなければ付けない（plugin を使わない実行を壊さない）
+    expect(resolveAgent(c, "planner").claude_args).not.toContain("--plugin-dir");
+  });
+
   test("claude_args は上限とツールをフラグ列にする", () => {
     // --tools（使える状態にする）と --allowed-tools（確認を求めない）は別の指定で、
     // 後者が無いと非対話実行では書き込みが拒否される（実機で確認 / A-24）

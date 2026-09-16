@@ -632,7 +632,7 @@ import { existsSync as existsSync9 } from "node:fs";
 import { join as join11 } from "node:path";
 
 // src/utils/resolveAgent.ts
-function resolveAgent(settings, agent) {
+function resolveAgent(settings, agent, central = null) {
   const a = settings.agents[agent];
   if (!a)
     throw new Error(`既定値に agents.${agent} がありません`);
@@ -648,7 +648,7 @@ function resolveAgent(settings, agent) {
     timeout_minutes: a.timeout_minutes,
     job_timeout_minutes: a.timeout_minutes + 10,
     tools,
-    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools })
+    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools, central })
   };
 }
 function claudeArgs(a) {
@@ -658,7 +658,8 @@ function claudeArgs(a) {
     `--max-turns ${a.max_turns}`,
     `--tools ${a.tools}`,
     `--allowed-tools ${a.tools}`,
-    ...denied.map((d) => `--disallowed-tools ${d}`)
+    ...denied.map((d) => `--disallowed-tools ${d}`),
+    ...a.central ? [`--plugin-dir ${a.central}`] : []
   ].join(" ");
 }
 
@@ -949,7 +950,7 @@ var selectSnapshot = (root, settings, config_error = null) => ({
   branch: root.info.branch ?? "",
   ...selectStatus(root, settings, config_error)
 });
-function selectNextAction(root, settings, config_error = null) {
+function selectNextAction(root, settings, config_error = null, central = null) {
   const { app } = root;
   const { phase } = selectStatus(root, settings, config_error);
   const base = {
@@ -972,7 +973,12 @@ function selectNextAction(root, settings, config_error = null) {
   const agent = agentFor(phase);
   if (!agent)
     return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
-  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(settings, agent) };
+  return {
+    ...base,
+    action: "run",
+    reason: "dispatch",
+    run: resolveAgent(settings, agent, central)
+  };
 }
 
 // src/redux/effects/explain.ts
@@ -1897,7 +1903,7 @@ function runCommand(command, args, settings, configError = null) {
     return { agent, wrote };
   }
   if (command === "route")
-    return selectNextAction(state(), settings, configError);
+    return selectNextAction(state(), settings, configError, args.central ?? null);
   if (command === "label")
     return selectLabel(state(), settings);
   if (command === "explain") {

@@ -312,6 +312,49 @@ describe("run: ブロックのシェル構文", () => {
   }
 });
 
+describe("plugin（agents/ と .claude-plugin/）", () => {
+  /**
+   * フェーズの中のチームは agent 定義として中央が配る（K-32）。**プロンプトに
+   * 振る舞いを書き戻すとリレーで薄まる**（実測: やり取りの記録が 7.6KB → 19.6KB）。
+   * プロンプト側は名前で呼ぶだけ、という状態を保つ。
+   */
+  const AGENTS = [
+    "reviewer-leader",
+    "reviewer-consistency",
+    "reviewer-requirements",
+    "reviewer-quality",
+    "grilling-planner",
+    "grilling-answerer",
+  ];
+
+  test("agent 定義が 6 つあり、name がファイル名と一致する", () => {
+    for (const name of AGENTS) {
+      const text = readFileSync(join(ROOT, "agents", `${name}.md`), "utf8");
+      expect(text, name).toContain(`name: ${name}`);
+      expect(text, name).toContain("description:");
+    }
+  });
+
+  test("plugin の manifest がある（版は git のタグから取られる）", () => {
+    const manifest = JSON.parse(readFileSync(join(ROOT, ".claude-plugin/plugin.json"), "utf8"));
+    expect(manifest.name).toBe("agent-pipeline");
+  });
+
+  test("planner と developer は agent を名前で呼ぶ", () => {
+    const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
+    const developer = readFileSync(join(ROOT, "prompts/developer.md"), "utf8");
+    for (const name of ["grilling-planner", "grilling-answerer", "reviewer-leader"]) {
+      expect(planner, name).toContain(name);
+    }
+    expect(developer).toContain("reviewer-leader");
+    // 観点はリーダーが振り分ける。親が直接呼ばない
+    for (const text of [planner, developer]) {
+      expect(text).not.toContain("reviewer-consistency");
+      expect(text).not.toContain("reviewer-quality");
+    }
+  });
+});
+
 describe("シェルスクリプトの書き方", () => {
   /**
    * `$VAR` の直後に全角文字を置くと、bash が**変数名の一部として読む**。

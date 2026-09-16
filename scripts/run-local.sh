@@ -73,7 +73,8 @@ if [ ! -d "$DIR/events" ]; then
 fi
 
 while :; do
-  ROUTE=$(cli route) || { echo "route が失敗しました" >&2; exit 1; }
+  # `--central` は plugin として読ませる場所（CI では run-cli.sh が action の展開先を渡す）
+  ROUTE=$(cli route --central "$ROOT") || { echo "route が失敗しました" >&2; exit 1; }
   ACTION=$(jq -r .action <<<"$ROUTE")
   PHASE=$(jq -r .phase <<<"$ROUTE")
   if [ "$ACTION" != "run" ]; then

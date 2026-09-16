@@ -8,7 +8,12 @@ import type { AgentName } from "../types.ts";
  *   - レビュアーのモデルは models.reviewer が null なら default に落とす（設計書 §3.3）
  *   - Claude Code に渡すフラグはここで組み立てる（上限とツールはハーネスの責務 / 契約 §5）
  */
-export function resolveAgent(settings: PipelineSettings, agent: AgentName) {
+export function resolveAgent(
+  settings: PipelineSettings,
+  agent: AgentName,
+  /** 中央リポジトリの場所。plugin として読ませる（agent 定義と hooks が入っている / K-32） */
+  central: string | null = null,
+) {
   const a = settings.agents[agent];
   if (!a) throw new Error(`既定値に agents.${agent} がありません`);
   const tools = settings.tool_profiles[a.tools];
@@ -27,7 +32,7 @@ export function resolveAgent(settings: PipelineSettings, agent: AgentName) {
      */
     job_timeout_minutes: a.timeout_minutes + 10,
     tools,
-    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools }),
+    claude_args: claudeArgs({ model, max_turns: a.max_turns, tools, central }),
   };
 }
 
@@ -46,7 +51,12 @@ export function resolveAgent(settings: PipelineSettings, agent: AgentName) {
  * — 付与漏れではなく明示的な拒否にしておくため（planner と plan-reviewer は
  * 唯一の非信頼入力である issue 本文を読むので、ここは二重に塞ぐ / 契約 §5）。
  */
-function claudeArgs(a: { model: string; max_turns: number; tools: string }): string {
+function claudeArgs(a: {
+  model: string;
+  max_turns: number;
+  tools: string;
+  central: string | null;
+}): string {
   const denied = a.tools.split(",").includes("Bash") ? [] : ["Bash"];
   return [
     `--model ${a.model}`,
@@ -54,5 +64,9 @@ function claudeArgs(a: { model: string; max_turns: number; tools: string }): str
     `--tools ${a.tools}`,
     `--allowed-tools ${a.tools}`,
     ...denied.map((d) => `--disallowed-tools ${d}`),
+    // 中央を plugin として読ませる。`agents/` の定義（レビューチームと grilling の 2 役）が
+    // これで名前から呼べるようになる。**親のツール制限は plugin より強い**ので、
+    // 定義側が Bash を要求してもここで塞いだものは漏れない（実測 / V-19）
+    ...(a.central ? [`--plugin-dir ${a.central}`] : []),
   ].join(" ");
 }

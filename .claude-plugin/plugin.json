@@ -1,0 +1,5 @@
+{
+  "name": "agent-pipeline",
+  "description": "issue を起点に計画・レビュー・実装・レビュー・完了報告を連鎖させるパイプライン。CI（GitHub Actions）とローカル（scripts/run-local.sh）で同じハーネスを使う",
+  "homepage": "https://github.com/satoshiarai-rgb/agent-pipeline"
+}

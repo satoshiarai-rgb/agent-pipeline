@@ -131,7 +131,9 @@ export function runCommand(
   }
 
   // 読むだけの 3 つ。selector を読み、何も書かない
-  if (command === "route") return selectNextAction(state(), settings, configError);
+  // `--central` は run-cli.sh が常に渡す（action の展開先）。plugin として読ませる
+  if (command === "route")
+    return selectNextAction(state(), settings, configError, args.central ?? null);
   if (command === "label") return selectLabel(state(), settings);
   if (command === "explain") {
     // 成果物のリンクを組むのに owner/repo が要る（ブランチは state が持っている）

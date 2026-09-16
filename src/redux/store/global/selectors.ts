@@ -156,6 +156,8 @@ export function selectNextAction(
   root: RootState,
   settings: PipelineSettings,
   config_error: string | null = null,
+  /** 中央リポジトリの場所。エージェントに渡すフラグに `--plugin-dir` として載る（K-32） */
+  central: string | null = null,
 ): NextAction {
   const { app } = root;
   const { phase } = selectStatus(root, settings, config_error);
@@ -184,5 +186,10 @@ export function selectNextAction(
   // 非 idle の 5 フェーズはすべてエージェントを持つので、いまここには到達しない。
   // **フェーズを足したときに黙って進まない状態を作らないための番犬として残す**（A-55 の判断）
   if (!agent) return { ...base, action: "block", reason: `no_transition_for_phase: ${phase}` };
-  return { ...base, action: "run", reason: "dispatch", run: resolveAgent(settings, agent) };
+  return {
+    ...base,
+    action: "run",
+    reason: "dispatch",
+    run: resolveAgent(settings, agent, central),
+  };
 }
