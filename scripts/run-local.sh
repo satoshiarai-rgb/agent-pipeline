@@ -43,6 +43,16 @@ done
 
 cli() { node "$CLI" "$@" --dir "$DIR"; }
 
+# 進行が見えるようにする。**いま何が走っていて、何分経ったか**が分からないと
+# 30 分の実行を眺めるしかなくなる（実機でそうなった）
+LOG_DIR=${AGENT_LOCAL_LOG_DIR:-${TMPDIR:-/tmp}/agent-local}
+mkdir -p "$LOG_DIR"
+say() { printf '[%s] %s\n' "$(date +%H:%M:%S)" "$1"; }
+elapsed() { # elapsed <開始の epoch>
+  local s=$(( $(date +%s) - $1 ))
+  printf '%dm%02ds' $(( s / 60 )) $(( s % 60 ))
+}
+
 if [ "$APPROVE" = true ]; then
   cli approve --association OWNER
   exit $?
@@ -59,7 +69,7 @@ if [ ! -d "$DIR/events" ]; then
   [ "$(git branch --show-current)" = "$BR" ] || git checkout -q "$BR"
   cli bootstrap --issue "$ISSUE" --branch "$BR" \
     --run-id "$(date -u +%Y%m%d%H%M%S)" --attempt 1 > /dev/null
-  echo "▶ bootstrap: ${DIR}（${BR}）"
+  say "bootstrap: ${DIR}（${BR}）"
 fi
 
 while :; do
@@ -67,7 +77,7 @@ while :; do
   ACTION=$(jq -r .action <<<"$ROUTE")
   PHASE=$(jq -r .phase <<<"$ROUTE")
   if [ "$ACTION" != "run" ]; then
-    echo "■ 止まりました: phase=$PHASE action=$ACTION $(jq -r .reason <<<"$ROUTE")"
+    say "止まりました: phase=${PHASE} action=${ACTION} $(jq -r .reason <<<"$ROUTE")"
     [ "$PHASE" = "awaiting_human" ] && echo "  承認するなら: $0 $DIR --approve"
     exit 0
   fi
@@ -78,8 +88,11 @@ while :; do
   # 判断の記録の名前の検査（`<run_id>-<attempt>-<slug>.md`）も並び替えも数値前提。
   # `local-…` のような文字列を使うと成果物ごと invalid になる（実機で踏んだ）
   RUN_ID="$(date -u +%Y%m%d%H%M%S)"
-  echo "▶ ${PHASE} / ${AGENT}（${ARGS}）"
+  say "${PHASE} / ${AGENT} を開始"
+  echo "    ${ARGS}"
   if [ "$DRY" = true ]; then exit 0; fi
+  STARTED=$(date +%s)
+  PHASE_LOG="$LOG_DIR/${RUN_ID}-${AGENT}.log"
 
   cli start --run-id "$RUN_ID" --attempt 1 --agent "$AGENT" > /dev/null
   PROMPT=$(mktemp)
@@ -95,9 +108,12 @@ while :; do
     cli dummy --run-id "$RUN_ID" > /dev/null
     STATUS=0
   else
+    echo "    プロンプト: ${PROMPT}"
+    echo "    ログ: ${PHASE_LOG}"
     # shellcheck disable=SC2086 — claude_args はフラグ列なので分割して渡す
-    claude -p "$(cat "$PROMPT")" $ARGS
-    STATUS=$?
+    # tee でログに落としつつ流す。**pipefail なので claude の終了コードは PIPESTATUS で取る**
+    claude -p "$(cat "$PROMPT")" $ARGS 2>&1 | tee "$PHASE_LOG"
+    STATUS=${PIPESTATUS[0]}
   fi
   FAILED=""
   [ $STATUS -eq 0 ] || FAILED="--agent-failed"   # 失敗しても finish は必ず呼ぶ（状態を残す）
@@ -112,7 +128,7 @@ while :; do
 
   # shellcheck disable=SC2086 — FAILED は空か --agent-failed
   RESULT=$(cli finish --run-id "$RUN_ID" --attempt 1 --changed-files "$CHANGED" $FAILED)
-  echo "  → $(jq -r '"\(.phase) result=\(.result) \(.detail // "")"' <<<"$RESULT")"
+  say "$(jq -r '"\(.phase) result=\(.result) \(.detail // "")"' <<<"$RESULT")（${AGENT} に $(elapsed "$STARTED")、コード差分 $(wc -l < "$CHANGED" | tr -d " ") ファイル）"
 
   [ "$ONCE" = true ] && exit 0
 done
