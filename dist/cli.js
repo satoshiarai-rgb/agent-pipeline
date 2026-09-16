@@ -142,7 +142,7 @@ function readConfig(repo) {
 }
 
 // src/redux/runCommand.ts
-import { readFileSync as readFileSync10 } from "node:fs";
+import { readFileSync as readFileSync11 } from "node:fs";
 
 // src/file/stateFile.ts
 import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
@@ -498,12 +498,12 @@ function composeRun(input) {
   };
 }
 
-// src/redux/effects/explain.ts
-import { existsSync as existsSync8 } from "node:fs";
+// src/redux/effects/dummy.ts
+import { existsSync as existsSync8, mkdirSync as mkdirSync4, readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
 import { join as join10 } from "node:path";
 
 // src/file/acceptanceFile.ts
-import { existsSync as existsSync7, readFileSync as readFileSync7 } from "node:fs";
+import { existsSync as existsSync7, readFileSync as readFileSync7, writeFileSync as writeFileSync5 } from "node:fs";
 import { join as join9 } from "node:path";
 function acceptancePath(dir) {
   return join9(dir, "acceptance.json");
@@ -513,6 +513,12 @@ function readAcceptance(dir) {
   if (!Array.isArray(raw?.criteria))
     throw new Error("acceptance.json に criteria がありません");
   return raw;
+}
+function saveAcceptance(dir, file2) {
+  const path = acceptancePath(dir);
+  writeFileSync5(path, `${JSON.stringify(file2, null, 2)}
+`);
+  return path;
 }
 function acceptanceProblems(file2) {
   const problems = [];
@@ -550,6 +556,80 @@ function allPassed(file2) {
 function hasAcceptance(dir) {
   return existsSync7(acceptancePath(dir));
 }
+
+// src/redux/effects/dummy.ts
+function readScenario(dir) {
+  const path = join10(dir, "scenario");
+  if (!existsSync8(path))
+    return "happy";
+  return readFileSync8(path, "utf8").trim() || "happy";
+}
+var acceptance = (status, evidence) => ({
+  criteria: [{ id: "AC-1", description: "ダミー", verification: "manual", status, evidence }]
+});
+function verdictFor(dir, kind, scenario) {
+  const first = nextReviewNumber(dir, kind) === 1;
+  if (kind === "plan" && scenario === "plan-loop")
+    return "request_changes";
+  if (kind === "plan" && scenario === "plan-changes" && first)
+    return "request_changes";
+  if (kind === "dev" && scenario === "dev-changes" && first)
+    return "request_changes";
+  return "approve";
+}
+var write = (path, text) => {
+  writeFileSync6(path, text);
+  return path;
+};
+var ARTIFACTS = {
+  planner: ({ dir }) => [
+    write(join10(dir, "plan.md"), `# ダミー計画
+
+## 規模判定
+
+- 変更ファイル数見込み: テストを除いて 1 / テストを含めて 1
+- 上限（テスト除き 20 / 込み 40）以内: yes
+`),
+    saveAcceptance(dir, acceptance("pending", null))
+  ],
+  "plan-reviewer": ({ dir, scenario }) => [
+    saveReview({
+      dir,
+      kind: "plan",
+      verdict: verdictFor(dir, "plan", scenario),
+      reviewer: "plan-reviewer",
+      body: "ダミーレビュー"
+    })
+  ],
+  developer: ({ dir, run_id, repo }) => {
+    const src = join10(repo, "dummy-src");
+    mkdirSync4(src, { recursive: true });
+    return [
+      write(join10(src, `change-${run_id}.txt`), `${new Date().toISOString()}
+`),
+      saveAcceptance(dir, acceptance("passed", "ダミー実行"))
+    ];
+  },
+  "dev-reviewer": ({ dir, scenario }) => [
+    saveReview({
+      dir,
+      kind: "dev",
+      verdict: verdictFor(dir, "dev", scenario),
+      reviewer: "dev-reviewer",
+      body: "ダミーレビュー"
+    })
+  ],
+  completion: ({ dir }) => [write(join10(dir, "completion.md"), `# ダミー完了報告
+`)]
+};
+function writeDummyArtifacts(agent, context) {
+  const artifacts = ARTIFACTS[agent];
+  return artifacts(context);
+}
+
+// src/redux/effects/explain.ts
+import { existsSync as existsSync9 } from "node:fs";
+import { join as join11 } from "node:path";
 
 // src/utils/resolveAgent.ts
 function resolveAgent(settings, agent) {
@@ -920,7 +1000,7 @@ function link(path, dir, branch, slug) {
   return `[\`${name}\`](https://github.com/${slug}/blob/${branch}/${path})`;
 }
 function artifacts(paths, dir, branch, slug) {
-  const rows = paths.filter((path) => existsSync8(path)).map((path) => `- ${link(path, dir, branch, slug)}`);
+  const rows = paths.filter((path) => existsSync9(path)).map((path) => `- ${link(path, dir, branch, slug)}`);
   if (rows.length === 0)
     return "";
   return `
@@ -932,11 +1012,11 @@ var GUIDE = {
   awaiting_human: {
     title: "計画ができました",
     files: (dir) => [
-      join10(dir, "plan.md"),
-      join10(dir, "acceptance.json"),
+      join11(dir, "plan.md"),
+      join11(dir, "acceptance.json"),
       ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "plan").reverse(),
-      join10(dir, "issue.md")
+      join11(dir, "issue.md")
     ],
     body: `**この PR にコメント**してください。
 
@@ -948,9 +1028,9 @@ var GUIDE = {
   done: {
     title: "実装が終わりました",
     files: (dir) => [
-      join10(dir, "completion.md"),
-      join10(dir, "staged", "README.md"),
-      join10(dir, "acceptance.json"),
+      join11(dir, "completion.md"),
+      join11(dir, "staged", "README.md"),
+      join11(dir, "acceptance.json"),
       ...decisionRecordPaths(dir),
       ...reviewPaths(dir, "dev").reverse(),
       ...reviewPaths(dir, "plan").reverse()
@@ -1080,15 +1160,15 @@ ${advice.body(dir)}`
 }
 
 // src/redux/effects/validate.ts
-import { existsSync as existsSync10, readFileSync as readFileSync9 } from "node:fs";
-import { join as join11 } from "node:path";
+import { existsSync as existsSync11, readFileSync as readFileSync10 } from "node:fs";
+import { join as join12 } from "node:path";
 
 // src/file/executionLog.ts
-import { existsSync as existsSync9, readFileSync as readFileSync8 } from "node:fs";
+import { existsSync as existsSync10, readFileSync as readFileSync9 } from "node:fs";
 function readResultEvent(path) {
-  if (!existsSync9(path))
+  if (!existsSync10(path))
     return null;
-  const parsed = parseJson(readFileSync8(path, "utf8"), "execution_file");
+  const parsed = parseJson(readFileSync9(path, "utf8"), "execution_file");
   const events = Array.isArray(parsed) ? parsed : [parsed];
   const results = events.filter((e) => e?.type === "result");
   return results.at(-1) ?? null;
@@ -1113,10 +1193,10 @@ function readApiErrorStatus(path) {
 
 // src/redux/effects/validate.ts
 var nonEmpty = (rel) => ({ dir }) => {
-  const path = join11(dir, rel);
-  return existsSync10(path) && readFileSync9(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
+  const path = join12(dir, rel);
+  return existsSync11(path) && readFileSync10(path, "utf8").trim() !== "" ? null : `${rel} が無いか空`;
 };
-var contains = (rel, needle) => ({ dir }) => readFileSync9(join11(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
+var contains = (rel, needle) => ({ dir }) => readFileSync10(join12(dir, rel), "utf8").includes(needle) ? null : `${rel} に ${needle} が無い`;
 var acceptanceSchema = ({ dir }) => {
   if (!hasAcceptance(dir))
     return "acceptance.json が無い";
@@ -1154,7 +1234,7 @@ var CONTRACT2 = {
       decisionRecords
     ],
     postProcess: ({ dir }) => {
-      const text = readFileSync9(join11(dir, "plan.md"), "utf8");
+      const text = readFileSync10(join12(dir, "plan.md"), "utf8");
       const scale = text.slice(text.indexOf("## 規模判定"));
       return scale.includes("上限超過") ? { oversize: true } : {};
     }
@@ -1804,6 +1884,18 @@ function runCommand(command, args, settings, configError = null) {
       attempt: Number(args.attempt ?? 1)
     });
   }
+  if (command === "dummy") {
+    const agent = selectInFlightAgent(state());
+    if (!agent)
+      throw new Error("実行が記録されていません（start が無い）");
+    const wrote = writeDummyArtifacts(agent, {
+      dir,
+      scenario: readScenario(dir),
+      run_id: need(args["run-id"], "run-id"),
+      repo: args.repo ?? "."
+    });
+    return { agent, wrote };
+  }
   if (command === "route")
     return selectNextAction(state(), settings, configError);
   if (command === "label")
@@ -1853,7 +1945,7 @@ function runCommand(command, args, settings, configError = null) {
         const listPath = args["changed-files"];
         let changed = [];
         if (listPath)
-          changed = readFileSync10(listPath, "utf8").split(`
+          changed = readFileSync11(listPath, "utf8").split(`
 `).filter(Boolean);
         report = validateRun({
           dir,

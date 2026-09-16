@@ -1,14 +1,20 @@
+import { describe, expect, test } from "bun:test";
 import { mkdirSync, mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { describe, expect, test } from "bun:test";
 import { conversationPath, conversationPaths, conversationsDir } from "../conversationFile.ts";
 
 const run = { run_id: "17293840112", attempt: 1 };
 
 describe("やり取りの記録（conversations/）", () => {
   test("名前は run と エージェント で閉じ、番号と相手だけをエージェントに任せる", () => {
-    const path = conversationPath("agent-work/issue-12", run, "planner", "02", "leader-performance");
+    const path = conversationPath(
+      "agent-work/issue-12",
+      run,
+      "planner",
+      "02",
+      "leader-performance",
+    );
     expect(path).toBe(
       "agent-work/issue-12/conversations/17293840112-1-planner-02-leader-performance.md",
     );

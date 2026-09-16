@@ -12,8 +12,6 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parse } from "yaml";
-import { defaultSettings, validateRun } from "../../src/index.ts";
-import type { AgentName } from "../../src/types.ts";
 
 /**
  * ワークフローの run: ブロックと、action の実体（scripts/run-cli.sh）を検査する。
@@ -311,167 +309,17 @@ describe("run: ブロックのシェル構文", () => {
   }
 });
 
-describe("dry run のダミーエージェント（実際に走らせる）", () => {
-  const dispatch = all.find((w) => w.path === join(CENTRAL, "agent-dispatch.yml"));
-  const script = dispatch?.doc.jobs?.run?.steps?.find((s) => s.id === "dummy")?.run;
-  const dirs: string[] = [];
-  afterEach(() => {
-    for (const d of dirs.splice(0)) rmSync(d, { recursive: true, force: true });
-  });
-
-  /** 1 フェーズ分を実行する */
-  function runPhase(dir: string, phase: string, agent: string): { ok: boolean } {
-    const f = join(dir, "agent.sh");
-    writeFileSync(f, script as string);
-    const r = spawnSync("bash", [f], {
-      cwd: dir,
-      encoding: "utf8",
-      env: {
-        ...process.env,
-        D: "agent-work/issue-1",
-        PHASE: phase,
-        AGENT: agent,
-        GITHUB_OUTPUT: join(dir, "out.txt"),
-        GITHUB_STEP_SUMMARY: join(dir, "summary.md"),
-        GITHUB_RUN_ID: "1",
-      },
-    });
-    return { ok: r.status === 0 };
-  }
-
-  /**
-   * 直近のレビューファイルの verdict。ハーネスもここを読む（frontmatter の 1 行だけ）。
-   * ダミーの GITHUB_OUTPUT ではなく成果物から読むので、本番と同じ経路を検査できる
-   */
-  function verdictOf(dir: string, kind: "plan" | "dev"): string {
-    const reviews = join(dir, "agent-work/issue-1/reviews");
-    if (!existsSync(reviews)) return "";
-    const last = readdirSync(reviews)
-      .filter((n) => n.startsWith(`${kind}-`))
-      .sort()
-      .at(-1);
-    if (!last) return "";
-    return /^verdict: (\S+)$/m.exec(readFileSync(join(reviews, last), "utf8"))?.[1] ?? "";
-  }
-
-  const makeRun = (scenario?: string) => {
-    const dir = mkdtempSync(join(tmpdir(), "wf-run-"));
-    dirs.push(dir);
-    const D = join(dir, "agent-work/issue-1");
-    spawnSync("mkdir", ["-p", D]);
-    if (scenario) writeFileSync(join(D, "scenario"), `${scenario}\n`);
-    writeFileSync(join(dir, "out.txt"), "");
-    return dir;
-  };
-
-  test("ステップが取り出せている", () => {
-    expect(script).toBeString();
-    expect(script).toContain("write_acceptance");
-  });
-
-  test("reviews/ が無い状態から全フェーズが成功する（pipefail で死なない）", () => {
-    const dir = makeRun("happy");
-    const phases: [string, string][] = [
-      ["planning", "planner"],
-      ["plan_review", "plan-reviewer"],
-      ["developing", "developer"],
-      ["dev_review", "dev-reviewer"],
-      ["completing", "completion"],
-    ];
-    for (const [phase, agent] of phases) {
-      expect(runPhase(dir, phase, agent).ok, phase).toBe(true);
-    }
-    const D = join(dir, "agent-work/issue-1");
-    expect(readdirSync(D).sort()).toEqual([
-      "acceptance.json",
-      "completion.md",
-      "plan.md",
-      "reviews",
-      "scenario",
-    ]);
-    expect(readdirSync(join(D, "reviews")).sort()).toEqual(["dev-01.md", "plan-01.md"]);
-  });
-
-  test("acceptance.json は妥当な JSON で、developing で passed になる", () => {
-    const dir = makeRun("happy");
-    runPhase(dir, "planning", "planner");
-    const path = join(dir, "agent-work/issue-1/acceptance.json");
-    expect(JSON.parse(readFileSync(path, "utf8")).criteria[0].status).toBe("pending");
-    runPhase(dir, "developing", "developer");
-    const after = JSON.parse(readFileSync(path, "utf8")).criteria[0];
-    expect(after.status).toBe("passed");
-    expect(after.evidence).toBe("ダミー実行");
-  });
-
-  test("レビュアーのフェーズだけレビューファイルを書く", () => {
-    const dir = makeRun("happy");
-    runPhase(dir, "planning", "planner");
-    expect(verdictOf(dir, "plan")).toBe("");
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(verdictOf(dir, "plan")).toBe("approve");
-    runPhase(dir, "developing", "developer");
-    expect(verdictOf(dir, "dev")).toBe("");
-    runPhase(dir, "dev_review", "dev-reviewer");
-    expect(verdictOf(dir, "dev")).toBe("approve");
-  });
-
-  test("scenario=plan-changes は 1 回目だけ差し戻す", () => {
-    const dir = makeRun("plan-changes");
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(verdictOf(dir, "plan")).toBe("request_changes");
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(verdictOf(dir, "plan")).toBe("approve");
-    expect(readdirSync(join(dir, "agent-work/issue-1/reviews")).sort()).toEqual([
-      "plan-01.md",
-      "plan-02.md",
-    ]);
-  });
-
-  test("scenario=plan-loop は常に差し戻す（ラウンド上限で blocked になる）", () => {
-    const dir = makeRun("plan-loop");
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(verdictOf(dir, "plan")).toBe("request_changes");
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(verdictOf(dir, "plan")).toBe("request_changes");
-  });
-
-  test("scenario ファイルが無ければ happy として扱う", () => {
-    const dir = makeRun();
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(verdictOf(dir, "plan")).toBe("approve");
-  });
-
-  test("ダミーの成果物が契約を満たす（dry run でも validate を通る / I-9d）", () => {
-    // 本番と同じ validate に掛ける。ここが通らないと dry run が blocked で止まる
-    const dir = makeRun("happy");
-    const runDir = join(dir, "agent-work/issue-1");
-    const v = (agent: AgentName, changed: string[] = []) =>
-      validateRun({ dir: runDir, settings: defaultSettings, agent, changed_files: changed });
-
-    runPhase(dir, "planning", "planner");
-    expect(v("planner")).toEqual({ result: "ok" });
-
-    runPhase(dir, "plan_review", "plan-reviewer");
-    expect(v("plan-reviewer")).toEqual({ result: "ok", verdict: "approve" });
-
-    runPhase(dir, "developing", "developer");
-    expect(v("developer", ["dummy-src/change-1.txt"])).toEqual({ result: "ok" });
-    // 差分の一覧が空なら developer は invalid（実装していないのと同じ）
-    expect(v("developer").result).toBe("invalid");
-
-    runPhase(dir, "dev_review", "dev-reviewer");
-    expect(v("dev-reviewer")).toEqual({ result: "ok", verdict: "approve" });
-
-    runPhase(dir, "completing", "completion");
-    expect(v("completion")).toEqual({ result: "ok", acceptance_passed: true });
-  });
-
-  test("レビューファイルの frontmatter に verdict が入る（ハーネスが読む唯一の値）", () => {
-    const dir = makeRun("happy");
-    runPhase(dir, "plan_review", "plan-reviewer");
-    const md = readFileSync(join(dir, "agent-work/issue-1/reviews/plan-01.md"), "utf8");
-    expect(md.startsWith("---\nverdict: approve\n")).toBe(true);
-    expect(md).toContain("reviewer: plan-reviewer");
+describe("dry run のダミーエージェント", () => {
+  // 中身はハーネス側（`src/redux/effects/dummy.ts` とそのテスト）にある。
+  // ここで見るのは「ワークフローがそれを呼んでいるか」だけ — シェルで書き直されると
+  // ローカル実行（`scripts/run-local.sh --dummy`）と同じものが 2 か所になる
+  test("ワークフローは CLI の dummy を呼ぶ（シェルで書かない）", () => {
+    const dispatch = all.find((w) => w.path === join(CENTRAL, "agent-dispatch.yml"));
+    const step = dispatch?.doc.jobs?.run?.steps?.find((s) => s.id === "dummy");
+    expect(step?.run).toBeUndefined();
+    expect(step?.uses).toContain("satoshiarai-rgb/agent-pipeline");
+    expect(step?.with?.command).toBe("dummy");
+    expect(step?.with?.["run-id"]).toBeString();
   });
 });
 

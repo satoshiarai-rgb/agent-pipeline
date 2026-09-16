@@ -29,12 +29,13 @@ usage() {
 [ -n "$DIR" ] || usage
 [ -f "$CLI" ] || { echo "エラー: $CLI がありません（agent-pipeline で bun run build）" >&2; exit 1; }
 
-ISSUE="" ONCE=false DRY=false APPROVE=false
+ISSUE="" ONCE=false DRY=false DUMMY=false APPROVE=false
 while [ $# -gt 0 ]; do
   case "$1" in
     --issue) ISSUE=${2:?}; shift 2 ;;
     --once) ONCE=true; shift ;;
-    --dry) DRY=true; shift ;;          # claude を呼ばず route の判断だけ見る
+    --dry) DRY=true; shift ;;          # claude を呼ばず route の判断だけ見る（1 フェーズで終わる）
+    --dummy) DUMMY=true; shift ;;      # claude の代わりにダミー成果物を書く（CI の dry run と同じ）
     --approve) APPROVE=true; shift ;;  # 人間の承認（PR コメントの代わり）
     *) usage ;;
   esac
@@ -82,9 +83,15 @@ while :; do
     AGENT_NAME="$AGENT" AGENT_PHASE="$PHASE" AGENT_RUN_DIR="$DIR" bash .agent/setup.sh || true
   fi
 
-  # shellcheck disable=SC2086 — claude_args はフラグ列なので分割して渡す
-  claude -p "$(cat "$PROMPT")" $ARGS
-  STATUS=$?
+  if [ "$DUMMY" = true ]; then
+    # CI の dry run と同じダミー（実装はハーネス側。同じものを 2 か所に書かない）
+    cli dummy --run-id "$RUN_ID" > /dev/null
+    STATUS=0
+  else
+    # shellcheck disable=SC2086 — claude_args はフラグ列なので分割して渡す
+    claude -p "$(cat "$PROMPT")" $ARGS
+    STATUS=$?
+  fi
   FAILED=""
   [ $STATUS -eq 0 ] || FAILED="--agent-failed"   # 失敗しても finish は必ず呼ぶ（状態を残す）
 

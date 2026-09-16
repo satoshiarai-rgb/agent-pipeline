@@ -1,4 +1,4 @@
-import { existsSync, readFileSync } from "node:fs";
+import { existsSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { parseJson } from "../utils/parseJson.ts";
 
@@ -38,6 +38,13 @@ export function readAcceptance(dir: string): AcceptanceFile {
  * 契約 §4 のスキーマ違反を列挙する。空なら妥当。
  * エージェント（プロンプト差し替え可）が書くファイルなので、ここで厳しく見る。
  */
+/** 書き出す。整形は JSON.stringify に任せる（人が読むのでインデント 2） */
+export function saveAcceptance(dir: string, file: AcceptanceFile): string {
+  const path = acceptancePath(dir);
+  writeFileSync(path, `${JSON.stringify(file, null, 2)}\n`);
+  return path;
+}
+
 export function acceptanceProblems(file: AcceptanceFile): string[] {
   const problems: string[] = [];
   if (file.criteria.length === 0) problems.push("criteria が空");

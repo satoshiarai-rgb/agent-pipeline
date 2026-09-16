@@ -4,6 +4,7 @@ import type { PipelineSettings } from "../pipelineSettings.ts";
 import type { AgentName } from "../types.ts";
 import { formatTimestamp } from "../utils/timestamp.ts";
 import { composeRun } from "./effects/compose.ts";
+import { readScenario, writeDummyArtifacts } from "./effects/dummy.ts";
 import { explainRun } from "./effects/explain.ts";
 import { type ValidationReport, validateRun } from "./effects/validate.ts";
 import { mapValidationToAction } from "./mapValidationToAction.ts";
@@ -113,6 +114,20 @@ export function runCommand(
       run_id: need(args["run-id"], "run-id"),
       attempt: Number(args.attempt ?? 1),
     });
+  }
+
+  // お試し実行（dry run）。エージェントを呼ばず、契約を満たす最小の成果物だけを書く。
+  // **書く相手は compose と同じく in_flight から取る**（agent という値の入口は start だけ）
+  if (command === "dummy") {
+    const agent = selectInFlightAgent(state());
+    if (!agent) throw new Error("実行が記録されていません（start が無い）");
+    const wrote = writeDummyArtifacts(agent, {
+      dir,
+      scenario: readScenario(dir),
+      run_id: need(args["run-id"], "run-id"),
+      repo: args.repo ?? ".",
+    });
+    return { agent, wrote };
   }
 
   // 読むだけの 3 つ。selector を読み、何も書かない
