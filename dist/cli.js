@@ -21,7 +21,7 @@ var defaultSettings = {
   },
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write",
-    plan: "Read,Glob,Grep,Write,Task",
+    plan: "Read,Glob,Grep,Write,Task,SendMessage",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
     build: "Read,Glob,Grep,Write,Edit,Bash,Task"
   },

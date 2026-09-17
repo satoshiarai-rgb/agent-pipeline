@@ -60,8 +60,13 @@ export const defaultSettings: PipelineSettings = {
      * レビューチームへの相談、developer はレビューチームへの相談と完了時の点検。
      * **レビュアー（plan-reviewer / dev-reviewer / completion）には渡さない**。
      * 使わない道具を見せないため（A-30 の趣旨）で、プロファイルを分ける費用はこれで払う
+     *
+     * **planner だけ `SendMessage` も持つ。** grilling はラウンドをまたいで同じインスタンスを
+     * 継続する（`Task` は呼ぶたびに新しいサブエージェントを作るため、2 ラウンド目が同じ
+     * ファイルを読み直す）。読み直しが消えるので、キャッシュの書き込み・読み込みと所要時間の
+     * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
      */
-    plan: "Read,Glob,Grep,Write,Task",
+    plan: "Read,Glob,Grep,Write,Task,SendMessage",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
     build: "Read,Glob,Grep,Write,Edit,Bash,Task",
   },

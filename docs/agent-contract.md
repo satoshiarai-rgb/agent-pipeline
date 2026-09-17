@@ -273,7 +273,7 @@ refresh token に揃えて 24h にした。
 | 状態 | `events/*.json`（状態の正）と `state.json`（その射影）を書くのはハーネスだけ。エージェントは書かない（設計書 §7.1 / K-26） |
 | レビュー番号 | `reviews/<kind>-NN.md` の NN はハーネスが決め、入力に含める。エージェントは `rounds` を知らない |
 | 判断の記録の名前と置き場 | ファイル名の prefix（`<run_id>-<attempt>`）はハーネスが決め、`## 出力` で渡す。エージェントが決めるのは `<slug>` だけ。**置き場もハーネスが `reversibility` から導く**（`hard` は `decision-records/`、それ以外は `journal/`） |
-| ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**`Task` を持つのは planner と developer だけ**（planner は計画を詰める往復とレビューチーム、developer はレビューチーム / A-58）。レビュアーには渡さない。サブエージェントも親と同じ許可の下で動くので、planner のサブエージェントはコマンドを実行できない |
+| ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**`Task` を持つのは planner と developer だけ**（planner は計画を詰める往復とレビューチーム、developer はレビューチーム / A-58）。レビュアーには渡さない。**`SendMessage` を持つのは planner だけ**で、grilling の 2 役をラウンドをまたいで継続するために使う（`Task` で作り直すと同じファイルを読み直す）。サブエージェントも親と同じ許可の下で動くので、planner のサブエージェントはコマンドを実行できない |
 | 実行環境 | 配布先の `.agent/setup.sh` が用意する（中央はツールチェーンを知らない）。**`AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` が環境変数で渡る**ので、重い準備は必要なフェーズだけに絞れる。サービスコンテナ（DB など）はジョブ定義側にしか書けないため、**必要なら `setup.sh` の中で `docker compose` などで自前に立てる** |
 | 上限 | `max_turns` と `timeout_minutes` はハーネスが渡す。エージェントは変更できない |
 | 失敗の分類 | 実行の失敗（`agent_failed`）、API エラー（`api_error` + ステータス）、検証の失敗（`invalid_artifacts`）を区別して `blocked_reason` に残す（A-31） |
