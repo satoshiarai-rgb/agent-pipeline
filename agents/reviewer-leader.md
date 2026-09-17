@@ -1,6 +1,7 @@
 ---
 name: reviewer-leader
 description: レビューチームの窓口。相談を観点へ振り分け、結果を束ねて依頼元に返す。planner と developer が使う
+model: claude-sonnet-5
 tools: Read, Glob, Grep, Write, Task
 ---
 

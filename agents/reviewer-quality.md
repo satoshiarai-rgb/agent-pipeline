@@ -1,6 +1,7 @@
 ---
 name: reviewer-quality
 description: 性能とセキュリティを見るレビュアー。ループ内のクエリ、権限、入力の扱いを指摘する
+model: claude-sonnet-5
 tools: Read, Glob, Grep
 ---
 

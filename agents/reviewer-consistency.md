@@ -1,6 +1,7 @@
 ---
 name: reviewer-consistency
 description: 既存実装との一貫性と構造を見るレビュアー。置き場所・呼び出し元・既存の書き方との差を指摘する
+model: claude-sonnet-5
 tools: Read, Glob, Grep
 ---
 

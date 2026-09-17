@@ -1,6 +1,7 @@
 ---
 name: reviewer-requirements
 description: 要件の達成と受け入れ条件の網羅を見るレビュアー。境界値と既存データの状態を突く
+model: claude-sonnet-5
 tools: Read, Glob, Grep
 ---
 
