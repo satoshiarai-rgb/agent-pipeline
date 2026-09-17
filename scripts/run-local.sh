@@ -1,7 +1,8 @@
 #!/usr/bin/env bash
 # ローカルでパイプラインを回す（開発用。配布はしない）。
 #
-#   使い方: 配布先リポジトリの作業ツリーで実行する
+#   使い方: **配布先リポジトリの専用 worktree** で実行する（主チェックアウトでは回さない。
+#           run ディレクトリ・作業ブランチ・dummy-src・submodule のずれが残って実作業と混ざる）
 #     <agent-pipeline>/scripts/run-local.sh agent-work/issue-12 --issue 12
 #     <agent-pipeline>/scripts/run-local.sh agent-work/issue-12          # 続きから
 #     <agent-pipeline>/scripts/run-local.sh agent-work/issue-12 --approve

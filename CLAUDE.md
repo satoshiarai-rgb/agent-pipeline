@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使う。実行時の依存は `redux` 1 本で、`dist/cli.js` にバンドルするのでランナーでは install しない。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。シェルスクリプトは `scripts/run-cli.sh`（action の実体）、`scripts/project-labels.sh`（ラベルの用意）、`scripts/release.sh`（リリースバージョンを切る）、`scripts/run-local.sh`（**ローカルでパイプラインを回す開発用**。CI と同じ CLI・同じ判定を使い、連鎖だけを while ループに置き換える）の 4 本。
 
+**検証（`scripts/run-local.sh`）は配布先の専用 worktree で回す。** 主チェックアウトで回すと
+`agent-work/issue-<n>/`・`claude/issue-<n>` ブランチ・`dummy-src/`・submodule のポインタのずれが
+残り、実作業と混ざる。worktree は `gwq add -b <branch>` で作り、**作った直後に
+`git submodule update --init --recursive` を走らせる**（`gwq add` は submodule を取得しない）。
+
 ```bash
 bun test              # 状態機械・契約・ワークフローの検査（git も GitHub API も触らない）
 bun run lint          # biome
