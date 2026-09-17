@@ -533,9 +533,9 @@ describe("計画の点検リスト（planner と plan-reviewer で同じもの�
     expect(between(reviewer)).toBe(between(planner));
   });
 
-  test("項目が 9 つある（増減したらここも直す）", () => {
+  test("項目が 10 個ある（増減したらここも直す）", () => {
     const planner = between(readFileSync(join(ROOT, "prompts/planner.md"), "utf8"));
-    expect(planner.match(/^- \[ \] /gm)?.length).toBe(9);
+    expect(planner.match(/^- \[ \] /gm)?.length).toBe(10);
   });
 });
 
