@@ -320,14 +320,13 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
    */
   const AGENTS = [
     "reviewer-leader",
-    "reviewer-consistency",
-    "reviewer-requirements",
-    "reviewer-quality",
+    "reviewer-functional",
+    "reviewer-nonfunctional",
     "grilling-planner",
     "grilling-answerer",
   ];
 
-  test("agent 定義が 6 つあり、name がファイル名と一致する", () => {
+  test("agent 定義が 5 つあり、name がファイル名と一致する", () => {
     for (const name of AGENTS) {
       const text = readFileSync(join(ROOT, "agents", `${name}.md`), "utf8");
       expect(text, name).toContain(`name: ${name}`);
@@ -349,8 +348,8 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
     expect(developer).toContain("reviewer-leader");
     // 観点はリーダーが振り分ける。親が直接呼ばない
     for (const text of [planner, developer]) {
-      expect(text).not.toContain("reviewer-consistency");
-      expect(text).not.toContain("reviewer-quality");
+      expect(text).not.toContain("reviewer-functional");
+      expect(text).not.toContain("reviewer-nonfunctional");
     }
   });
 });
