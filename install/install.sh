@@ -6,7 +6,7 @@
 #   bash <agent-pipeline を clone した場所>/install/install.sh
 #
 #   --force               既にあるファイルを上書きする（既定は飛ばす）
-#   AGENT_PIPELINE_REF    取ってくる版（既定 main）
+#   AGENT_PIPELINE_REF    取ってくるバージョン（既定 main）
 #
 # 手元に agent-pipeline の checkout があればそこから、無ければ GitHub から取ります。
 # 置いたあと何を書くかは docs/installation.md にあります。
@@ -77,7 +77,7 @@ cat <<'NEXT'
   3. .agent/conventions.md を埋める（埋めない節は削る）。.agent/setup.sh にテストの準備を書く。
      使わない雛形はファイルごと削ってよい（無くても動く）
      .github/dependabot.yml が既にあって skip された場合は、github-actions の項目を足す
-     （パイプラインの版を上げる PR が自動で来るようにするため）
+     （パイプラインのバージョンを上げる PR が自動で来るようにするため）
   4. .gitignore を確認する（setup.sh の実行後に、そのまま成果物をコミットするため）
   5. 起動ラベルを作る（状態のラベルはパイプラインが作るが、これだけは自分で）
        gh label create agent:go --description "エージェントパイプラインを起動する" --color 1f883d

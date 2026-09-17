@@ -7,7 +7,7 @@ import type { PipelineSettings } from "../pipelineSettings.ts";
  *   - **書いたキーだけを上書きする**（深いマージ）。書かなかったキーは中央の既定に追従する
  *   - **`null` は「継承」**。既定に戻したいときに、キーを消さずに書ける
  *   - **既定に無いキーはエラー**（誤字を黙って無視しない）。型が違うのもエラー
- *   - **上書きできるのは下の OVERRIDABLE だけ。** 版の握手（`pipeline_version`）は中央のもの。
+ *   - **上書きできるのは下の OVERRIDABLE だけ。** バージョンの握手（`pipeline_version`）は中央のもの。
  *     フェーズの遷移はそもそも設定に無く、`src/redux/store/app/reducer.ts` が持つ（K-26）。
  *     **`labels` も中央のもの**（配布先のラッパーが起動ラベルを直書きしているので、
  *     ここで prefix や trigger を変えても半分しか効かない / A-55）

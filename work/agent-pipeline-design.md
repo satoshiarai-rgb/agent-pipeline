@@ -1,6 +1,6 @@
 # Claude エージェントパイプライン 設計書
 
-- 版: 1.0（レビュー反映版）
+- バージョン: 1.0（レビュー反映バージョン）
 - 日付: 2026-09-04
 - 状態: 実装着手可。§10 の未決事項は着手前または並行で確認する。
 
@@ -14,7 +14,7 @@ GitHub issue を起点に、複数の Claude エージェントが計画・レ�
 
 | 用語 | 意味 |
 |---|---|
-| 中央リポジトリ | `org/agent-pipeline`。共通の reusable workflow、プロンプト、テンプレートを持つ。タグで版管理 |
+| 中央リポジトリ | `org/agent-pipeline`。共通の reusable workflow、プロンプト、テンプレートを持つ。タグでバージョン管理 |
 | 配布先リポジトリ | パイプラインを導入する各プロダクトリポジトリ |
 | ハーネス | 中央リポジトリの reusable workflow のうち、エージェント実行の前後処理（checkout、状態更新、push、ラベル操作）を担う部分。エージェントとは区別する |
 | エージェント | Claude Code の1回の実行。プロンプトと入力ファイルを受け取り、成果物ファイルを書く。状態は書かない |
@@ -183,7 +183,7 @@ agent-work/            # main にマージして残す（決定済み）
 ### 5.1 `state.yml`（ハーネスのみが書く）
 
 ```yaml
-pipeline_version: 1           # 中央リポジトリのメジャー版。途中で上げない
+pipeline_version: 1           # 中央リポジトリのメジャーバージョン。途中で上げない
 issue: 123
 branch: claude/issue-123
 pr: 456                       # bootstrap 時に確定
@@ -203,7 +203,7 @@ blocked_reason: null
 ```
 
 - `total_steps` は自走ループの最終防波堤。フェーズ別ラウンド上限だけでは想定外遷移を止められない
-- `pipeline_version` を持たせることで、中央の破壊的変更が進行中の run を壊さないようにする（ハーネスは版が合わない run を `blocked` にする）
+- `pipeline_version` を持たせることで、中央の破壊的変更が進行中の run を壊さないようにする（ハーネスはバージョンが合わない run を `blocked` にする）
 
 ### 5.2 `acceptance.yml`（planner が作成、developer が status を更新）
 

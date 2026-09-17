@@ -34,7 +34,7 @@ bun test ./.github/workflows/__tests__/workflows.test.ts
 検査するのは 3 つ。
 
 1. **YAML の妥当性** — パースできるか、ファイル名と `name:` が一致しているか、中央 action の
-   参照 ref が揃っているか（A-11 の版ずれ防止）
+   参照 ref が揃っているか（A-11 のバージョンずれ防止）
 2. **`run:` ブロックのシェル構文** — 全ブロックを取り出して `bash -n` にかける
 3. **dry run のダミーエージェントの実挙動** — 一時ディレクトリで全フェーズを実際に実行し、
    成果物・`acceptance.json` の妥当性・`verdict` の出力・シナリオ分岐を確認する
@@ -162,7 +162,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
   - `skip-mixed`: `[skip ci]` 付きと無しを 1 回の push にまとめる → **立つか立たないかがこの検証の本題**
   - `outside-paths`: `agent-work` の外だけを変更 → `paths` フィルタで起動しない
 - **設計原則が 2 つ入っている**:
-  1. push で起動したジョブは `workflow_dispatch` の入力を受け取れないため、モードも `agent-work/loop/mode` というファイルに書いて渡している。パイプライン本体の「状態はイベントではなく git 上のファイルに置く」原則の最小版
+  1. push で起動したジョブは `workflow_dispatch` の入力を受け取れないため、モードも `agent-work/loop/mode` というファイルに書いて渡している。パイプライン本体の「状態はイベントではなく git 上のファイルに置く」原則の最小バージョン
   2. **カウントを保存せず導出する。** 1 行の共有カウンタは、並行した 2 つの更新が rebase で自動マージされて「どちらのランも書いていない値」を生む余地がある。実行ごとに別ファイル（`<run_id>-<attempt>`）を作れば名前が衝突しないので、マージは常に「両方を保持」になる。本体でも `rounds` / `total_steps` を同じ形にする（worklist A-33）
 - **確認**: 3 本のランが連鎖する。`[skip ci]` を付けたコミットでは連鎖が止まる。**`[skip ci]` を含むコミットと含まないコミットを混ぜた 1 回の push でどうなるかも試す**（start マーカーの push が失敗して 2 コミットまとまったときに無音で止まらないか）
 - **完了条件**: 連鎖の起動と抑止を意図どおりに制御できる → **達成**。4 モードすべて期待どおり（normal: 3 ラン連鎖 / skip-single: 抑止 / skip-mixed: **抑止されない** = 判定は HEAD コミット / outside-paths: paths フィルタで起動せず）
@@ -202,7 +202,7 @@ Step B-2 で実際に踏んだ。短い内容なら `printf` の方が安全。
     本番でも役に立つ**（設計書 §9-9「小さな issue で 1 本通す」）
 - **確認**: `route` の outputs が `run` に渡る。`route` が `agent=none` を返したとき `run` が skip される
 - **完了条件**: 呼ぶ側が「イベントを振り分けるだけ」になる → **達成**（配布先 69 行 / 中央 366 行）
-  - `bootstrap` → `awaiting_human` → 承認 → `done` まで、B-2 の 343 行版と同じ挙動で完走
+  - `bootstrap` → `awaiting_human` → 承認 → `done` まで、B-2 の 343 行バージョンと同じ挙動で完走
   - **`secrets: inherit` で App の認証情報が中央の reusable workflow に渡ることを確認**（設計書 §8 の前提）
   - `route` → `run` の job outputs が reusable workflow の内部で渡ることを確認
   - 効果が早速出た: `pipefail` の修正を中央だけに入れ、配布先を触らずに反映できた

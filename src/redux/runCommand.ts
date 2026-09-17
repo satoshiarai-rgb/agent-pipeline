@@ -150,7 +150,7 @@ export function runCommand(
     return { ...selectStatus(root, settings), continue_chain: selectContinueChain(root, settings) };
   }
 
-  // run の最初のイベント。識別子（issue / ブランチ / 版）をここで確定する
+  // run の最初のイベント。識別子（issue / ブランチ / バージョン）をここで確定する
   if (command === "bootstrap") {
     const issue = need(args.issue, "issue");
     const action = bootstrap({

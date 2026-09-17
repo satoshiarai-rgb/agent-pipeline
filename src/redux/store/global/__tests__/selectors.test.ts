@@ -95,7 +95,7 @@ describe("selectNextAction: ファイルから読んだ状態でも同じ", () =
     expect(r.run?.agent).toBe("planner");
   });
 
-  test("bootstrap イベントの版とハーネスの版が違えば止まる", () => {
+  test("bootstrap イベントのバージョンとハーネスのバージョンが違えば止まる", () => {
     const dir = makeRun();
     const newer = { ...c, pipeline_version: c.pipeline_version + 1 };
     expect(route(dir, newer).action).toBe("block");

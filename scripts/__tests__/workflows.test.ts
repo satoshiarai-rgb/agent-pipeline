@@ -125,16 +125,16 @@ describe("ワークフローの YAML", () => {
   });
 
   /**
-   * 参照する ref は 2 種類しかない（A-11 の版ずれ防止 / 2026-09-09 の判断）。
+   * 参照する ref は 2 種類しかない（A-11 のバージョンずれ防止 / 2026-09-09 の判断）。
    *
-   *   配布先に置くラッパー（install/*.yml）  `@v1.2.3` = **正確な版**（2026-09-10 の判断）
+   *   配布先に置くラッパー（install/*.yml）  `@v1.2.3` = **正確なバージョン**（2026-09-10 の判断）
    *   中央の自己参照（.github/workflows/*）   `@main`   = 開発の最新
    *
-   * **タグを打つときは `scripts/release.sh` が中央側もその版に書き換えたコミットを作る**
-   * ので、配布先は 1 つのタグから自己完結した版（workflow + dist/cli.js + prompts）を引ける。
+   * **タグを打つときは `scripts/release.sh` が中央側もそのバージョンに書き換えたコミットを作る**
+   * ので、配布先は 1 つのタグから自己完結したバージョン（workflow + dist/cli.js + prompts）を引ける。
    * main の中央側を `@main` のままにするのは、開発と検証が常に最新を通すため。
    */
-  test("参照する ref は 配布先が正確な版、中央が main", () => {
+  test("参照する ref は 配布先が正確なバージョン、中央が main", () => {
     const refsOf = (wf: Workflow) => {
       const text = readFileSync(wf.path, "utf8");
       const refs = new Set<string>();
@@ -214,7 +214,7 @@ describe("ワークフローの YAML", () => {
    */
   /**
    * 使っていない権限は配布先に与えない（2026-09-11 のレビュー指摘）。
-   * WIF に切り替えるときは、どのみち caller の `uses:` の版を上げるので、そのついでに足す。
+   * WIF に切り替えるときは、どのみち caller の `uses:` のバージョンを上げるので、そのついでに足す。
    */
   test("配布先のラッパーは id-token を宣言しない", () => {
     for (const wf of all.filter((w) => w.path.includes("/install/"))) {
@@ -335,7 +335,7 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
     }
   });
 
-  test("plugin の manifest がある（版は git のタグから取られる）", () => {
+  test("plugin の manifest がある（バージョンは git のタグから取られる）", () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, ".claude-plugin/plugin.json"), "utf8"));
     expect(manifest.name).toBe("agent-pipeline");
   });
@@ -620,7 +620,7 @@ describe("scripts/run-cli.sh（action の実体）", () => {
           by: "harness",
           issue: 2,
           branch: "claude/issue-2",
-          // ハーネスと揃えておく（ずれると版の不一致で explain が停止の説明を返す）
+          // ハーネスと揃えておく（ずれるとバージョンの不一致で explain が停止の説明を返す）
           pipeline_version: defaultSettings.pipeline_version,
         },
       }),

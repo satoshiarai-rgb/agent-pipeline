@@ -74,7 +74,7 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 | `.github/ISSUE_TEMPLATE/agent-task.yml` | issue の入力を揃えるフォーム | [`install/issue-template.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/issue-template.yml) |
 
 上限やモデルを変えるための `.agent/config.json` は既定では置きません（必要になってから
-手順 4 で足します）。1 枚ずつ置きたい場合や版を指定したい場合は
+手順 4 で足します）。1 枚ずつ置きたい場合やバージョンを指定したい場合は
 [`install/README.md`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/README.md#コピー)
 を参照してください。
 
@@ -91,14 +91,14 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 Federation に切り替えるときに `id-token: write` を足します）。作業ブランチへの push は
 `concurrency` で直列化されます（理由はファイル内のコメントに書いてあります）。
 
-参照先は **`@v1.0.3` のような正確な版**です（`install.sh` が置くファイルはそうなっています）。
+参照先は **`@v1.0.3` のような正確なバージョン**です（`install.sh` が置くファイルはそうなっています）。
 **動かないタグなので、同じ入力で同じ動きが再現できます。**
 
-- **上げるときは、このワークフローの `uses:` の版を書き換えて PR にします**（4 行）。
+- **上げるときは、このワークフローの `uses:` のバージョンを書き換えて PR にします**（4 行）。
   何が変わるかは中央リポジトリのタグの差分で確認できます
 - 自動で追随したいなら `@v1`（移動する major タグ）に書き換えることもできます。パッチを入れると
   付け替わるので、意図せず挙動が変わることを受け入れる場合だけにしてください
-- `@main` は**開発版**です。パイプライン自体を開発している場合を除いて使わないでください
+- `@main` は**開発バージョン**です。パイプライン自体を開発している場合を除いて使わないでください
 
 ## 4. 置いた雛形を埋める（任意）
 
@@ -138,7 +138,7 @@ Federation に切り替えるときに `id-token: write` を足します）。�
   規則は 3 つです。**書いたキーだけが上書きされ**（書かなかったキーは本体の既定に追従します）、
   **`null` は「既定を継承」**、**既定に無いキーや型違いはエラー**になります（誤字を黙って
   無視しないため）。エラーのときは一部だけ適用せず、`blocked` にして理由を PR にコメントします。
-  フェーズの遷移そのものと版（`pipeline_version`）は本体のもので、上書きできません
+  フェーズの遷移そのものとバージョン（`pipeline_version`）は本体のもので、上書きできません
 
   **組織のリポジトリで使うなら `approvers` を確認してください。** 既定は
   `["OWNER", "COLLABORATOR"]` で、組織のメンバーがコメントすると GitHub は `MEMBER` を返すため、
@@ -191,13 +191,13 @@ gh variable set AGENT_DRY_RUN --body false
 使い方は [overview.md の「使い方」](overview.md#使い方) にまとめてあります。
 最初の 1 件は、変更範囲の小さい issue で試すことをおすすめします。
 
-## 7. 版を上げる
+## 7. リリースバージョンを上げる
 
-配布先は**正確な版**（`@v1.0.3` のようなタグ）を参照しています。上げる作業は
-**`.github/workflows/agent-pipeline.yml` の `uses:` の版を書き換えて PR にする**だけです（4 行）。
+配布先は**正確なバージョン**（`@v1.0.3` のようなタグ）を参照しています。上げる作業は
+**`.github/workflows/agent-pipeline.yml` の `uses:` のバージョンを書き換えて PR にする**だけです（4 行）。
 
 **`install.sh --force` は使わないでください。** `.agent/conventions.md` や `.agent/setup.sh` まで
-雛形に戻ります（あなたが書いた内容が消えます）。上げるのはワークフローの版だけです。
+雛形に戻ります（あなたが書いた内容が消えます）。上げるのはワークフローのバージョンだけです。
 
 **自動で PR を作らせるなら Dependabot** を使います（`install.sh` が
 [`dependabot.yml`](https://github.com/satoshiarai-rgb/agent-pipeline/blob/main/install/dependabot.yml)
@@ -213,7 +213,7 @@ gh variable set AGENT_DRY_RUN --body false
 上げる前に見るところ:
 
 - **中央のタグ間の差分**（`https://github.com/satoshiarai-rgb/agent-pipeline/compare/v1.0.3...v1.0.4`）
-- **`pipeline_version` が上がっていないか。** 上がっている版に切り替えると、**進行中の run は
+- **`pipeline_version` が上がっていないか。** 上がっているバージョンに切り替えると、**進行中の run は
   `pipeline_version_mismatch` で止まります**（噛み合わない状態で続けて状態を失わないための設計です）。
   進行中の run が無いタイミング（`agent:` ラベルの付いた issue が無い状態）で上げてください。
   止まってしまった issue は、新しい issue で立て直します

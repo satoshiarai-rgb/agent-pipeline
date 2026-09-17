@@ -83,7 +83,7 @@ describe("writeStateFile", () => {
   });
 });
 
-describe("版の一致（中央の破壊的変更から進行中の run を守る）", () => {
+describe("バージョンの一致（中央の破壊的変更から進行中の run を守る）", () => {
   const versionOf = (pipeline_version: number) =>
     selectNextAction(rootOf({ phase: "planning" }, { pipeline_version }), settings()).reason;
 

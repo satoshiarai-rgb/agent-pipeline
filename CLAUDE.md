@@ -4,7 +4,7 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## リポジトリの現状
 
-ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使う。実行時の依存は `redux` 1 本で、`dist/cli.js` にバンドルするのでランナーでは install しない。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。シェルスクリプトは `scripts/run-cli.sh`（action の実体）、`scripts/project-labels.sh`（ラベルの用意）、`scripts/release.sh`（版を切る）、`scripts/run-local.sh`（**ローカルでパイプラインを回す開発用**。CI と同じ CLI・同じ判定を使い、連鎖だけを while ループに置き換える）の 4 本。
+ハーネスは TypeScript で実装済み（`src/`）。ランタイムは Node、bun は開発ツールチェーンとして使う。実行時の依存は `redux` 1 本で、`dist/cli.js` にバンドルするのでランナーでは install しない。設計書は `scripts/*.py` を Python として想定しているが、**実装は TypeScript を採る**（設計書側の記述が古い）。シェルスクリプトは `scripts/run-cli.sh`（action の実体）、`scripts/project-labels.sh`（ラベルの用意）、`scripts/release.sh`（リリースバージョンを切る）、`scripts/run-local.sh`（**ローカルでパイプラインを回す開発用**。CI と同じ CLI・同じ判定を使い、連鎖だけを while ループに置き換える）の 4 本。
 
 ```bash
 bun test              # 状態機械・契約・ワークフローの検査（git も GitHub API も触らない）
@@ -29,7 +29,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
 | `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
 | `agents/` | **フェーズの中のチームの定義**（レビューチームのリーダーと 2 観点、grilling の 2 役）。Claude Code の plugin として配り、`claude_args` の `--plugin-dir` で読ませる。**配布先の上書きは想定しない**（K-32）。振る舞いをプロンプト側に書き戻すとリレーで薄まる |
-| `.claude-plugin/plugin.json` | このリポジトリを plugin として扱うための manifest。版は git のタグから取られる |
+| `.claude-plugin/plugin.json` | このリポジトリを plugin として扱うための manifest。バージョンは git のタグから取られる |
 | `install/` | 配布先に置くファイルの原本（`agent-pipeline.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent-pipeline.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
 
 作業前に `work/worklist.md`（何を漏らさないか）と `work/steps.md`（どの順で手を動かすか）を読むこと。以下は全体像の要約であり、仕様の正は設計書側にある。
@@ -50,7 +50,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 
 GitHub issue を起点に、複数の Claude Code 実行（planner → plan-reviewer → 人間承認 → developer → dev-reviewer → completion）を GitHub Actions 上で連鎖させ、PR まで到達させるパイプライン。
 
-このリポジトリは**中央リポジトリ**（`org/agent-pipeline`）であり、reusable workflow・プロンプト・テンプレートを持ち、タグ（`v1`, `v2`, ...）で版管理される。パイプラインを使う**配布先リポジトリ**は薄いラッパー（`.github/workflows/agent-pipeline.yml`）と固有設定（`.agent/`）だけを持ち、共通部分はコピーせず実行時に中央を checkout して読む。つまり、ここへの変更は全配布先に波及する — 破壊的変更はタグを上げ、run の `pipeline_version`（`bootstrap` イベントが確定し、`state.json` にも射影される）による不一致検出（進行中 run を `blocked` にする）で守る。
+このリポジトリは**中央リポジトリ**（`org/agent-pipeline`）であり、reusable workflow・プロンプト・テンプレートを持ち、タグ（`v1`, `v2`, ...）でバージョン管理される。パイプラインを使う**配布先リポジトリ**は薄いラッパー（`.github/workflows/agent-pipeline.yml`）と固有設定（`.agent/`）だけを持ち、共通部分はコピーせず実行時に中央を checkout して読む。つまり、ここへの変更は全配布先に波及する — 破壊的変更はタグを上げ、run の `pipeline_version`（`bootstrap` イベントが確定し、`state.json` にも射影される）による不一致検出（進行中 run を `blocked` にする）で守る。
 
 ## 設計上の不変条件
 

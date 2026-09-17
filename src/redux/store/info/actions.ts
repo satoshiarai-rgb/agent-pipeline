@@ -6,7 +6,7 @@ import actionCreatorFactory from "../../../utils/typescriptFsa.ts";
  * **`issue` / `branch` / `pipeline_version` はここに無い。** それらは環境ではなく
  * run 自身の記録なので、`RESTORE`（いまはスナップショット、段取り 2 以降は
  * bootstrap イベント）が入れる。環境から注入すると、`--dir` の取り違えで
- * 別の run の識別子が入り込み、版の握手（`pipeline_version`）も意味を失う。
+ * 別の run の識別子が入り込み、バージョンの握手（`pipeline_version`）も意味を失う。
  */
 export interface ConfigurePayload {
   /** run のディレクトリ（`agent-work/issue-<n>`）。ファイルを読み書きする起点 */

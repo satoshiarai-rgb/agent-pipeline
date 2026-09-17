@@ -96,7 +96,7 @@ describe("retry: 受け付けないもの", () => {
   });
 
   test("実行中に止まったものは断る（戻しても route が動かさない）", () => {
-    // start だけして finish していない状態で、中央の版が上がって止まった場合
+    // start だけして finish していない状態で、中央のバージョンが上がって止まった場合
     const dir = makeRun("developing");
     start(dir, "developer", "999", c);
     const newer = { ...c, pipeline_version: c.pipeline_version + 1 };

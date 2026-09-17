@@ -22,9 +22,9 @@ export interface PipelineSettings {
  */
 export const defaultSettings: PipelineSettings = {
   /**
-   * 中央リポジトリのメジャー版。合わない run は blocked にする。
+   * 中央リポジトリのメジャーバージョン。合わない run は blocked にする。
    * 2 にしたのは状態の正を `state.json` からイベントログに移したため（K-26 / A-53 段取り 2）。
-   * 版 1 で始まった run は `events/` を持たないので、続けると状態を失う
+   * バージョン 1 で始まった run は `events/` を持たないので、続けると状態を失う
    */
   pipeline_version: 3,
 

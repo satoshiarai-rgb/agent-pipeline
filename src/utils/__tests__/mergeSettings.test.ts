@@ -65,7 +65,7 @@ describe("mergeSettings（受け付けないもの）", () => {
     expect(error({ agents: { planer: { max_turns: 3 } } })).toContain("agents.planer");
   });
 
-  test("版の握手は配布先では上書きできない", () => {
+  test("バージョンの握手は配布先では上書きできない", () => {
     expect(error({ pipeline_version: 2 })).toContain("上書きできません");
   });
 

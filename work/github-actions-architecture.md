@@ -127,7 +127,7 @@ jobs:
 補足:
 
 - `id-token: write` は caller 側に必要。GitHub は caller に権限がないと `job_workflow_ref` クレームをトークンに含めない
-- `concurrency.group` の issue 番号は、push イベントでは `github.ref_name`（`claude/issue-123`）から得る。issue イベントと comment イベントでは `github.event.issue.number`。同じ issue で文字列が異なるため、厳密には `route` job で正規化して再度 concurrency を張るのが望ましいが、push 同士・issue 同士はそれぞれ直列化されるので初期版はこれで足りる
+- `concurrency.group` の issue 番号は、push イベントでは `github.ref_name`（`claude/issue-123`）から得る。issue イベントと comment イベントでは `github.event.issue.number`。同じ issue で文字列が異なるため、厳密には `route` job で正規化して再度 concurrency を張るのが望ましいが、push 同士・issue 同士はそれぞれ直列化されるので初期バージョンはこれで足りる
 
 ---
 
@@ -471,14 +471,14 @@ Anthropic のフェデレーションルールは `subject_prefix` / `audience` 
 
 - `ANTHROPIC_ORG_ID`, `ANTHROPIC_FDRL`, `ANTHROPIC_SVAC`, `ANTHROPIC_WRKSPC` を Organization variables に置く。配布先で上書きが必要な場合のみ repository variables に同名で置く
 
-### 8.4 版管理
+### 8.4 バージョン管理
 
 - タグ: `v1`（移動）、`v1.x.y`（不変）。配布先は `@v1` を参照
 - 破壊的変更は `v2` を切り、`pipeline_version: 2` の run だけが `v2` の遷移表を使う。`v1` の dispatch は `pipeline_version: 2` の run を `blocked` にせず `agent=none` で無視する（並行運用を許す）
 
 ### 8.5 コミットが増える点
 
-1 エージェント実行あたり 2 コミット（start マーカー + 成果物）。start マーカーが不要なら `mark started` step を外し、stale 検知は `gh run list --branch` で代替する。初期版は残す。
+1 エージェント実行あたり 2 コミット（start マーカー + 成果物）。start マーカーが不要なら `mark started` step を外し、stale 検知は `gh run list --branch` で代替する。初期バージョンは残す。
 
 ---
 

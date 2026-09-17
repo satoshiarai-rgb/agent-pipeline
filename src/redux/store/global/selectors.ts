@@ -65,7 +65,7 @@ export function selectLabel(root: RootState, settings: PipelineSettings) {
  *
  *   1. 実行が失敗した / 契約を満たさなかった / 上限に達した（reducer が `failure_reason` に残す）
  *   2. 配布先の `.agent/config.json` が受け付けられない（`config_error`）
- *   3. 中央の版が進行中の run と合わない
+ *   3. 中央のバージョンが進行中の run と合わない
  *   4. 実行回数の総数が上限に達した
  *
  * 2〜4 は状態と設定から毎回計算できるので、イベントとして記録しない。
@@ -148,7 +148,7 @@ export interface NextAction {
 
 /**
  * 次に何をするかを決める（`route` コマンド。**読み取りだけで何も書かない**）。
- * 版と設定の整合性は遷移の規則ではないので、遷移の判断より先に見る。
+ * バージョンと設定の整合性は遷移の規則ではないので、遷移の判断より先に見る。
  * どちらも `block` として返す — ここで例外を投げると状態が git に載らないまま
  * job が落ち、run が無音で止まる（設計書 §7.1）。
  */

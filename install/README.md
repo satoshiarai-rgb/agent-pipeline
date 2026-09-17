@@ -11,7 +11,7 @@
 | [`conventions.md`](conventions.md) | `.agent/conventions.md` | 任意。このリポジトリの流儀を伝える唯一の手段 |
 | [`setup.sh`](setup.sh) | `.agent/setup.sh` | 任意。テストを走らせる準備が必要なら |
 | [`issue-template.yml`](issue-template.yml) | `.github/ISSUE_TEMPLATE/agent-task.yml` | 任意。issue の入力を揃える |
-| [`dependabot.yml`](dependabot.yml) | `.github/dependabot.yml` | 任意（推奨）。**パイプラインの版を上げる PR を自動で作らせる**。既にある場合は置きません（`github-actions` の項目を自分で足す） |
+| [`dependabot.yml`](dependabot.yml) | `.github/dependabot.yml` | 任意（推奨）。**パイプラインのバージョンを上げる PR を自動で作らせる**。既にある場合は置きません（`github-actions` の項目を自分で足す） |
 | [`config.json`](config.json) | `.agent/config.json` | 任意。往復回数・モデル・上限・ツール・承認できる人を変えたいときだけ |
 
 `agent-pipeline.yml` は原則そのままコピーして使えます（中央の reusable workflow を呼ぶだけなので、
@@ -66,7 +66,7 @@ curl -fsSL https://raw.githubusercontent.com/satoshiarai-rgb/agent-pipeline/main
 
 ```bash
 bash <clone した場所>/install/install.sh
-AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # 版を指定する
+AGENT_PIPELINE_REF=v1 bash <clone した場所>/install/install.sh   # バージョンを指定する
 ```
 
 1 つだけ欲しいときは、その原本を直接取ってください（`config.json` はこの方法だけです）。

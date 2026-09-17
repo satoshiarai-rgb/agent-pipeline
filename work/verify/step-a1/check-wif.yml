@@ -60,7 +60,7 @@ jobs:
 
       # base-action は「Claude Code を 1 回動かすだけ」の部品。
       # PR へのコメントや issue の操作といった GitHub 連携は持たない（そこは自分で書く）。
-      # @v1 は移動タグなので、検証の再現性のためパッチ版に固定する。
+      # @v1 は移動タグなので、検証の再現性のためパッチバージョンに固定する。
       - name: Claude を 1 回呼ぶ
         uses: anthropics/claude-code-action/base-action@v1.0.215
         with:
