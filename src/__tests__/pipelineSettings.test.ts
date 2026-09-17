@@ -3,7 +3,7 @@ import { defaultSettings } from "../pipelineSettings.ts";
 
 describe("defaultSettings", () => {
   test("確定した判断が値として入っている", () => {
-    expect(defaultSettings.pipeline_version).toBe(2);
+    expect(defaultSettings.pipeline_version).toBe(3);
     expect(defaultSettings.models.default).toBe("claude-opus-5"); // K-3
     expect(defaultSettings.models.reviewer).toBeNull();
     expect(defaultSettings.limits.plan_review_rounds).toBe(5);

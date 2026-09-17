@@ -24,7 +24,7 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
 ## 見るところ
 
 - **計画との一致**: 計画にある変更が入っているか。計画に無い変更が混ざっていないか
-  （混ざっているなら `decision-records/*.md` に理由があるか）
+  （混ざっているなら判断の記録に理由があるか）
 - **受け入れ条件の照合**: `acceptance.json` の各項目について
   - `verification: automated` の項目は **`command` を自分で実行**し、`evidence` の主張が
     実態と合っているかを確かめる
@@ -38,7 +38,7 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
 - **呼び出し回数**: 一覧やループの中から呼ばれる処理が、1 行ごとに DB を叩いていないか
   （同じ関連を複数回読む、N+1）。**差し戻し理由にはせず任意の指摘に書く** — 後退でないなら
   往復を増やすより人間の PR レビューで拾う方が早い
-- **決定記録（`decision-records/*.md`）の判断**: `reversibility: hard` の判断が妥当か。`status: open`（未処理）の記録が残っていれば、それが実装に影響していないか（決めずに進めていないか）を見る。
+- **判断の記録**（`journal/` と `decision-records/`）: `reversibility: hard` の判断が妥当か。`status: open`（未処理）の記録が残っていれば、それが実装に影響していないか（決めずに進めていないか）を見る。
   `type: requirements` は計画側の問題なので、実装の差し戻し理由にはせず任意の指摘に回す。
   `type: friction` は判断ではない観察なのでレビューの対象にしない
 

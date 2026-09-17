@@ -9,8 +9,8 @@ import {
   hasAcceptance,
   readAcceptance,
 } from "../../file/acceptanceFile.ts";
-import { decisionRecordProblems } from "../../file/decisionRecords.ts";
 import { completedCleanly, readApiErrorStatus } from "../../file/executionLog.ts";
+import { journalProblems } from "../../file/journal.ts";
 import { latestReviewPath, readVerdict } from "../../file/reviewFile.ts";
 import type { PipelineSettings } from "../../pipelineSettings.ts";
 import type { AgentName, RunResult, Verdict } from "../../types.ts";
@@ -87,8 +87,8 @@ const hasDiff: Check = ({ changed }) => (changed.length > 0 ? null : "差分が�
 
 /** 決定記録は任意。書いたなら 1 ファイル 1 レコードの形であること（名前も含む） */
 const decisionRecords: Check = ({ dir }) => {
-  const problems = decisionRecordProblems(dir);
-  return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
+  const problems = journalProblems(dir);
+  return problems.length > 0 ? `判断の記録: ${problems.join(" / ")}` : null;
 };
 
 /**

@@ -59,7 +59,7 @@ const compose = (dir: string, agent: AgentName, over: { repo?: string } = {}) =>
 const record = (dir: string, slug: string) =>
   put(
     dir,
-    `decision-records/${RUN.run_id}-${RUN.attempt}-${slug}.md`,
+    `journal/${RUN.run_id}-${RUN.attempt}-${slug}.md`,
     "---\ntype: design\ntitle: セッション有効期限を 24h にした\nreversibility: easy\n---\n\n本文",
   );
 
@@ -148,7 +148,7 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
       join(dir, "issue.md"),
       join(dir, "plan.md"),
       join(dir, "acceptance.json"),
-      join(dir, "decision-records", "17293840112-1-session-ttl.md"),
+      join(dir, "journal", "17293840112-1-session-ttl.md"),
     ]);
   });
 
@@ -232,9 +232,7 @@ describe("決定記録の書き込み先（契約 §5）", () => {
     const dir = makeRun();
     const { text, review_path } = compose(dir, "developer");
     expect(review_path).toBeNull();
-    expect(text).toContain(
-      `- 判断の記録: ${join(dir, "decision-records", "17293840112-1-<slug>.md")}`,
-    );
+    expect(text).toContain(`- 判断の記録: ${join(dir, "journal", "17293840112-1-<slug>.md")}`);
     // 役割プロンプトが差し替えられても残るよう、名前の規則はハーネス側に書く
     expect(text).toContain("判断 1 つにつき 1 ファイル");
   });

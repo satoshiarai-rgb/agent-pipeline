@@ -1,11 +1,21 @@
-import { existsSync, readdirSync, readFileSync } from "node:fs";
+import { existsSync, mkdirSync, readdirSync, readFileSync, renameSync } from "node:fs";
 import { basename, join } from "node:path";
 import { type Frontmatter, parseFrontmatter } from "../utils/frontmatter.ts";
 
 /**
- * `decision-records/<run_id>-<attempt>-<slug>.md` の 1 ファイル（契約 §4）。
+ * `<run_id>-<attempt>-<slug>.md` の 1 ファイル（契約 §4）。
  * planner が「計画を詰める過程で片付いた決定」を、developer が「計画に無い判断」を、
  * 判断 1 つにつき 1 ファイルで書く。
+ *
+ * **エージェントが書く先は常に `journal/`。** 置き場は `reversibility` から導く規則で、
+ * ハーネスが `finish` のたびに寄せ直す（`routeJournal`）。エージェントは 1 箇所だけ知ればよく、
+ * 場所の判断は `reversibility` の判断 1 つに畳まれる。
+ *
+ *   journal/           後戻りが容易な判断。進行中の記録で、量が多い（1 ラウンドで 8 件など）
+ *   decision-records/  **後戻りが困難な判断だけ。** ADR の候補で、人間が承認時に重点確認する
+ *
+ * 分けるのは粒度が違うからである。全部を `decision-records/` に置くと、ADR という名前が
+ * 「ページ名を ja.yml に合わせる」程度の判断まで含むことになり、人間が見るべきものが埋もれる。
  *
  * トピックごとにファイルを分けるので、追記が競合せず diff に新規ファイルとして現れる。
  * 名前の prefix（`<run_id>-<attempt>`）はハーネスが決めるため、実行をまたいだ名前の衝突
@@ -14,8 +24,9 @@ import { type Frontmatter, parseFrontmatter } from "../utils/frontmatter.ts";
  * frontmatter は機械が読む 4 つ（`type` / `title` / `reversibility` / `status`）だけで、内容は本文にある
  * （`reviews/*.md` と同じ「機械は frontmatter、人は本文」の形 / 設計書 §5.4）。
  *
- * ハーネスがするのは**名前と形の検査**（`decisionRecordProblems`）と**パスの列挙**
- * （`decisionRecordPaths` → 次のエージェントへの入力）だけで、中身は読まない。
+ * ハーネスがするのは**名前と形の検査**（`journalProblems`）と**置き場の振り分け**
+ * （`routeJournal`）と**パスの列挙**（`journalPaths` → 次のエージェントへの入力）だけで、
+ * 中身は読まない。
  */
 /** 実行を一意にする組。`runs/<agent>-<run_id>-<attempt>.json` と同じもの */
 export interface Execution {
@@ -23,13 +34,20 @@ export interface Execution {
   attempt: number;
 }
 
-const DIR = "decision-records";
+/**
+ * `reversibility` → 置き場。**この表が置き場の規則そのもの**で、振り分けも列挙も検査も
+ * ここを引く。値を足すときはこの表だけを触る。
+ */
+const DIRS = { easy: "journal", hard: "decision-records" } as const;
+
+type Reversibility = keyof typeof DIRS;
+
 const SHAPE = "<run_id>-<attempt>-<slug>.md";
 
 /** `<slug>` は英小文字・数字をハイフンで繋いだもの。日本語のタイトルは frontmatter に置く */
 const NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
 
-const REVERSIBILITY = ["easy", "hard"];
+const REVERSIBILITY = Object.keys(DIRS);
 
 /**
  * 判断の行き先（2026-09-09 に追加）。**書いてあれば検査するが、無くても違反にしない** —
@@ -55,30 +73,60 @@ const TYPES = ["requirements", "design", "harness", "friction"] as const;
 
 export type DecisionType = (typeof TYPES)[number];
 
+/** エージェントが書く先。**常に `journal/`** で、`hard` は後でハーネスが寄せる */
+export function journalDir(dir: string): string {
+  return join(dir, DIRS.easy);
+}
+
+/** 後戻りが困難な判断の置き場。ADR の候補として人間が見る */
 export function decisionRecordsDir(dir: string): string {
-  return join(dir, DIR);
+  return join(dir, DIRS.hard);
 }
 
 /** エージェントに伝える書き込み先。prefix はハーネスが決め、`<slug>` だけを任せる */
-export function decisionRecordPath(dir: string, run: Execution, slug: string): string {
-  return join(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
+export function journalPath(dir: string, run: Execution, slug: string): string {
+  return join(journalDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
 }
 
-/** 実行順（古い順）に返す。名前の prefix がそのまま実行の順序を持つ */
-export function decisionRecordPaths(dir: string): string[] {
-  const base = decisionRecordsDir(dir);
-  if (!existsSync(base)) return [];
-  return readdirSync(base)
-    .sort(byExecution)
-    .map((name) => join(base, name));
+/**
+ * 両方の置き場を実行順（古い順）に返す。名前の prefix がそのまま実行の順序を持つので、
+ * どちらのディレクトリにあるかは順序に影響しない。
+ */
+export function journalPaths(dir: string): string[] {
+  const paths = Object.values(DIRS).flatMap((name) => {
+    const base = join(dir, name);
+    if (!existsSync(base)) return [];
+    return readdirSync(base).map((file) => join(base, file));
+  });
+  return paths.sort((a, b) => byExecution(basename(a), basename(b)));
+}
+
+/**
+ * `reversibility` が示す置き場へ寄せ直す。移した先のパスを返す。
+ * **`finish` のたびに呼ぶ。** 後のラウンドで `reversibility` が変わったら、その時点で移る。
+ * frontmatter が読めないものは動かさない（`journalProblems` が拾う）。
+ */
+export function routeJournal(dir: string): string[] {
+  const moved: string[] = [];
+  for (const path of journalPaths(dir)) {
+    const frontmatter = parseFrontmatter(readFileSync(path, "utf8"));
+    const target = DIRS[frontmatter?.fields.reversibility as Reversibility];
+    if (!target) continue;
+    const to = join(dir, target, basename(path));
+    if (to === path) continue;
+    mkdirSync(join(dir, target), { recursive: true });
+    renameSync(path, to);
+    moved.push(to);
+  }
+  return moved;
 }
 
 /**
  * 契約 §4 の違反を列挙する。空なら妥当（1 つも書かないことは違反ではない）。
  * エージェント（プロンプト差し替え可）が書くファイルなので、名前と形だけをここで見る。
  */
-export function decisionRecordProblems(dir: string): string[] {
-  return decisionRecordPaths(dir).flatMap((path) =>
+export function journalProblems(dir: string): string[] {
+  return journalPaths(dir).flatMap((path) =>
     fileProblems(basename(path), readFileSync(path, "utf8")),
   );
 }

@@ -14,7 +14,7 @@ describe("readStateFile", () => {
     expect(f.phase).toBe("planning");
     expect(f.blocked_reason).toBeNull();
     expect(f.meta).toEqual({
-      pipeline_version: 2,
+      pipeline_version: 3,
       issue: 123,
       branch: "claude/issue-123",
     });
@@ -45,7 +45,7 @@ describe("writeStateFile", () => {
     );
     const written = JSON.parse(readFileSync(stateFilePath(dir), "utf8"));
     expect(written).toEqual({
-      pipeline_version: 2,
+      pipeline_version: 3,
       issue: 123,
       branch: "claude/issue-123",
       phase: "plan_review",
@@ -92,7 +92,7 @@ describe("版の一致（中央の破壊的変更から進行中の run を守�
   });
 
   test("不一致なら理由を返す", () => {
-    expect(versionOf(1)).toContain("pipeline_version_mismatch: run=1 harness=2");
+    expect(versionOf(1)).toContain("pipeline_version_mismatch: run=1 harness=3");
   });
 });
 

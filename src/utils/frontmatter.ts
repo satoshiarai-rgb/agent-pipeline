@@ -2,7 +2,7 @@
  * frontmatter（ファイル先頭の `---` で囲まれたブロック）を読む。
  *
  * 機械が読むのは 1 行 1 スカラーの値だけ（`reviews/*.md` の `verdict`、
- * `decision-records/*.md` の `title` と `reversibility`）なので YAML パーサは持たない。
+ * 判断の記録の `title` と `reversibility`）なので YAML パーサは持たない。
  * リストや入れ子は読まず、その分は本文側に置く決めにしている（契約 §4）。
  */
 export interface Frontmatter {

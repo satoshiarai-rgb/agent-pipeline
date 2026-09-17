@@ -290,7 +290,7 @@ describe("developer", () => {
 
   test("決定記録の形が壊れていれば invalid（機械が読む形式なので）", () => {
     const dir = setup();
-    write(dir, "decision-records/17293840112-1-session-ttl.md", record({ reversibility: "容易" }));
+    write(dir, "journal/17293840112-1-session-ttl.md", record({ reversibility: "容易" }));
     expect(
       validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("reversibility");
@@ -298,7 +298,7 @@ describe("developer", () => {
 
   test("名前がハーネスの決めた形でなければ invalid（過去の記録を上書きさせない）", () => {
     const dir = setup();
-    write(dir, "decision-records/D-1.md", record());
+    write(dir, "journal/D-1.md", record());
     expect(
       validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).detail,
     ).toContain("名前が");
@@ -306,7 +306,7 @@ describe("developer", () => {
 
   test("決定記録が妥当なら ok", () => {
     const dir = setup();
-    write(dir, "decision-records/17293840112-1-session-ttl.md", record());
+    write(dir, "journal/17293840112-1-session-ttl.md", record());
     expect(
       validateRun({ dir, settings: c, agent: "developer", changed_files: ["src/a.ts"] }).result,
     ).toBe("ok");

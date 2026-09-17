@@ -26,7 +26,7 @@ export const defaultSettings: PipelineSettings = {
    * 2 にしたのは状態の正を `state.json` からイベントログに移したため（K-26 / A-53 段取り 2）。
    * 版 1 で始まった run は `events/` を持たないので、続けると状態を失う
    */
-  pipeline_version: 2,
+  pipeline_version: 3,
 
   models: {
     default: "claude-opus-5",

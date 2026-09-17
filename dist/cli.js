@@ -9,7 +9,7 @@ import { join } from "node:path";
 
 // src/pipelineSettings.ts
 var defaultSettings = {
-  pipeline_version: 2,
+  pipeline_version: 3,
   models: {
     default: "claude-opus-5",
     reviewer: null
@@ -144,9 +144,96 @@ function readConfig(repo) {
 // src/redux/runCommand.ts
 import { readFileSync as readFileSync11 } from "node:fs";
 
+// src/file/journal.ts
+import { existsSync as existsSync2, mkdirSync, readdirSync, readFileSync as readFileSync2, renameSync } from "node:fs";
+import { basename, join as join2 } from "node:path";
+
+// src/utils/frontmatter.ts
+var BLOCK = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/;
+var FIELD = /^([A-Za-z_][\w-]*):[ \t]*(.*)$/;
+function parseFrontmatter(text) {
+  const block = text.match(BLOCK);
+  if (!block)
+    return null;
+  const fields = block[1].split(/\r?\n/).map((line) => line.match(FIELD)).filter((f) => f !== null);
+  return {
+    fields: Object.fromEntries(fields.map((f) => [f[1], f[2].trim()])),
+    body: (block[2] ?? "").trim()
+  };
+}
+
+// src/file/journal.ts
+var DIRS = { easy: "journal", hard: "decision-records" };
+var SHAPE = "<run_id>-<attempt>-<slug>.md";
+var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
+var REVERSIBILITY = Object.keys(DIRS);
+var STATUS = ["adopted", "open", "dropped"];
+var TYPES = ["requirements", "design", "harness", "friction"];
+function journalDir(dir) {
+  return join2(dir, DIRS.easy);
+}
+function journalPath(dir, run, slug) {
+  return join2(journalDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
+}
+function journalPaths(dir) {
+  const paths = Object.values(DIRS).flatMap((name) => {
+    const base = join2(dir, name);
+    if (!existsSync2(base))
+      return [];
+    return readdirSync(base).map((file) => join2(base, file));
+  });
+  return paths.sort((a, b) => byExecution(basename(a), basename(b)));
+}
+function routeJournal(dir) {
+  const moved = [];
+  for (const path of journalPaths(dir)) {
+    const frontmatter = parseFrontmatter(readFileSync2(path, "utf8"));
+    const target = DIRS[frontmatter?.fields.reversibility];
+    if (!target)
+      continue;
+    const to = join2(dir, target, basename(path));
+    if (to === path)
+      continue;
+    mkdirSync(join2(dir, target), { recursive: true });
+    renameSync(path, to);
+    moved.push(to);
+  }
+  return moved;
+}
+function journalProblems(dir) {
+  return journalPaths(dir).flatMap((path) => fileProblems(basename(path), readFileSync2(path, "utf8")));
+}
+var CONTENT = [
+  ({ fields }) => TYPES.includes(fields.type) ? null : `type は ${TYPES.join(" | ")}`,
+  ({ fields }) => fields.title ? null : "title が無い",
+  ({ fields }) => REVERSIBILITY.includes(fields.reversibility ?? "") ? null : "reversibility は easy か hard",
+  ({ fields }) => {
+    if (fields.status === undefined)
+      return null;
+    if (STATUS.includes(fields.status))
+      return null;
+    return `status は ${STATUS.join(" | ")}`;
+  },
+  ({ body }) => body ? null : "本文が無い（何をどう決めたかを書く）"
+];
+function fileProblems(name, text) {
+  const frontmatter = parseFrontmatter(text);
+  return [
+    NAME.test(name) ? null : `名前が ${SHAPE} ではない`,
+    frontmatter ? null : "frontmatter が無い",
+    ...frontmatter ? CONTENT.map((check) => check(frontmatter)) : []
+  ].filter((reason) => reason !== null).map((reason) => `${name}: ${reason}`);
+}
+function byExecution(a, b) {
+  const [aRun = 0, aAttempt = 0] = execution(a);
+  const [bRun = 0, bAttempt = 0] = execution(b);
+  return aRun - bRun || aAttempt - bAttempt || a.localeCompare(b);
+}
+var execution = (name) => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);
+
 // src/file/stateFile.ts
-import { readFileSync as readFileSync2, writeFileSync } from "node:fs";
-import { join as join2 } from "node:path";
+import { readFileSync as readFileSync3, writeFileSync } from "node:fs";
+import { join as join3 } from "node:path";
 
 // src/utils/parseJson.ts
 function parseJson(text, source = "JSON") {
@@ -191,7 +278,7 @@ function renderStateFile(snapshot, now) {
   return stringifyJson(ordered);
 }
 function stateFilePath(dir) {
-  return join2(dir, "state.json");
+  return join3(dir, "state.json");
 }
 function writeStateFile(dir, snapshot, now) {
   writeFileSync(stateFilePath(dir), renderStateFile(snapshot, now));
@@ -212,85 +299,17 @@ import { existsSync as existsSync6 } from "node:fs";
 import { join as join8 } from "node:path";
 
 // src/file/conversationFile.ts
-import { join as join3 } from "node:path";
+import { join as join4 } from "node:path";
 var DIR = "conversations";
 function conversationsDir(dir) {
-  return join3(dir, DIR);
+  return join4(dir, DIR);
 }
 function conversationPath(dir, run, agent, round, slug) {
-  return join3(conversationsDir(dir), `${run.run_id}-${run.attempt}-${agent}-${round}-${slug}.md`);
+  return join4(conversationsDir(dir), `${run.run_id}-${run.attempt}-${agent}-${round}-${slug}.md`);
 }
-
-// src/file/decisionRecords.ts
-import { existsSync as existsSync2, readdirSync, readFileSync as readFileSync3 } from "node:fs";
-import { basename, join as join4 } from "node:path";
-
-// src/utils/frontmatter.ts
-var BLOCK = /^---\r?\n([\s\S]*?)\r?\n---(?:\r?\n([\s\S]*))?$/;
-var FIELD = /^([A-Za-z_][\w-]*):[ \t]*(.*)$/;
-function parseFrontmatter(text) {
-  const block = text.match(BLOCK);
-  if (!block)
-    return null;
-  const fields = block[1].split(/\r?\n/).map((line) => line.match(FIELD)).filter((f) => f !== null);
-  return {
-    fields: Object.fromEntries(fields.map((f) => [f[1], f[2].trim()])),
-    body: (block[2] ?? "").trim()
-  };
-}
-
-// src/file/decisionRecords.ts
-var DIR2 = "decision-records";
-var SHAPE = "<run_id>-<attempt>-<slug>.md";
-var NAME = /^(\d+)-(\d+)-[a-z0-9]+(?:-[a-z0-9]+)*\.md$/;
-var REVERSIBILITY = ["easy", "hard"];
-var STATUS = ["adopted", "open", "dropped"];
-var TYPES = ["requirements", "design", "harness", "friction"];
-function decisionRecordsDir(dir) {
-  return join4(dir, DIR2);
-}
-function decisionRecordPath(dir, run, slug) {
-  return join4(decisionRecordsDir(dir), `${run.run_id}-${run.attempt}-${slug}.md`);
-}
-function decisionRecordPaths(dir) {
-  const base = decisionRecordsDir(dir);
-  if (!existsSync2(base))
-    return [];
-  return readdirSync(base).sort(byExecution).map((name) => join4(base, name));
-}
-function decisionRecordProblems(dir) {
-  return decisionRecordPaths(dir).flatMap((path) => fileProblems(basename(path), readFileSync3(path, "utf8")));
-}
-var CONTENT = [
-  ({ fields }) => TYPES.includes(fields.type) ? null : `type は ${TYPES.join(" | ")}`,
-  ({ fields }) => fields.title ? null : "title が無い",
-  ({ fields }) => REVERSIBILITY.includes(fields.reversibility ?? "") ? null : "reversibility は easy か hard",
-  ({ fields }) => {
-    if (fields.status === undefined)
-      return null;
-    if (STATUS.includes(fields.status))
-      return null;
-    return `status は ${STATUS.join(" | ")}`;
-  },
-  ({ body }) => body ? null : "本文が無い（何をどう決めたかを書く）"
-];
-function fileProblems(name, text) {
-  const frontmatter = parseFrontmatter(text);
-  return [
-    NAME.test(name) ? null : `名前が ${SHAPE} ではない`,
-    frontmatter ? null : "frontmatter が無い",
-    ...frontmatter ? CONTENT.map((check) => check(frontmatter)) : []
-  ].filter((reason) => reason !== null).map((reason) => `${name}: ${reason}`);
-}
-function byExecution(a, b) {
-  const [aRun = 0, aAttempt = 0] = execution(a);
-  const [bRun = 0, bAttempt = 0] = execution(b);
-  return aRun - bRun || aAttempt - bAttempt || a.localeCompare(b);
-}
-var execution = (name) => (NAME.exec(name)?.slice(1, 3) ?? []).map(Number);
 
 // src/file/eventLog.ts
-import { existsSync as existsSync3, mkdirSync, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
+import { existsSync as existsSync3, mkdirSync as mkdirSync2, readdirSync as readdirSync2, readFileSync as readFileSync4, writeFileSync as writeFileSync2 } from "node:fs";
 import { join as join5 } from "node:path";
 var eventsDir = (dir) => join5(dir, "events");
 function suffixOf(type) {
@@ -306,7 +325,7 @@ function eventFileName(action, invocation, sequence) {
 }
 function appendEvent(dir, action, invocation) {
   const path = join5(eventsDir(dir), eventFileName(action, invocation, eventPaths(dir).length + 1));
-  mkdirSync(eventsDir(dir), { recursive: true });
+  mkdirSync2(eventsDir(dir), { recursive: true });
   const event = { type: action.type, payload: action.payload };
   if (action.error)
     event.error = true;
@@ -329,7 +348,7 @@ function readEvents(dir) {
 }
 
 // src/file/promptFile.ts
-import { existsSync as existsSync4, mkdirSync as mkdirSync2, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
+import { existsSync as existsSync4, mkdirSync as mkdirSync3, readFileSync as readFileSync5, writeFileSync as writeFileSync3 } from "node:fs";
 import { dirname, join as join6 } from "node:path";
 function promptCandidates(agent, roots) {
   return [
@@ -353,14 +372,14 @@ function readConventions(repo) {
   return text === "" ? null : { path, text };
 }
 function writeComposedPrompt(path, text) {
-  mkdirSync2(dirname(path), { recursive: true });
+  mkdirSync3(dirname(path), { recursive: true });
   writeFileSync3(path, `${text.trimEnd()}
 `);
   return path;
 }
 
 // src/file/reviewFile.ts
-import { existsSync as existsSync5, mkdirSync as mkdirSync3, readdirSync as readdirSync3, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
+import { existsSync as existsSync5, mkdirSync as mkdirSync4, readdirSync as readdirSync3, readFileSync as readFileSync6, writeFileSync as writeFileSync4 } from "node:fs";
 import { join as join7 } from "node:path";
 function renderReview(input) {
   const { verdict, round, reviewer, body } = input;
@@ -386,7 +405,7 @@ function saveReview(input) {
   const { dir, kind, verdict, reviewer, body } = input;
   const round = nextReviewNumber(dir, kind);
   const path = reviewPath(dir, kind, round);
-  mkdirSync3(join7(dir, "reviews"), { recursive: true });
+  mkdirSync4(join7(dir, "reviews"), { recursive: true });
   writeFileSync4(path, renderReview({ verdict, round, reviewer, body }));
   return path;
 }
@@ -420,7 +439,7 @@ var latest = (label, kind) => ({
 var ISSUE = file("issue 本文", "issue.md");
 var PLAN = file("計画", "plan.md");
 var ACCEPTANCE = file("受け入れ条件", "acceptance.json");
-var DECISIONS = { label: "判断の記録", find: decisionRecordPaths };
+var DECISIONS = { label: "判断の記録", find: journalPaths };
 var PLAN_REVIEW = latest("前回のレビュー", "plan");
 var DEV_REVIEW = latest("前回のレビュー", "dev");
 var ALL_REVIEWS = { label: "レビュー", find: (dir) => reviewPaths(dir) };
@@ -449,7 +468,7 @@ var outputSection = (input) => {
   const lines = [
     review ? `- レビュー: ${review}` : null,
     decisions ? [
-      `- 判断の記録: ${decisionRecordPath(dir, run, "<slug>")}`,
+      `- 判断の記録: ${journalPath(dir, run, "<slug>")}`,
       "  （判断 1 つにつき 1 ファイル。`<slug>` はトピックを表す英小文字・数字・ハイフンで、",
       "  2〜5 語・40 字以内。ファイル名の他の部分は変えない）"
     ].join(`
@@ -499,7 +518,7 @@ function composeRun(input) {
 }
 
 // src/redux/effects/dummy.ts
-import { existsSync as existsSync8, mkdirSync as mkdirSync4, readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
+import { existsSync as existsSync8, mkdirSync as mkdirSync5, readFileSync as readFileSync8, writeFileSync as writeFileSync6 } from "node:fs";
 import { join as join10 } from "node:path";
 
 // src/file/acceptanceFile.ts
@@ -603,7 +622,7 @@ var ARTIFACTS = {
   ],
   developer: ({ dir, run_id, repo }) => {
     const src = join10(repo, "dummy-src");
-    mkdirSync4(src, { recursive: true });
+    mkdirSync5(src, { recursive: true });
     return [
       write(join10(src, `change-${run_id}.txt`), `${new Date().toISOString()}
 `),
@@ -1020,7 +1039,7 @@ var GUIDE = {
     files: (dir) => [
       join11(dir, "plan.md"),
       join11(dir, "acceptance.json"),
-      ...decisionRecordPaths(dir),
+      ...journalPaths(dir),
       ...reviewPaths(dir, "plan").reverse(),
       join11(dir, "issue.md")
     ],
@@ -1037,7 +1056,7 @@ var GUIDE = {
       join11(dir, "completion.md"),
       join11(dir, "staged", "README.md"),
       join11(dir, "acceptance.json"),
-      ...decisionRecordPaths(dir),
+      ...journalPaths(dir),
       ...reviewPaths(dir, "dev").reverse(),
       ...reviewPaths(dir, "plan").reverse()
     ],
@@ -1221,8 +1240,8 @@ var reviewWithVerdict = (kind) => ({ dir }) => {
 };
 var hasDiff = ({ changed }) => changed.length > 0 ? null : "差分が無い";
 var decisionRecords = ({ dir }) => {
-  const problems = decisionRecordProblems(dir);
-  return problems.length > 0 ? `decision-records/: ${problems.join(" / ")}` : null;
+  const problems = journalProblems(dir);
+  return problems.length > 0 ? `判断の記録: ${problems.join(" / ")}` : null;
 };
 var PROTECTED = [".github/workflows/", ".agent/"];
 var noProtectedChanges = ({ changed }) => {
@@ -1953,6 +1972,7 @@ function runCommand(command, args, settings, configError = null) {
         if (listPath)
           changed = readFileSync11(listPath, "utf8").split(`
 `).filter(Boolean);
+        routeJournal(dir);
         report = validateRun({
           dir,
           settings,

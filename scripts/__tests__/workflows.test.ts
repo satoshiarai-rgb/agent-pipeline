@@ -12,6 +12,7 @@ import {
 import { tmpdir } from "node:os";
 import { basename, join } from "node:path";
 import { parse } from "yaml";
+import { defaultSettings } from "../../src/pipelineSettings.ts";
 
 /**
  * ワークフローの run: ブロックと、action の実体（scripts/run-cli.sh）を検査する。
@@ -619,7 +620,8 @@ describe("scripts/run-cli.sh（action の実体）", () => {
           by: "harness",
           issue: 2,
           branch: "claude/issue-2",
-          pipeline_version: 2,
+          // ハーネスと揃えておく（ずれると版の不一致で explain が停止の説明を返す）
+          pipeline_version: defaultSettings.pipeline_version,
         },
       }),
     );

@@ -17,7 +17,7 @@ PR をレビューする人間のために、**この run で何が起きたの�
    run は `blocked` になる**（人間が見るべき状態なので、その旨を報告に書く）
 2. `verification: automated` の項目は `command` を実行して、報告と実態が合っていることを確かめる
 3. レビューの履歴（何が差し戻され、どう直ったか）を読み、人間が知るべき点を拾う
-4. 決定記録（`decision-records/*.md`）の frontmatter を見て、`reversibility: hard` の判断と `status: open`（未処理のまま残った判断）を拾う。
+4. 判断の記録の frontmatter を見て、`reversibility: hard` の判断と `status: open`（未処理のまま残った判断）を拾う。**`hard` はハーネスが `decision-records/` に寄せてあるので、そのディレクトリがそのまま「人間が見るべきもの」の一覧になる。**
    `type: friction` は判断ではない観察なので、報告では判断と混ぜない
 
 ## 出力: `completion.md`
@@ -41,8 +41,8 @@ run ディレクトリに `completion.md` を書く（例: `agent-work/issue-12/
 
 ## 人間に確認してほしいこと
 
-- セッション有効期限を 24h にした判断（`decision-records/17293840112-1-session-ttl.md`）は
-  計画に無いもの。既存の refresh token に揃えたが、意図と合うか
+- 保存形式を JSONL に変えた判断（`decision-records/17293840112-1-storage-format.md`）は
+  `reversibility: hard`。移行後に戻すには書き出し直しが要るので、意図と合うか
 - （無ければ「特になし」）
 
 ## 経緯

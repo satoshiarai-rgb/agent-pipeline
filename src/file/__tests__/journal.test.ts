@@ -3,11 +3,12 @@ import { mkdirSync, writeFileSync } from "node:fs";
 import { basename } from "node:path";
 import { cleanupRuns, makeRun } from "../../__tests__/runDirFixture.ts";
 import {
-  decisionRecordPath,
-  decisionRecordPaths,
-  decisionRecordProblems,
-  decisionRecordsDir,
-} from "../decisionRecords.ts";
+  journalDir,
+  journalPath,
+  journalPaths,
+  journalProblems,
+  routeJournal,
+} from "../journal.ts";
 
 afterEach(cleanupRuns);
 
@@ -25,8 +26,8 @@ reversibility: easy
 
 /** レコードを 1 ファイル書く。name を渡せば契約違反の名前も置ける */
 const write = (dir: string, slug: string, text = RECORD, name?: string) => {
-  mkdirSync(decisionRecordsDir(dir), { recursive: true });
-  const path = name ? `${decisionRecordsDir(dir)}/${name}` : decisionRecordPath(dir, RUN, slug);
+  mkdirSync(journalDir(dir), { recursive: true });
+  const path = name ? `${journalDir(dir)}/${name}` : journalPath(dir, RUN, slug);
   writeFileSync(path, text);
   return path;
 };
@@ -34,22 +35,22 @@ const write = (dir: string, slug: string, text = RECORD, name?: string) => {
 describe("書き込み先（契約 §5）", () => {
   test("名前は <run_id>-<attempt>-<slug>.md で、prefix はハーネスが決める", () => {
     const dir = makeRun();
-    expect(decisionRecordPath(dir, RUN, "session-ttl")).toBe(
-      `${dir}/decision-records/17293840112-1-session-ttl.md`,
+    expect(journalPath(dir, RUN, "session-ttl")).toBe(
+      `${dir}/journal/17293840112-1-session-ttl.md`,
     );
   });
 
   test("実行が変われば prefix も変わる（過去のラウンドの記録を上書きできない）", () => {
     const dir = makeRun();
-    const first = decisionRecordPath(dir, RUN, "session-ttl");
-    const second = decisionRecordPath(dir, { run_id: "17301992044", attempt: 2 }, "session-ttl");
+    const first = journalPath(dir, RUN, "session-ttl");
+    const second = journalPath(dir, { run_id: "17301992044", attempt: 2 }, "session-ttl");
     expect(first).not.toBe(second);
   });
 });
 
 describe("読み込み", () => {
   test("無ければ空", () => {
-    expect(decisionRecordPaths(makeRun())).toEqual([]);
+    expect(journalPaths(makeRun())).toEqual([]);
   });
 
   test("1 ファイル 1 レコードとしてパスを列挙する（中身は読まない）", () => {
@@ -58,7 +59,7 @@ describe("読み込み", () => {
     write(dir, "token-rotation", RECORD.replace("easy", "hard").replace("design", "requirements"));
 
     // prefix が同じなら名前順（session-ttl → token-rotation）
-    expect(decisionRecordPaths(dir).map((p) => basename(p))).toEqual([
+    expect(journalPaths(dir).map((p) => basename(p))).toEqual([
       "17293840112-1-session-ttl.md",
       "17293840112-1-token-rotation.md",
     ]);
@@ -70,7 +71,7 @@ describe("読み込み", () => {
     write(dir, "a", RECORD, "17301992044-1-a.md");
     write(dir, "c", RECORD, "17301992044-2-c.md");
 
-    expect(decisionRecordPaths(dir).map((p) => basename(p))).toEqual([
+    expect(journalPaths(dir).map((p) => basename(p))).toEqual([
       "9999999999-1-b.md",
       "17301992044-1-a.md",
       "17301992044-2-c.md",
@@ -80,45 +81,43 @@ describe("読み込み", () => {
 
 describe("契約（§4）の検査", () => {
   test("1 つも書かないことは違反ではない", () => {
-    expect(decisionRecordProblems(makeRun())).toEqual([]);
+    expect(journalProblems(makeRun())).toEqual([]);
   });
 
   test("妥当なら何も返さない", () => {
     const dir = makeRun();
     write(dir, "session-ttl");
     write(dir, "token-rotation");
-    expect(decisionRecordProblems(dir)).toEqual([]);
+    expect(journalProblems(dir)).toEqual([]);
   });
 
   test("名前の形を見る（prefix を無視した名前・日本語の名前を通さない）", () => {
     const dir = makeRun();
     write(dir, "x", RECORD, "D-1.md");
-    expect(decisionRecordProblems(dir)[0]).toContain("名前が <run_id>-<attempt>-<slug>.md");
+    expect(journalProblems(dir)[0]).toContain("名前が <run_id>-<attempt>-<slug>.md");
 
     const other = makeRun();
     write(other, "x", RECORD, "17293840112-1-セッション.md");
-    expect(decisionRecordProblems(other)[0]).toContain("名前が");
+    expect(journalProblems(other)[0]).toContain("名前が");
   });
 
   test("frontmatter が無ければ 1 つの理由だけを返す", () => {
     const dir = makeRun();
     write(dir, "session-ttl", "## 決めたこと\n\n24h にした\n");
-    expect(decisionRecordProblems(dir)).toEqual([
-      "17293840112-1-session-ttl.md: frontmatter が無い",
-    ]);
+    expect(journalProblems(dir)).toEqual(["17293840112-1-session-ttl.md: frontmatter が無い"]);
   });
 
   test("type は決めた 4 つだけ（受け手で振り分けるための値なので自由記述を通さない）", () => {
     const dir = makeRun();
     write(dir, "session-ttl", RECORD.replace("type: design", "type: performance"));
-    expect(decisionRecordProblems(dir)[0]).toContain("type は requirements | design");
+    expect(journalProblems(dir)[0]).toContain("type は requirements | design");
   });
 
   test("status は書いてあれば 3 値のどれか。無くても違反ではない", () => {
     // 無い場合（`status` を持たない既存の記録を止めないため / 2026-09-09）
     const without = makeRun();
     write(without, "session-ttl", RECORD);
-    expect(decisionRecordProblems(without)).toEqual([]);
+    expect(journalProblems(without)).toEqual([]);
     // 書いてある場合は検査する
     const ok = makeRun();
     write(
@@ -126,29 +125,68 @@ describe("契約（§4）の検査", () => {
       "session-ttl",
       RECORD.replace("reversibility: easy", "reversibility: easy\nstatus: open"),
     );
-    expect(decisionRecordProblems(ok)).toEqual([]);
+    expect(journalProblems(ok)).toEqual([]);
     const ng = makeRun();
     write(
       ng,
       "session-ttl",
       RECORD.replace("reversibility: easy", "reversibility: easy\nstatus: 採択"),
     );
-    expect(decisionRecordProblems(ng)[0]).toContain("status は adopted | open | dropped");
+    expect(journalProblems(ng)[0]).toContain("status は adopted | open | dropped");
   });
 
   test("reversibility は easy か hard だけ", () => {
     const dir = makeRun();
     write(dir, "session-ttl", RECORD.replace("reversibility: easy", "reversibility: 容易"));
-    expect(decisionRecordProblems(dir)[0]).toContain("reversibility は easy か hard");
+    expect(journalProblems(dir)[0]).toContain("reversibility は easy か hard");
   });
 
   test("title と本文の欠落を見る", () => {
     const noTitle = makeRun();
     write(noTitle, "session-ttl", RECORD.replace("title: セッション有効期限を 24h にした", ""));
-    expect(decisionRecordProblems(noTitle)[0]).toContain("title が無い");
+    expect(journalProblems(noTitle)[0]).toContain("title が無い");
 
     const noBody = makeRun();
     write(noBody, "session-ttl", "---\ntype: design\ntitle: x\nreversibility: easy\n---\n");
-    expect(decisionRecordProblems(noBody)[0]).toContain("本文が無い");
+    expect(journalProblems(noBody)[0]).toContain("本文が無い");
+  });
+});
+
+describe("置き場の振り分け（reversibility から導く）", () => {
+  const hard = RECORD.replace("reversibility: easy", "reversibility: hard");
+
+  test("hard は decision-records/ へ移り、easy は journal/ に残る", () => {
+    const dir = makeRun();
+    write(dir, "session-ttl");
+    write(dir, "storage-engine", hard);
+
+    routeJournal(dir);
+
+    // 並びは実行順（prefix）→ ファイル名で、どちらの置き場にあるかは影響しない
+    expect(journalPaths(dir).map((p) => p.replace(`${dir}/`, ""))).toEqual([
+      "journal/17293840112-1-session-ttl.md",
+      "decision-records/17293840112-1-storage-engine.md",
+    ]);
+  });
+
+  test("後のラウンドで hard から easy に変われば journal/ に戻る", () => {
+    const dir = makeRun();
+    write(dir, "storage-engine", hard);
+    routeJournal(dir);
+
+    writeFileSync(`${dir}/decision-records/17293840112-1-storage-engine.md`, RECORD);
+    routeJournal(dir);
+
+    expect(journalPaths(dir).map((p) => p.replace(`${dir}/`, ""))).toEqual([
+      "journal/17293840112-1-storage-engine.md",
+    ]);
+  });
+
+  test("frontmatter が読めないものは動かさない（検査が拾う）", () => {
+    const dir = makeRun();
+    write(dir, "broken", "frontmatter が無い本文だけ");
+
+    expect(routeJournal(dir)).toEqual([]);
+    expect(journalProblems(dir)[0]).toContain("frontmatter が無い");
   });
 });

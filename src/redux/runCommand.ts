@@ -1,4 +1,5 @@
 import { readFileSync } from "node:fs";
+import { routeJournal } from "../file/journal.ts";
 import { writeStateFile } from "../file/stateFile.ts";
 import type { PipelineSettings } from "../pipelineSettings.ts";
 import type { AgentName } from "../types.ts";
@@ -196,6 +197,8 @@ export function runCommand(
         const listPath = args["changed-files"];
         let changed: string[] = [];
         if (listPath) changed = readFileSync(listPath, "utf8").split("\n").filter(Boolean);
+        // 判断の記録を reversibility が示す置き場へ寄せてから検査する（hard は decision-records/ へ）
+        routeJournal(dir);
         report = validateRun({
           dir,
           settings,

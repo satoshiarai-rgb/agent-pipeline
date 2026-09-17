@@ -84,7 +84,7 @@ describe("selectNextAction: 何を起動するか", () => {
   test("pipeline_version が合わなければ block", () => {
     const r = selectNextAction(rootOf({ phase: "planning" }, { pipeline_version: 1 }), c);
     expect(r.action).toBe("block");
-    expect(r.reason).toContain("pipeline_version_mismatch: run=1 harness=2");
+    expect(r.reason).toContain("pipeline_version_mismatch: run=1 harness=3");
   });
 });
 
@@ -99,7 +99,7 @@ describe("selectNextAction: ファイルから読んだ状態でも同じ", () =
     const dir = makeRun();
     const newer = { ...c, pipeline_version: c.pipeline_version + 1 };
     expect(route(dir, newer).action).toBe("block");
-    expect(route(dir, newer).reason).toContain("pipeline_version_mismatch: run=2 harness=3");
+    expect(route(dir, newer).reason).toContain("pipeline_version_mismatch: run=3 harness=4");
   });
 });
 
@@ -150,7 +150,7 @@ describe("selectContinueChain / selectSnapshot", () => {
   test("スナップショットは識別子と phase だけを持つ（導出値は出さない）", () => {
     const s = selectSnapshot(rootOf({ phase: "developing", failure_reason: "agent_failed" }), c);
     expect(s).toEqual({
-      pipeline_version: 2,
+      pipeline_version: 3,
       issue: 123,
       branch: "claude/issue-123",
       phase: "blocked",

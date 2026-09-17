@@ -1,12 +1,8 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { conversationPath } from "../../file/conversationFile.ts";
-import {
-  decisionRecordPath,
-  decisionRecordPaths,
-  type Execution,
-} from "../../file/decisionRecords.ts";
 import { eventPaths } from "../../file/eventLog.ts";
+import { type Execution, journalPath, journalPaths } from "../../file/journal.ts";
 import {
   type PromptRoots,
   readConventions,
@@ -49,7 +45,7 @@ const latest = (label: string, kind: "plan" | "dev"): Input => ({
 const ISSUE = file("issue 本文", "issue.md");
 const PLAN = file("計画", "plan.md");
 const ACCEPTANCE = file("受け入れ条件", "acceptance.json");
-const DECISIONS: Input = { label: "判断の記録", find: decisionRecordPaths };
+const DECISIONS: Input = { label: "判断の記録", find: journalPaths };
 const PLAN_REVIEW = latest("前回のレビュー", "plan");
 const DEV_REVIEW = latest("前回のレビュー", "dev");
 const ALL_REVIEWS: Input = { label: "レビュー", find: (dir) => reviewPaths(dir) };
@@ -119,7 +115,7 @@ const outputSection = (input: {
     review ? `- レビュー: ${review}` : null,
     decisions
       ? [
-          `- 判断の記録: ${decisionRecordPath(dir, run, "<slug>")}`,
+          `- 判断の記録: ${journalPath(dir, run, "<slug>")}`,
           "  （判断 1 つにつき 1 ファイル。`<slug>` はトピックを表す英小文字・数字・ハイフンで、",
           "  2〜5 語・40 字以内。ファイル名の他の部分は変えない）",
         ].join("\n")

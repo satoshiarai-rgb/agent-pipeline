@@ -1,7 +1,7 @@
 import { existsSync } from "node:fs";
 import { join } from "node:path";
 import { hasAcceptance, readAcceptance } from "../../file/acceptanceFile.ts";
-import { decisionRecordPaths } from "../../file/decisionRecords.ts";
+import { journalPaths } from "../../file/journal.ts";
 import { reviewPaths } from "../../file/reviewFile.ts";
 import type { PipelineSettings } from "../../pipelineSettings.ts";
 import type { Phase } from "../../types.ts";
@@ -95,7 +95,7 @@ const GUIDE: Partial<Record<Phase, Guide>> = {
       join(dir, "plan.md"),
       join(dir, "acceptance.json"),
       // 計画レビューの問いに planner が答えた記録（grilling）。承認の判断材料になる
-      ...decisionRecordPaths(dir),
+      ...journalPaths(dir),
       ...reviewPaths(dir, "plan").reverse(),
       join(dir, "issue.md"),
     ],
@@ -114,7 +114,7 @@ const GUIDE: Partial<Record<Phase, Guide>> = {
       // エージェントが書けない場所の完成品。**設置は人間の作業**として残る（A-48）
       join(dir, "staged", "README.md"),
       join(dir, "acceptance.json"),
-      ...decisionRecordPaths(dir),
+      ...journalPaths(dir),
       ...reviewPaths(dir, "dev").reverse(),
       ...reviewPaths(dir, "plan").reverse(),
     ],

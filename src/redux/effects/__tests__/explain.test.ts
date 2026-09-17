@@ -87,7 +87,7 @@ describe("理由ごとの案内（上から順に最初に一致したもの）"
   });
 
   test("版の不一致は「揃えれば解ける」と案内する（導出される停止 / K-26）", () => {
-    const md = explain(blocked("pipeline_version_mismatch: run=1 harness=2"))?.markdown ?? "";
+    const md = explain(blocked("pipeline_version_mismatch: run=1 harness=3"))?.markdown ?? "";
     expect(md).toContain("pipeline_version");
     expect(md).toContain("続きから動きます");
     expect(md).not.toContain("state.json");
