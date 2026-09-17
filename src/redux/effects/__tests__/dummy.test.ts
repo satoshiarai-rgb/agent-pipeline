@@ -2,6 +2,7 @@ import { afterEach, describe, expect, test } from "bun:test";
 import { existsSync, mkdirSync, mkdtempSync, readdirSync, readFileSync, rmSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
+import { journalProblems, routeJournal } from "../../../file/journal.ts";
 import { defaultSettings } from "../../../pipelineSettings.ts";
 import type { AgentName } from "../../../types.ts";
 import { readScenario, type Scenario, writeDummyArtifacts } from "../dummy.ts";
@@ -28,7 +29,7 @@ describe("dry run のダミーエージェント", () => {
 
   /** 1 フェーズ分を書く */
   const run = (r: { repo: string; dir: string }, agent: AgentName, scenario: Scenario = "happy") =>
-    writeDummyArtifacts(agent, { dir: r.dir, scenario, run_id: "1", repo: r.repo });
+    writeDummyArtifacts(agent, { dir: r.dir, scenario, run_id: "1", attempt: 1, repo: r.repo });
 
   /** 直近のレビューの verdict。ハーネスが読むのも frontmatter のこの 1 行だけ */
   function verdictOf(dir: string, kind: "plan" | "dev"): string {
@@ -56,10 +57,30 @@ describe("dry run のダミーエージェント", () => {
     expect(readdirSync(r.dir).sort()).toEqual([
       "acceptance.json",
       "completion.md",
+      "journal",
       "plan.md",
       "reviews",
     ]);
     expect(readdirSync(join(r.dir, "reviews")).sort()).toEqual(["dev-01.md", "plan-01.md"]);
+  });
+
+  /**
+   * 置き場の振り分け（`routeJournal`）は `finish` の一部なので、ダミーが判断の記録を
+   * 書かないとドライランで一度も通らない。**`easy` と `hard` を 1 件ずつ**書く
+   */
+  test("planner は判断の記録を easy と hard で 1 件ずつ書く（振り分けをドライランでも通す）", () => {
+    const r = makeRun();
+    run(r, "planner");
+
+    expect(readdirSync(join(r.dir, "journal")).sort()).toEqual([
+      "1-1-dummy-easy.md",
+      "1-1-dummy-hard.md",
+    ]);
+    expect(journalProblems(r.dir)).toEqual([]);
+    expect(routeJournal(r.dir).map((p) => p.replace(`${r.dir}/`, ""))).toEqual([
+      "decision-records/1-1-dummy-hard.md",
+    ]);
+    expect(readdirSync(join(r.dir, "journal"))).toEqual(["1-1-dummy-easy.md"]);
   });
 
   test("acceptance.json は妥当な JSON で、developing で passed になる", () => {

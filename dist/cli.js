@@ -600,8 +600,26 @@ var write = (path, text) => {
   writeFileSync6(path, text);
   return path;
 };
+var journalEntry = (run, dir, slug, reversibility) => write(journalPath(dir, run, slug), `---
+type: design
+title: ダミーの判断（${reversibility}）
+reversibility: ${reversibility}
+status: adopted
+---
+
+## 決めたこと
+ダミー実行の判断。
+`);
+function journalEntries(context) {
+  const { dir, ...run } = context;
+  mkdirSync5(journalDir(dir), { recursive: true });
+  return [
+    journalEntry(run, dir, "dummy-easy", "easy"),
+    journalEntry(run, dir, "dummy-hard", "hard")
+  ];
+}
 var ARTIFACTS = {
-  planner: ({ dir }) => [
+  planner: ({ dir, run_id, attempt }) => [
     write(join10(dir, "plan.md"), `# ダミー計画
 
 ## 規模判定
@@ -609,7 +627,8 @@ var ARTIFACTS = {
 - 変更ファイル数見込み: テストを除いて 1 / テストを含めて 1
 - 上限（テスト除き 20 / 込み 40）以内: yes
 `),
-    saveAcceptance(dir, acceptance("pending", null))
+    saveAcceptance(dir, acceptance("pending", null)),
+    ...journalEntries({ dir, run_id, attempt })
   ],
   "plan-reviewer": ({ dir, scenario }) => [
     saveReview({
@@ -1917,6 +1936,7 @@ function runCommand(command, args, settings, configError = null) {
       dir,
       scenario: readScenario(dir),
       run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
       repo: args.repo ?? "."
     });
     return { agent, wrote };

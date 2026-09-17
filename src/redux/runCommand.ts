@@ -126,6 +126,7 @@ export function runCommand(
       dir,
       scenario: readScenario(dir),
       run_id: need(args["run-id"], "run-id"),
+      attempt: Number(args.attempt ?? 1),
       repo: args.repo ?? ".",
     });
     return { agent, wrote };

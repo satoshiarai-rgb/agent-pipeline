@@ -1,6 +1,7 @@
 import { existsSync, mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { join } from "node:path";
 import { type AcceptanceFile, saveAcceptance } from "../../file/acceptanceFile.ts";
+import { journalDir, journalPath } from "../../file/journal.ts";
 import { nextReviewNumber, saveReview } from "../../file/reviewFile.ts";
 import type { AgentName } from "../../types.ts";
 
@@ -30,6 +31,8 @@ interface Context {
   scenario: Scenario;
   /** developer が作る差分のファイル名に使う（実行ごとに変える） */
   run_id: string;
+  /** 判断の記録の名前の prefix に使う（`<run_id>-<attempt>`） */
+  attempt: number;
   /** 配布先のチェックアウト。developer のダミーはここにコードの差分を作る（既定はカレント） */
   repo: string;
 }
@@ -55,15 +58,40 @@ const write = (path: string, text: string): string => {
   return path;
 };
 
+/** 判断の記録を 1 件書く。ハーネスが読むのは frontmatter の 4 つだけ（契約 §4） */
+const journalEntry = (
+  run: { run_id: string; attempt: number },
+  dir: string,
+  slug: string,
+  reversibility: "easy" | "hard",
+): string =>
+  write(
+    journalPath(dir, run, slug),
+    `---\ntype: design\ntitle: ダミーの判断（${reversibility}）\nreversibility: ${reversibility}\nstatus: adopted\n---\n\n## 決めたこと\nダミー実行の判断。\n`,
+  );
+
+/** `easy` は journal/ に残り、`hard` は finish で decision-records/ に寄る */
+function journalEntries(context: { dir: string; run_id: string; attempt: number }): string[] {
+  const { dir, ...run } = context;
+  mkdirSync(journalDir(dir), { recursive: true });
+  return [
+    journalEntry(run, dir, "dummy-easy", "easy"),
+    journalEntry(run, dir, "dummy-hard", "hard"),
+  ];
+}
+
 /** エージェントごとの成果物。1 行 1 エージェントで読めるようにする */
 const ARTIFACTS: Record<AgentName, (context: Context) => string[]> = {
   // 規模判定は planner の必須出力。「上限超過」の語が無ければ実装に進む（K-21）
-  planner: ({ dir }) => [
+  planner: ({ dir, run_id, attempt }) => [
     write(
       join(dir, "plan.md"),
       "# ダミー計画\n\n## 規模判定\n\n- 変更ファイル数見込み: テストを除いて 1 / テストを含めて 1\n- 上限（テスト除き 20 / 込み 40）以内: yes\n",
     ),
     saveAcceptance(dir, acceptance("pending", null)),
+    // **`easy` と `hard` を 1 件ずつ書く。** 置き場の振り分け（`routeJournal`）は `finish` の
+    // 一部なので、これが無いとドライランで一度も通らない
+    ...journalEntries({ dir, run_id, attempt }),
   ],
 
   "plan-reviewer": ({ dir, scenario }) => [
