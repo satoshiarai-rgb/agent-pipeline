@@ -114,7 +114,12 @@ while :; do
     echo "    ログ: ${PHASE_LOG}"
     # shellcheck disable=SC2086 — claude_args はフラグ列なので分割して渡す
     # tee でログに落としつつ流す。**pipefail なので claude の終了コードは PIPESTATUS で取る**
-    claude -p "$(cat "$PROMPT")" $ARGS 2>&1 | tee "$PHASE_LOG"
+    #
+    # **`--strict-mcp-config` は測定を CI と揃えるために要る。** これが無いと開発者個人の
+    # MCP サーバー（Notion・Slack・Drive 等）のツール定義が全部この実行の文脈に載る。
+    # 実測: 同じ最小プロンプトで 75,126 → 15,038 トークン（固定オーバーヘッドの 80% が MCP）。
+    # CI のランナーにはユーザーの MCP 設定が無いので、付けないとローカルだけ高く出る
+    claude -p "$(cat "$PROMPT")" $ARGS --strict-mcp-config 2>&1 | tee "$PHASE_LOG"
     STATUS=${PIPESTATUS[0]}
   fi
   FAILED=""
