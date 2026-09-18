@@ -54,6 +54,18 @@ elapsed() { # elapsed <開始の epoch>
   printf '%dm%02ds' $(( s / 60 )) $(( s % 60 ))
 }
 
+# **殺されても状態を閉じる。** スクリプトが途中で止まると `finish` に到達せず、run は
+# `agent_started` のまま宙に浮く。`retry` は `blocked` からしか使えないので戻す経路が無くなる。
+# CI では `agent-dispatch.yml` が必ず状態を書くので起きない、ローカル固有の穴（今日 3 回踏んだ）
+abort() {
+  trap - INT TERM
+  [ -n "${RUN_ID:-}" ] || exit 130
+  say "中断されました。${AGENT:-エージェント} を agent_failed として閉じます"
+  cli finish --run-id "$RUN_ID" --attempt 1 --changed-files /dev/null --agent-failed > /dev/null
+  echo "  続きから戻すには: node <agent-pipeline>/dist/cli.js retry --association OWNER --dir $DIR"
+  exit 130
+}
+
 if [ "$APPROVE" = true ]; then
   cli approve --association OWNER
   exit $?
@@ -97,6 +109,7 @@ while :; do
   PHASE_LOG="$LOG_DIR/${RUN_ID}-${AGENT}.log"
 
   cli start --run-id "$RUN_ID" --attempt 1 --agent "$AGENT" > /dev/null
+  trap abort INT TERM          # ここから finish までが「実行中」の区間
   PROMPT=$(mktemp)
   cli compose --central "$ROOT" --out "$PROMPT" --run-id "$RUN_ID" --attempt 1 --repo . > /dev/null
 
@@ -135,6 +148,7 @@ while :; do
 
   # shellcheck disable=SC2086 — FAILED は空か --agent-failed
   RESULT=$(cli finish --run-id "$RUN_ID" --attempt 1 --changed-files "$CHANGED" $FAILED)
+  trap - INT TERM              # 閉じたので中断ハンドラを外す
   say "$(jq -r '"\(.phase) result=\(.result) \(.detail // "")"' <<<"$RESULT")（${AGENT} に $(elapsed "$STARTED")、コード差分 $(wc -l < "$CHANGED" | tr -d " ") ファイル）"
 
   [ "$ONCE" = true ] && exit 0
