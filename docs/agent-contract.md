@@ -55,7 +55,7 @@
 - issue 本文: agent-work/issue-12/issue.md
 - 計画: agent-work/issue-12/plan.md
 - 受け入れ条件: agent-work/issue-12/acceptance.json
-- 前回のレビュー: agent-work/issue-12/reviews/plan-01.md
+- 計画のレビュー: agent-work/issue-12/reviews/plan-01.md
 - 実装中の判断: agent-work/issue-12/journal/17293840112-1-session-ttl.md
 - 実装中の判断: agent-work/issue-12/journal/17293840112-1-token-rotation.md
 
@@ -158,7 +158,7 @@ reviewer: plan-reviewer
 
 | | 内容 |
 |---|---|
-| 入力 | `plan.md`、`acceptance.json`、`reviews/dev-*.md`（あれば）、判断の記録（あれば） |
+| 入力 | `plan.md`、`acceptance.json`、`reviews/plan-*.md` の直近 1 通（**承認したレビュー。`## 任意の指摘` を実装のついでに直すため**）、`reviews/dev-*.md` の直近 1 通（あれば）、判断の記録（あれば） |
 | 出力（必須） | コード変更（差分が空なら `blocked`） |
 | 出力（任意） | `staged/pr-body.md`。置かれていればハーネスが PR 本文に反映する（`Closes #<issue>` は残す）。エージェントは `gh` を実行しない |
 | 出力（任意） | `conversations/<run_id>-<attempt>-developer-<NN>-<slug>.md` — レビューチームとのやり取りの保管。planner と同じ扱いで、ハーネスは中身を読まない |

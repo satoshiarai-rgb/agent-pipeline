@@ -440,8 +440,8 @@ var ISSUE = file("issue 本文", "issue.md");
 var PLAN = file("計画", "plan.md");
 var ACCEPTANCE = file("受け入れ条件", "acceptance.json");
 var DECISIONS = { label: "判断の記録", find: journalPaths };
-var PLAN_REVIEW = latest("前回のレビュー", "plan");
-var DEV_REVIEW = latest("前回のレビュー", "dev");
+var PLAN_REVIEW = latest("計画のレビュー", "plan");
+var DEV_REVIEW = latest("実装のレビュー", "dev");
 var ALL_REVIEWS = { label: "レビュー", find: (dir) => reviewPaths(dir) };
 var EVENTS = { label: "実行の記録", find: eventPaths };
 var CONTRACT = {
@@ -452,7 +452,7 @@ var CONTRACT = {
   },
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
   developer: {
-    inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS],
+    inputs: [PLAN, ACCEPTANCE, PLAN_REVIEW, DEV_REVIEW, DECISIONS],
     decisions: true,
     conversations: true
   },

@@ -46,8 +46,8 @@ const ISSUE = file("issue 本文", "issue.md");
 const PLAN = file("計画", "plan.md");
 const ACCEPTANCE = file("受け入れ条件", "acceptance.json");
 const DECISIONS: Input = { label: "判断の記録", find: journalPaths };
-const PLAN_REVIEW = latest("前回のレビュー", "plan");
-const DEV_REVIEW = latest("前回のレビュー", "dev");
+const PLAN_REVIEW = latest("計画のレビュー", "plan");
+const DEV_REVIEW = latest("実装のレビュー", "dev");
 const ALL_REVIEWS: Input = { label: "レビュー", find: (dir) => reviewPaths(dir) };
 const EVENTS: Input = { label: "実行の記録", find: eventPaths };
 
@@ -78,8 +78,12 @@ const CONTRACT: Record<AgentName, Contract> = {
   },
   // 片付いた決定を渡す。同じことを問い直させないため
   "plan-reviewer": { inputs: [ISSUE, PLAN, ACCEPTANCE, DECISIONS], review: "plan" },
+  // 計画のレビューも渡す。**`approve` に添えられた「任意の指摘」の行き先がここしかない** —
+  // 差し戻しの回なら planner に届いて計画に組み込まれるが、承認の回に書かれたものは
+  // planner が走らないので宙に浮く。一覧に 1 行足せば閉じる指摘のために計画をやり直すのは
+  // 割に合わないので、レビュアーはそれを任意に落とし、developer が直して記録を残す
   developer: {
-    inputs: [PLAN, ACCEPTANCE, DEV_REVIEW, DECISIONS],
+    inputs: [PLAN, ACCEPTANCE, PLAN_REVIEW, DEV_REVIEW, DECISIONS],
     decisions: true,
     conversations: true,
   },

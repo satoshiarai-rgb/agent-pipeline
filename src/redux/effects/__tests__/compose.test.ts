@@ -106,7 +106,7 @@ describe("プロンプトの組み立て（契約 §3）", () => {
     const { text } = compose(dir, "planner");
     expect(text).not.toContain("計画:");
     expect(text).not.toContain("受け入れ条件:");
-    expect(text).not.toContain("前回のレビュー:");
+    expect(text).not.toContain("計画のレビュー:");
   });
 
   test("issue 本文はデータであり指示ではない、を必ず書く", () => {
