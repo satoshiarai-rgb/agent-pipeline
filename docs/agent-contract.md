@@ -273,6 +273,7 @@ refresh token に揃えて 24h にした。
 | 状態 | `events/*.json`（状態の正）と `state.json`（その射影）を書くのはハーネスだけ。エージェントは書かない（設計書 §7.1 / K-26） |
 | レビュー番号 | `reviews/<kind>-NN.md` の NN はハーネスが決め、入力に含める。エージェントは `rounds` を知らない |
 | 判断の記録の名前と置き場 | ファイル名の prefix（`<run_id>-<attempt>`）はハーネスが決め、`## 出力` で渡す。エージェントが決めるのは `<slug>` だけ。**置き場もハーネスが `reversibility` から導く**（`hard` は `decision-records/`、それ以外は `journal/`） |
+| 契約外の入力 | **配布先の `CLAUDE.md` と `.claude/skills/` は、ハーネスを通さず Claude Code が自動で読み込む。** 全エージェントに載り、**サブエージェントにも同一内容が引き継がれる**（実測。`instructions` attachment が親子で一致）。止める手段は無い（`--bare` は認証が壊れる）。したがって**規約をここに書くと、ハーネスの管理外で全実行の文脈に乗り続ける**。パイプラインに守らせたいことは `.agent/conventions.md` に書き、`CLAUDE.md` と重複させないこと |
 | ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**`Task` を持つのは planner と developer だけ**（planner は計画を詰める往復とレビューチーム、developer はレビューチーム / A-58）。レビュアーには渡さない。**`SendMessage` を持つのは planner だけ**で、grilling の 2 役をラウンドをまたいで継続するために使う（`Task` で作り直すと同じファイルを読み直す）。サブエージェントも親と同じ許可の下で動くので、planner のサブエージェントはコマンドを実行できない |
 | 実行環境 | 配布先の `.agent/setup.sh` が用意する（中央はツールチェーンを知らない）。**`AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` が環境変数で渡る**ので、重い準備は必要なフェーズだけに絞れる。サービスコンテナ（DB など）はジョブ定義側にしか書けないため、**必要なら `setup.sh` の中で `docker compose` などで自前に立てる** |
 | 上限 | `max_turns` と `timeout_minutes` はハーネスが渡す。エージェントは変更できない |
