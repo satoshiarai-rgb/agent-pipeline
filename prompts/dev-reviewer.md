@@ -73,6 +73,7 @@ reviewer: dev-reviewer
 - `round` は出力パスの番号（`dev-02.md` なら 2）
 - `request_changes` なら「差し戻す理由」を必ず書く。**この本文が次の developer への入力になる**ので、
   どのファイルの何をどう直せばよいかが分かる粒度で書く
+- `approve` なら「差し戻す理由」の節は不要
 
 ## 禁止
 
