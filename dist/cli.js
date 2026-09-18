@@ -23,7 +23,7 @@ var defaultSettings = {
     readonly: "Read,Glob,Grep,Write",
     plan: "Read,Glob,Grep,Write,Task,SendMessage",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
-    build: "Read,Glob,Grep,Write,Edit,Bash,Task"
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage"
   },
   agents: {
     planner: { max_turns: 150, timeout_minutes: 120, tools: "plan" },

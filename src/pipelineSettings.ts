@@ -61,14 +61,18 @@ export const defaultSettings: PipelineSettings = {
      * **レビュアー（plan-reviewer / dev-reviewer / completion）には渡さない**。
      * 使わない道具を見せないため（A-30 の趣旨）で、プロファイルを分ける費用はこれで払う
      *
-     * **planner だけ `SendMessage` も持つ。** grilling はラウンドをまたいで同じインスタンスを
-     * 継続する（`Task` は呼ぶたびに新しいサブエージェントを作るため、2 ラウンド目が同じ
-     * ファイルを読み直す）。読み直しが消えるので、キャッシュの書き込み・読み込みと所要時間の
+     * **`Task` を持つ側は `SendMessage` も持つ。** `Task` は呼ぶたびに新しいサブエージェントを
+     * 作るので、2 回目以降が同じファイル（planner なら issue と既存コード、developer なら
+     * ブランチの差分）を読み直す。**1 回目だけ `Task` で起こし、以降は `SendMessage` で
+     * その相手に送る。** 読み直しが消えるので、キャッシュの書き込み・読み込みと所要時間の
      * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
+     *
+     * 対象は grilling の 2 人と `reviewer-leader` の両方。リーダーは相談 3 回 + 完了時の
+     * 点検 1 回で最大 4 回呼ばれるため、作り直すと差分を 4 回読み直すことになる
      */
     plan: "Read,Glob,Grep,Write,Task,SendMessage",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
-    build: "Read,Glob,Grep,Write,Edit,Bash,Task",
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage",
   },
 
   /**

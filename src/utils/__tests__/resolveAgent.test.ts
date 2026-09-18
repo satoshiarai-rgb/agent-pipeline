@@ -9,7 +9,9 @@ describe("resolveAgent", () => {
 
   test("tool_profiles を実体に展開する", () => {
     expect(resolveAgent(c, "planner").tools).toBe("Read,Glob,Grep,Write,Task,SendMessage");
-    expect(resolveAgent(c, "developer").tools).toBe("Read,Glob,Grep,Write,Edit,Bash,Task");
+    expect(resolveAgent(c, "developer").tools).toBe(
+      "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage",
+    );
   });
 
   test("reviewer が null なら default モデルを使う", () => {
@@ -42,8 +44,8 @@ describe("resolveAgent", () => {
     // 後者が無いと非対話実行では書き込みが拒否される（実機で確認 / A-24）
     expect(resolveAgent(c, "developer").claude_args).toBe(
       `--model claude-opus-5 --max-turns ${c.agents.developer.max_turns}` +
-        " --tools Read,Glob,Grep,Write,Edit,Bash,Task" +
-        " --allowed-tools Read,Glob,Grep,Write,Edit,Bash,Task",
+        " --tools Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage" +
+        " --allowed-tools Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage",
     );
   });
 
