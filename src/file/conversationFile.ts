@@ -8,8 +8,8 @@ import type { Execution } from "./journal.ts";
  *
  * 名前に `<agent>` と `<slug>` を入れるのは、**どのフェーズの誰と誰のやり取りか**を
  * 一覧で見分けるため（`...-planner-02-leader-performance.md`）。run の中には
- * 種類の違う往復が混ざる — planner の grilling（計画者 ⇄ 回答者）、レビューチームへの相談、
- * 成果物レビューの取りまとめ。番号だけでは後から追えない。
+ * 種類の違う往復が混ざる — planner が計画を詰める問い（レビューチームが答える）、
+ * developer の相談、成果物レビューの取りまとめ。番号だけでは後から追えない。
  *
  * 判断の記録（`journal/` と `decision-records/`）との違い:
  *

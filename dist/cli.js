@@ -504,8 +504,8 @@ var outputSection = (input) => {
     conversations ? [
       `- やり取りの記録: ${conversationPath(dir, run, agent, "<NN>", "<slug>")}`,
       "  （エージェント同士のやり取り。1 往復につき 1 ファイル。`<NN>` は通し番号の 2 桁",
-      "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`grilling` /",
-      "  `leader-performance` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）"
+      "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`leader-consult` /",
+      "  `leader-review` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）"
     ].join(`
 `) : null
   ].filter((line) => line !== null);

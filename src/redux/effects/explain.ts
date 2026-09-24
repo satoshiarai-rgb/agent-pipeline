@@ -94,7 +94,7 @@ const GUIDE: Partial<Record<Phase, Guide>> = {
     files: (dir) => [
       join(dir, "plan.md"),
       join(dir, "acceptance.json"),
-      // 計画レビューの問いに planner が答えた記録（grilling）。承認の判断材料になる
+      // 計画を詰める問いにレビューチームが答えた記録。承認の判断材料になる
       ...journalPaths(dir),
       ...reviewPaths(dir, "plan").reverse(),
       join(dir, "issue.md"),

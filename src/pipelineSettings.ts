@@ -56,8 +56,8 @@ export const defaultSettings: PipelineSettings = {
     readonly: "Read,Glob,Grep,Write",
     /**
      * `Task`（サブエージェント）を持つのは planner と developer だけ。どちらも
-     * **自分の中でチームを回す**ため — planner は計画者と回答者の往復（grilling / A-58）と
-     * レビューチームへの相談、developer はレビューチームへの相談と完了時の点検。
+     * **自分の中でチームを回す**ため — planner は計画を詰める問い（A-66）と完了時の点検、
+     * developer は相談と完了時の点検。どちらも相手はレビューチーム。
      * **レビュアー（plan-reviewer / dev-reviewer / completion）には渡さない**。
      * 使わない道具を見せないため（A-30 の趣旨）で、プロファイルを分ける費用はこれで払う
      *
@@ -67,8 +67,8 @@ export const defaultSettings: PipelineSettings = {
      * その相手に送る。** 読み直しが消えるので、キャッシュの書き込み・読み込みと所要時間の
      * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
      *
-     * 対象は grilling の 2 人と `reviewer-leader` の両方。リーダーは相談 3 回 + 完了時の
-     * 点検 1 回で最大 4 回呼ばれるため、作り直すと差分を 4 回読み直すことになる
+     * 相手は `reviewer-leader`。planner なら問いのラウンド 3 回 + 完了時の点検 1 回、
+     * developer なら相談 3 回 + 点検 1 回で、どちらも最大 4 回呼ぶ。作り直すと 4 回読み直す
      */
     plan: "Read,Glob,Grep,Write,Task,SendMessage",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
@@ -81,8 +81,8 @@ export const defaultSettings: PipelineSettings = {
    * 上限が足りないと完成した成果物ごと agent_failed になる。実測は
    * planner 18〜22 / plan-reviewer 13〜15 / developer 43。
    *
-   * **planner だけ 100 ターン / 90 分と大きい。** 計画を詰める過程で計画者と回答者の
-   * サブエージェントを 3 ラウンド往復させるため（A-58）。**計画が重くなるのは想定どおり**で、
+   * **planner だけ 100 ターン / 90 分と大きい。** 計画を詰める過程で、問いをレビューチームに
+   * 3 ラウンド渡して答えさせるため（A-58 / A-66）。**計画が重くなるのは想定どおり**で、
    * ターンが足りないと成果物ごと捨てられるので、時間も合わせて上げている
    * （timeout が 20 分のままだと step のタイムアウトで殺され、同じことになる）。
    *

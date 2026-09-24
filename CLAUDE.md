@@ -33,7 +33,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | `docs/installation.md` | 利用者向け: 導入手順（GitHub App、Secrets、ワークフロー、お試し実行） |
 | `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
 | `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
-| `agents/` | **フェーズの中のチームの定義**（レビューチームのリーダーと 2 観点、grilling の 2 役）。Claude Code の plugin として配り、`claude_args` の `--plugin-dir` で読ませる。**配布先の上書きは想定しない**（K-32）。振る舞いをプロンプト側に書き戻すとリレーで薄まる |
+| `agents/` | **フェーズの中のチームの定義**（レビューチームのリーダーと 2 観点。planner の計画を詰める問いにもこのチームが答える / A-66）。Claude Code の plugin として配り、`claude_args` の `--plugin-dir` で読ませる。**配布先の上書きは想定しない**（K-32）。振る舞いをプロンプト側に書き戻すとリレーで薄まる |
 | `.claude-plugin/plugin.json` | このリポジトリを plugin として扱うための manifest。バージョンは git のタグから取られる |
 | `install/` | 配布先に置くファイルの原本（`agent-pipeline.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent-pipeline.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
 

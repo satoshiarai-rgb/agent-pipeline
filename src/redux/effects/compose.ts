@@ -69,7 +69,7 @@ interface Contract {
 }
 
 const CONTRACT: Record<AgentName, Contract> = {
-  // planner は決定記録を**書く**（計画レビューの問いに答えた記録 / grilling）。
+  // planner は決定記録を**書く**（計画を詰める問いにレビューチームが答えた記録）。
   // 前のラウンドで片付いた決定を読み直せるよう、入力にも入れる
   planner: {
     inputs: [ISSUE, PLAN, ACCEPTANCE, PLAN_REVIEW, DECISIONS],
@@ -166,8 +166,8 @@ const outputSection = (input: {
       ? [
           `- やり取りの記録: ${conversationPath(dir, run, agent, "<NN>", "<slug>")}`,
           "  （エージェント同士のやり取り。1 往復につき 1 ファイル。`<NN>` は通し番号の 2 桁",
-          "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`grilling` /",
-          "  `leader-performance` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）",
+          "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`leader-consult` /",
+          "  `leader-review` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）",
         ].join("\n")
       : null,
   ].filter((line): line is string => line !== null);

@@ -142,7 +142,7 @@ describe("エージェントごとの入力（契約 §4 の表）", () => {
     review(dir, "plan", 1);
 
     const { inputs } = compose(dir, "plan-reviewer");
-    // 判断の記録も成果物（前のラウンドで片付いた決定。同じことを問い直させない / grilling）。
+    // 判断の記録も成果物（前のラウンドで片付いた決定。同じことを問い直させない）。
     // **渡さないのは生成側のセッションログや思考過程**で、コミットされた成果物は渡してよい
     expect(inputs).toEqual([
       join(dir, "issue.md"),
@@ -220,7 +220,7 @@ describe("レビューの書き込み先（契約 §5）", () => {
   test("planner の出力の節は判断の記録とやり取りの記録（レビューは書かない）", () => {
     const { text, review_path } = compose(makeRun(), "planner");
     expect(review_path).toBeNull();
-    // 計画レビューの問いに答えた記録を書く（grilling）。名前の prefix はハーネスが決める
+    // 計画を詰める問いの答えを記録に書く。名前の prefix はハーネスが決める
     expect(text).toContain("## 出力");
     expect(text).toContain("判断の記録:");
     expect(text).not.toContain("- レビュー:");

@@ -22,8 +22,8 @@ describe("defaultSettings", () => {
   });
 
   // 4 本だけ（A-30 の趣旨は「エージェントごとに集合を変えない」こと）。
-  // Task を持つのは自分の中でチームを回す 2 つ（planner の grilling とレビューチーム、
-  // developer のレビューチーム / A-58）。exec と build の違いは Task の有無だけ
+  // Task を持つのは自分の中でチームを回す 2 つ（planner と developer。相手はどちらも
+  // レビューチーム / A-58・A-66）。exec と build の違いは Task の有無だけ
   test("ツールプロファイルは 4 本。書き込みと実行の境界を保つ", () => {
     expect(Object.keys(defaultSettings.tool_profiles)).toEqual([
       "readonly",

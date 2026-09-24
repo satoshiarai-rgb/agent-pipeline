@@ -121,7 +121,7 @@ interface Contract {
 
 const CONTRACT: Record<AgentName, Contract> = {
   planner: {
-    // 決定記録は任意。書いたなら形式（1 ファイル 1 レコード・名前）を見る（grilling の記録）
+    // 決定記録は任意。書いたなら形式（1 ファイル 1 レコード・名前）を見る
     checks: [
       nonEmpty("plan.md"),
       contains("plan.md", "## 規模判定"),
