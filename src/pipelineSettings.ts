@@ -68,7 +68,9 @@ export const defaultSettings: PipelineSettings = {
      * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
      *
      * 相手は `reviewer-leader`。planner なら問いのラウンド 3 回 + 完了時の点検 1 回、
-     * developer なら相談 3 回 + 点検 1 回で、どちらも最大 4 回呼ぶ。作り直すと 4 回読み直す
+     * developer なら相談 3 回 + 点検 1 回で、どちらも最大 4 回呼ぶ。作り直すと 4 回読み直す。
+     * リーダーの下の観点 2 人も同じ理由で継続させる（`agents/reviewer-leader.md` の `tools:`。
+     * 親のツール制限は plugin より強いので、ここに `SendMessage` が無いとリーダーも使えない / V-19）
      */
     plan: "Read,Glob,Grep,Write,Task,SendMessage",
     exec: "Read,Glob,Grep,Write,Edit,Bash",

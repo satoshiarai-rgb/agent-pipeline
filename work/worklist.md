@@ -419,6 +419,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - 触ったもの: `prompts/planner.md`（計画を詰める節とレビューチームの節を統合）/ `agents/reviewer-*.md` / `agents/grilling-*.md`（削除）/ `effects/compose.ts`（やり取りの記録の `<slug>` の例）/ `docs/agent-contract.md` / `scripts/__tests__/workflows.test.ts`（agent 定義は 3 つ）/ 各所のコメント
   - **Q-8 の「grilling をラウンドまたぎで継続する変更が効くか」は測る対象が無くなった**
   - 未測定: 費用がどれだけ動いたか。判別は Q-8 と同じく `~/.claude/projects/<配布先>/*/subagents/*.jsonl` の本数とモデル（Opus のサブエージェントが 0 本になっているか）と、planner 本体の cache read
+- [x] A-67: **リーダーにも `SendMessage` を持たせ、観点の 2 人を呼び出しをまたいで継続させる（2026-09-24）。**
+  - A-66 で grilling をリーダーへの問いに統合したので、リーダーは 1 回の planner 実行で最大 4 回呼ばれる。`Task` で観点を毎回作り直すと、そのたびに同じファイルを読み直す
+  - 初回は `Task`（`run_in_background: false` を明示。既定は background）、2 回目以降は `SendMessage`。**`SendMessage` の答えは後から届くので、揃うまで依頼元に返さない**と定義に書いた — compass-wiki issue #108 の planner（2026-09-18）でリーダーが「まだ届いていない」と 3 回返し、依頼元が催促してようやく束ねた結果が出た。同じ失敗を `SendMessage` で再現しやすくなる
+  - 未測定: サブエージェントの中から `SendMessage` で孫を再開したとき、答えが届くまでリーダーが待てるか。判別は `conversations/*-leader-*.md` が揃っているのに、観点の transcript がラウンドごとに増えていないこと
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）
