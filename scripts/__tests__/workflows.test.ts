@@ -319,9 +319,9 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
    * 振る舞いを書き戻すとリレーで薄まる**（実測: やり取りの記録が 7.6KB → 19.6KB）。
    * プロンプト側は名前で呼ぶだけ、という状態を保つ。
    */
-  const AGENTS = ["reviewer-leader", "reviewer-functional", "reviewer-nonfunctional"];
+  const AGENTS = ["reviewer-leader", "reviewer-functional", "reviewer-nonfunctional", "researcher"];
 
-  test("agent 定義が 3 つあり、name がファイル名と一致する", () => {
+  test("agent 定義が 4 つあり、name がファイル名と一致する", () => {
     for (const name of AGENTS) {
       const text = readFileSync(join(ROOT, "agents", `${name}.md`), "utf8");
       expect(text, name).toContain(`name: ${name}`);
@@ -337,8 +337,9 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
   test("planner と developer は agent を名前で呼ぶ", () => {
     const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
     const developer = readFileSync(join(ROOT, "prompts/developer.md"), "utf8");
-    // planner は観点の 2 人を直接呼ぶ（入れ子の中のリーダーが答えを待てなかった / A-68）
-    for (const name of ["reviewer-functional", "reviewer-nonfunctional"]) {
+    // planner は観点の 2 人を直接呼ぶ（入れ子の中のリーダーが答えを待てなかった / A-68）。
+    // 事実の読み込みは researcher に任せる（本体が読むと履歴に残って毎ターン再送される / A-69）
+    for (const name of ["reviewer-functional", "reviewer-nonfunctional", "researcher"]) {
       expect(planner, name).toContain(name);
     }
     // developer はリーダー越しに呼ぶ。観点はリーダーが振り分けるので、developer が直接呼ばない

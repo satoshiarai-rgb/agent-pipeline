@@ -68,6 +68,8 @@ export const defaultSettings: PipelineSettings = {
      * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
      *
      * planner は観点の 2 人を直接呼ぶ（問いのラウンド 3 回 + 完了時の点検 1 回。A-68）。
+     * 事実の読み込みも `researcher` に任せて継続させる（本体が読むと履歴に残り、以降の
+     * ターンのたびに再送される / A-69）。
      * developer は `reviewer-leader` を呼び（相談 3 回 + 点検 1 回）、リーダーが観点の 2 人を
      * 同じ理由で継続させる（`agents/reviewer-leader.md` の `tools:`。親のツール制限は plugin より
      * 強いので、ここに `SendMessage` が無いとリーダーも使えない / V-19）
