@@ -20,10 +20,10 @@ var defaultSettings = {
     total_steps: 24
   },
   tool_profiles: {
-    readonly: "Read,Glob,Grep,Write",
+    readonly: "Read,Glob,Grep,Write,Skill",
     plan: "Read,Glob,Grep,Write,Task,SendMessage,Skill",
-    exec: "Read,Glob,Grep,Write,Edit,Bash",
-    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage"
+    exec: "Read,Glob,Grep,Write,Edit,Bash,Skill",
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage,Skill"
   },
   agents: {
     planner: { max_turns: 150, timeout_minutes: 120, tools: "plan" },
@@ -505,7 +505,7 @@ var outputSection = (input) => {
       `- やり取りの記録: ${conversationPath(dir, run, agent, "<NN>", "<slug>")}`,
       "  （エージェント同士のやり取り。1 往復につき 1 ファイル。`<NN>` は通し番号の 2 桁",
       "  （`01` から）、`<slug>` は相手を表す英小文字・数字・ハイフン（`team-consult` /",
-      "  `leader-review` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）"
+      "  `team-review` など、2〜4 語・40 字以内）。ファイル名の他の部分は変えない）"
     ].join(`
 `) : null
   ].filter((line) => line !== null);

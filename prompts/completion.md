@@ -15,7 +15,8 @@ PR をレビューする人間のために、**この run で何が起きたの�
 
 1. `acceptance.json` の全項目が `passed` かを確認する。**1 つでも `pending` / `failed` があれば
    run は `blocked` になる**（人間が見るべき状態なので、その旨を報告に書く）
-2. `verification: automated` の項目は `command` を実行して、報告と実態が合っていることを確かめる
+2. skill `agent-pipeline:shared-evidence` を呼び、「照合する」の表で報告と実態が合っていることを確かめる
+   （`automated` の項目は `command` を実行する）
 3. レビューの履歴（何が差し戻され、どう直ったか）を読み、人間が知るべき点を拾う
 4. 判断の記録の frontmatter を見て、`reversibility: hard` の判断と `status: open`（未処理のまま残った判断）を拾う。**`hard` はハーネスが `decision-records/` に寄せてあるので、そのディレクトリがそのまま「人間が見るべきもの」の一覧になる。**
    `type: friction` は判断ではない観察なので、報告では判断と混ぜない

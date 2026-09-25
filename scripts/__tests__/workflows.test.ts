@@ -313,15 +313,48 @@ describe("run: ブロックのシェル構文", () => {
   }
 });
 
-describe("plugin（agents/ と .claude-plugin/）", () => {
+describe("plugin（agents/ と skills/ と .claude-plugin/）", () => {
   /**
    * フェーズの中のチームは agent 定義として中央が配る（K-32）。**プロンプトに
    * 振る舞いを書き戻すとリレーで薄まる**（実測: やり取りの記録が 7.6KB → 19.6KB）。
    * プロンプト側は名前で呼ぶだけ、という状態を保つ。
    */
-  const AGENTS = ["reviewer-leader", "reviewer-functional", "reviewer-nonfunctional", "researcher"];
+  const AGENTS = ["reviewer-functional", "reviewer-nonfunctional", "researcher"];
 
-  test("agent 定義が 4 つあり、name がファイル名と一致する", () => {
+  /**
+   * コアな動作は plugin 同梱の skill に置き、役割のプロンプトは段の直前に名前で呼ぶ（A-70・A-71）。
+   * 接頭辞は使う範囲を表す: `plan-` は計画のフェーズ、`shared-` はフェーズをまたぐもの。
+   * **この表が「どの役割がどの skill を呼ぶか」の正**で、足すときは行を足す
+   */
+  const SKILLS: Record<string, string[]> = {
+    "plan-format": ["planner"],
+    "plan-grilling": ["planner"],
+    "plan-checklist": ["planner", "plan-reviewer"],
+    "shared-team": ["planner", "developer"],
+    "shared-journal": ["planner", "developer"],
+    "shared-evidence": ["developer", "dev-reviewer", "completion"],
+    "shared-verdict": ["plan-reviewer", "dev-reviewer"],
+  };
+
+  /**
+   * skill に移した中身の目印。**目印は持ち主の skill にだけあり、どのプロンプトにも無い**ことを見る。
+   * プロンプトに写し戻すと、片方だけが直って食い違う
+   */
+  const MOVED: Record<string, string[]> = {
+    "plan-format": ["# 計画: <issue のタイトル>", '"criteria": ['],
+    "plan-grilling": ["| 2 人の答え | 扱い |"],
+    "plan-checklist": ["<!-- checklist:start -->"],
+    "shared-team": ["to: reviewer-functional / reviewer-nonfunctional"],
+    "shared-journal": ["status: adopted\n---"],
+    "shared-evidence": ["| `manual` | 何をどう確かめたかを 1〜2 行"],
+    "shared-verdict": ["verdict: request_changes\nround: 2"],
+  };
+
+  const prompt = (name: string) => readFileSync(join(ROOT, "prompts", `${name}.md`), "utf8");
+  const skill = (name: string) => readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8");
+  const ROLES = ["planner", "plan-reviewer", "developer", "dev-reviewer", "completion"];
+
+  test("agent 定義が 3 つあり、name がファイル名と一致する", () => {
     for (const name of AGENTS) {
       const text = readFileSync(join(ROOT, "agents", `${name}.md`), "utf8");
       expect(text, name).toContain(`name: ${name}`);
@@ -329,40 +362,57 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
     }
   });
 
-  /**
-   * planner の成果物の形式は plugin 同梱の skill に置く（A-70）。進め方はプロンプト、形式は skill。
-   * プロンプトに雛形を写し戻すと、片方だけが直って食い違う
-   */
-  test("planner は成果物の形式を skill から読み、プロンプトに雛形を持たない", () => {
-    const skill = readFileSync(join(ROOT, "skills/plan-format/SKILL.md"), "utf8");
-    expect(skill).toContain("name: plan-format");
-    expect(skill).toContain("description:");
-    expect(skill).toContain("# 計画: <issue のタイトル>");
-    expect(skill).toContain('"criteria": [');
+  test("skill の name がディレクトリ名と一致し、description を持つ", () => {
+    for (const name of Object.keys(SKILLS)) {
+      expect(skill(name), name).toContain(`name: ${name}`);
+      expect(skill(name), name).toContain("description:");
+    }
+  });
 
-    const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
-    expect(planner).toContain("agent-pipeline:plan-format");
-    expect(planner).not.toContain("# 計画: <issue のタイトル>");
-    expect(planner).not.toContain('"criteria": [');
+  test("役割のプロンプトは、使う skill を名前で呼ぶ", () => {
+    for (const [name, roles] of Object.entries(SKILLS)) {
+      for (const role of roles) {
+        expect(prompt(role), `${role} → ${name}`).toContain(`agent-pipeline:${name}`);
+      }
+    }
+  });
+
+  test("skill に移した中身は、持ち主の skill にだけある", () => {
+    for (const [name, markers] of Object.entries(MOVED)) {
+      for (const marker of markers) {
+        expect(skill(name), `${name} に ${marker}`).toContain(marker);
+        for (const role of ROLES) {
+          expect(prompt(role), `${role} に ${marker}`).not.toContain(marker);
+        }
+      }
+    }
+  });
+
+  /**
+   * planner も developer も観点の 2 人を直接呼ぶ（入れ子の中のリーダーが答えを待てなかった / A-68・A-71）。
+   * 呼ぶ相手の名前は `shared-team` が持ち、事実の読み込み役は `plan-grilling` が持つ
+   */
+  test("チームの呼び先は skill が名前で持ち、リーダーはどこからも呼ばれない", () => {
+    for (const name of ["reviewer-functional", "reviewer-nonfunctional"]) {
+      expect(skill("shared-team"), name).toContain(name);
+    }
+    expect(skill("plan-grilling")).toContain("researcher");
+    for (const role of ROLES) {
+      expect(prompt(role), role).not.toContain("reviewer-leader");
+    }
+  });
+
+  test("計画の点検の一覧は 12 項目ある（増減したらここも直す）", () => {
+    const text = skill("plan-checklist");
+    const start = text.indexOf("<!-- checklist:start -->");
+    const end = text.indexOf("<!-- checklist:end -->");
+    const list = text.slice(start, end);
+    expect(list.match(/^- \[ \] /gm)?.length).toBe(12);
   });
 
   test("plugin の manifest がある（バージョンは git のタグから取られる）", () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, ".claude-plugin/plugin.json"), "utf8"));
     expect(manifest.name).toBe("agent-pipeline");
-  });
-
-  test("planner と developer は agent を名前で呼ぶ", () => {
-    const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
-    const developer = readFileSync(join(ROOT, "prompts/developer.md"), "utf8");
-    // planner は観点の 2 人を直接呼ぶ（入れ子の中のリーダーが答えを待てなかった / A-68）。
-    // 事実の読み込みは researcher に任せる（本体が読むと履歴に残って毎ターン再送される / A-69）
-    for (const name of ["reviewer-functional", "reviewer-nonfunctional", "researcher"]) {
-      expect(planner, name).toContain(name);
-    }
-    // developer はリーダー越しに呼ぶ。観点はリーダーが振り分けるので、developer が直接呼ばない
-    expect(developer).toContain("reviewer-leader");
-    expect(developer).not.toContain("reviewer-functional");
-    expect(developer).not.toContain("reviewer-nonfunctional");
   });
 });
 
@@ -523,31 +573,6 @@ describe("install/ の雛形（配布先にそのままコピーされる）", (
       expect(text, f).toContain(f);
     }
     expect(text).toContain(".gitignore"); // A-46 の前提
-  });
-});
-
-/**
- * planner は計画を出す前に自己点検し、plan-reviewer は**同じ一覧**で見る（2026-09-10）。
- * 一覧を 2 つのプロンプトに写しているので、片方だけ直ると点検が食い違う。
- */
-describe("計画の点検リスト（planner と plan-reviewer で同じもの）", () => {
-  const between = (text: string) => {
-    const start = text.indexOf("<!-- checklist:start -->");
-    const end = text.indexOf("<!-- checklist:end -->");
-    expect(start, "checklist の開始マーカーが無い").toBeGreaterThan(-1);
-    expect(end, "checklist の終了マーカーが無い").toBeGreaterThan(start);
-    return text.slice(start, end);
-  };
-
-  test("2 つのプロンプトで一致している", () => {
-    const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
-    const reviewer = readFileSync(join(ROOT, "prompts/plan-reviewer.md"), "utf8");
-    expect(between(reviewer)).toBe(between(planner));
-  });
-
-  test("項目が 12 個ある（増減したらここも直す）", () => {
-    const planner = between(readFileSync(join(ROOT, "prompts/planner.md"), "utf8"));
-    expect(planner.match(/^- \[ \] /gm)?.length).toBe(12);
   });
 });
 

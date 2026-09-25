@@ -23,7 +23,8 @@ describe("defaultSettings", () => {
 
   // 4 本だけ（A-30 の趣旨は「エージェントごとに集合を変えない」こと）。
   // Task を持つのは自分の中でチームを回す 2 つ（planner と developer。相手はどちらも
-  // レビューチーム / A-58・A-66）。exec と build の違いは Task の有無だけ
+  // 観点の 2 人 / A-58・A-66・A-71）。exec と build の違いは Task の有無だけ。
+  // Skill は全プロファイルが持つ（どの役割も段の直前に skill を呼ぶ / A-71）
   test("ツールプロファイルは 4 本。書き込みと実行の境界を保つ", () => {
     expect(Object.keys(defaultSettings.tool_profiles)).toEqual([
       "readonly",

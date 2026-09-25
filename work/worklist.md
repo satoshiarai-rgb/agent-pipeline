@@ -454,6 +454,27 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - planner は**書く直前に名前を指定して**呼ぶ（呼ぶかどうかを planner に任せない）。`plan` プロファイルに `Skill` を足した（親の `--tools` に無いと呼べない / V-20）
   - `agents/` と同じく**配布先の上書きは想定しない**（K-32）。配布先が `.agent/prompts/planner.md` を差し替えても、形式は中央のものが使われる
   - テストで「skill が雛形を持ち、planner のプロンプトは持たない」ことを検査する（写し戻すと片方だけが直って食い違う）
+- [x] A-71: **コアな動作を plugin 同梱の skill に切り出した。リーダーを廃し、判断の記録の見出しを揃えた（2026-09-25）。**
+  - **分け方**: 役割のプロンプトは「役割・読むもの・手順（どの段でどの skill を呼ぶか）・役割に固有の規則・禁止・検証」だけを持つ。何度も出てくる動作の手順と形式は skill が持つ。**プロンプト全体を skill にはしない** — 進め方は最初のターンから要るのでトークンが減らず、呼ばれなければエージェントが何をすべきか分からないまま動く
+  - **接頭辞は使う範囲を表す**: `plan-` は計画のフェーズ、`shared-` はフェーズをまたぐもの（`tools-` は Claude Code のツールや `tool_profiles` と紛れるので採らなかった）。共通の skill は他の skill を呼ばない末端にする（skill は skill を取り込めず、呼び出しを多段にすると途中で呼ばれない危険が増える）
+
+    | skill | 呼ぶ役割 | 中身 |
+    |---|---|---|
+    | `plan-format` | planner | `plan.md` と `acceptance.json` の形式（A-70） |
+    | `plan-grilling` | planner | researcher に事実を調べさせ、決定を問いにして観点に答えさせ、答えを表で合わせる |
+    | `plan-checklist` | planner・plan-reviewer | 計画の点検の一覧（以前は 2 つのプロンプトに写してテストで一致を検査していた） |
+    | `shared-team` | planner・developer | 観点の 2 人の呼び方・継続・待ち方・やり取りの記録 |
+    | `shared-journal` | planner・developer | 判断の記録の形式 |
+    | `shared-evidence` | developer・dev-reviewer・completion | `status` / `evidence` の書き方と照合の見方 |
+    | `shared-verdict` | plan-reviewer・dev-reviewer | `reviews/*.md` の判定の形式 |
+
+  - **役割ごとに違う判断はプロンプトに残した**: 差し戻すかどうかの基準（plan-reviewer は「人間の判断が要るか」、dev-reviewer は「マージすると問題になるか」）、判断の記録の読み方。答えの合わせ方は `plan-grilling` に置いた（developer は実装中の選択をいまどおり自分で決めて記録する）
+  - **`reviewer-leader` を廃した。** developer も観点の 2 人を直接呼ぶ。入れ子の中から答えを待てない穴（A-67）が developer からも消える。A-67 の「リーダーの継続」は対象ごと無くなった
+  - **判断の記録の見出しを揃えた。** 必須は `## 決めたこと` / `## なぜ`。`## 問い`（問いに答えて決めたとき）、`## 影響する受け入れ条件`（developer は必ず、無ければ「無し」）、`## 採らなかった案`（他の案があったとき）は置くときだけ。developer の `## 前提` は `## なぜ` に、`## 影響`（触ったファイル）は差分で分かるので落とした。ハーネスは見出しを検査していないので、契約は変わらない
+  - 全プロファイルに `Skill` を足した（どの役割も skill を呼ぶ）。プロンプトは 5 本で 947 行 → 399 行、skill は 7 本で 508 行
+  - テストは `workflows.test.ts` の `SKILLS` 表（skill → 呼ぶ役割）と `MOVED` 表（skill に移した中身の目印は持ち主の skill にだけある）で見る
+  - 確かめたこと: 本物の中央を `--plugin-dir` で渡した `claude -p` から、7 つとも名前で呼べた
+  - 未測定: 実際の run で、各役割が段の直前に skill を毎回呼ぶか。呼ばなかったときに何が崩れるか
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

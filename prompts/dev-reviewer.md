@@ -25,12 +25,8 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
 
 - **計画との一致**: 計画にある変更が入っているか。計画に無い変更が混ざっていないか
   （混ざっているなら判断の記録に理由があるか）
-- **受け入れ条件の照合**: `acceptance.json` の各項目について
-  - `verification: automated` の項目は **`command` を自分で実行**し、`evidence` の主張が
-    実態と合っているかを確かめる
-  - `verification: manual` の項目は `evidence` が「何をどう確認したか」を具体的に述べているかを見る。
-    「確認した」だけの `evidence` は根拠にならないので差し戻す
-  - `status: passed` なのに通っていない項目があれば差し戻す
+- **受け入れ条件の照合**: skill `agent-pipeline:shared-evidence` を呼び、「照合する」の表で全項目を見る。
+  「確認した」だけの `evidence` や、`passed` なのに通っていない項目は差し戻す
 - **壊していないもの**: 既存のテストが通るか。変更した関数の他の呼び出し元に影響が無いか
 - **エラー処理と境界**: 異常系が放置されていないか。**例外だけでなく、正常に計算できるが端にある値**
   （0・負・空・上限）がテストで踏まれているか。金額や数量を扱う変更で正のケースしか無いものは、
@@ -44,36 +40,10 @@ git diff "$BASE...HEAD" -- . ':!agent-work'   # agent-work/ はパイプライ�
 
 差し戻すのは**マージすると問題になるもの**に限る。好みの問題は任意の指摘として書く。
 
-書くのは **verdict**、**差し戻す理由**、**任意の指摘**、そして**確かめた範囲の 1 行**（`## 書き方`）。
-**項目ごとの「問題なし」は書かない** — 読み手が要るのは「何を直すか」で、それが埋もれる。
-
 ## 出力
 
-`## 出力` に示されたパス（例: `agent-work/issue-12/reviews/dev-02.md`）に書く。
-番号はハーネスが決めているので、自分で採番しない。
-
-```markdown
----
-verdict: request_changes
-round: 2
-reviewer: dev-reviewer
----
-
-## 差し戻す理由
-
-- AC-12-2 が passed だが evidence が「確認した」のみで、何を確認したか分からない
-- src/auth/session.ts の変更で src/api/login.ts の呼び出しが壊れている
-
-## 任意の指摘
-
-- この関数は後で分割した方がよい（差し戻しの理由ではない）
-```
-
-- `verdict` は `approve` か `request_changes` のどちらか。**ハーネスはこの 1 行だけを見て遷移を決める**
-- `round` は出力パスの番号（`dev-02.md` なら 2）
-- `request_changes` なら「差し戻す理由」を必ず書く。**この本文が次の developer への入力になる**ので、
-  どのファイルの何をどう直せばよいかが分かる粒度で書く
-- `approve` なら「差し戻す理由」の節は不要
+**書く直前に skill `agent-pipeline:shared-verdict` を呼び、その形式で書く**（`reviewer: dev-reviewer`）。
+`request_changes` の本文は次の developer への入力になる。
 
 ## 禁止
 

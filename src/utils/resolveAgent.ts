@@ -64,7 +64,7 @@ function claudeArgs(a: {
     `--tools ${a.tools}`,
     `--allowed-tools ${a.tools}`,
     ...denied.map((d) => `--disallowed-tools ${d}`),
-    // 中央を plugin として読ませる。`agents/` の定義（観点の 2 人と、developer 用のリーダー）が
+    // 中央を plugin として読ませる。`agents/` の定義（観点の 2 人と researcher）と `skills/` が
     // これで名前から呼べるようになる。**親のツール制限は plugin より強い**ので、
     // 定義側が Bash を要求してもここで塞いだものは漏れない（実測 / V-19）
     ...(a.central ? [`--plugin-dir ${a.central}`] : []),

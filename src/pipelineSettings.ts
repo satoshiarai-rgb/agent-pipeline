@@ -53,7 +53,7 @@ export const defaultSettings: PipelineSettings = {
    * `--tools` は利用可能なツールを絞る指定で、実測でコンテキストからも消える（V-15）。
    */
   tool_profiles: {
-    readonly: "Read,Glob,Grep,Write",
+    readonly: "Read,Glob,Grep,Write,Skill",
     /**
      * `Task`（サブエージェント）を持つのは planner と developer だけ。どちらも
      * **自分の中でチームを回す**ため — planner は計画を詰める問い（A-66）と完了時の点検、
@@ -67,20 +67,17 @@ export const defaultSettings: PipelineSettings = {
      * その相手に送る。** 読み直しが消えるので、キャッシュの書き込み・読み込みと所要時間の
      * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
      *
-     * planner は観点の 2 人を直接呼ぶ（問いのラウンド 3 回 + 完了時の点検 1 回。A-68）。
-     * 事実の読み込みも `researcher` に任せて継続させる（本体が読むと履歴に残り、以降の
+     * planner も developer も観点の 2 人を直接呼ぶ（相談 3 回 + 完了時の点検 1 回。A-68 / A-71）。
+     * planner は事実の読み込みも `researcher` に任せて継続させる（本体が読むと履歴に残り、以降の
      * ターンのたびに再送される / A-69）。
      *
-     * **planner だけ `Skill` を持つ。** 成果物の形式（`plan.md` / `acceptance.json`）を plugin 同梱の
-     * skill `agent-pipeline:plan-format` に置き、書く直前に呼ばせるため（A-70）。親の `--tools` に
-     * 無いと呼べないことを実測した（V-20）
-     * developer は `reviewer-leader` を呼び（相談 3 回 + 点検 1 回）、リーダーが観点の 2 人を
-     * 同じ理由で継続させる（`agents/reviewer-leader.md` の `tools:`。親のツール制限は plugin より
-     * 強いので、ここに `SendMessage` が無いとリーダーも使えない / V-19）
+     * **`Skill` は全プロファイルが持つ。** コアな動作（計画の詰め方・チームの呼び方・判断の記録・
+     * evidence・判定の書き方・点検の一覧）を plugin 同梱の skill に置き、どの役割も段の直前に呼ぶ
+     * ため（A-70 / A-71）。親の `--tools` に無いと呼べないことを実測した（V-20）
      */
     plan: "Read,Glob,Grep,Write,Task,SendMessage,Skill",
-    exec: "Read,Glob,Grep,Write,Edit,Bash",
-    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage",
+    exec: "Read,Glob,Grep,Write,Edit,Bash,Skill",
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage,Skill",
   },
 
   /**
