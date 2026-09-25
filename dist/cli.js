@@ -26,7 +26,7 @@ var defaultSettings = {
     build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage,Skill"
   },
   agents: {
-    planner: { max_turns: 150, timeout_minutes: 120, tools: "plan" },
+    planner: { max_turns: 300, timeout_minutes: 120, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
     developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },

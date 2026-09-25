@@ -486,6 +486,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
     - **判断の記録は揃えた見出しで書かれた。** developer の記録にも `## 影響する受け入れ条件` があった
     - **計画の差し戻しは中身の指摘だった**: `argparse` の `parse_args()` ではパスとフラグの交互配置（`docs/rule --strict docs/glossary`）が通らなくなる — 観点の 2 人が計画を詰める段階で見逃した技術的な事実を、plan-reviewer が実装前に止めた。planner は 2 ラウンド目で `parse_intermixed_args()` に替え、その呼び方を確かめる AC を足した
     - 費用の内訳: planner 1 回目 $5.7 / plan-reviewer $1.0 / planner 2 回目 $3.2 / plan-reviewer $1.2 / developer $5.5 / dev-reviewer $1.2 / completion $0.9
+  - **CI で回した（2026-09-25、compass-wiki issue #36 = #13 の本文、`v1.0.3` を `712d70c` で上書き。上書き前の `v1.0.3` は `055630e`）。** 引数は正しく渡った（`--plugin-dir /home/runner/work/_actions/satoshiarai-rgb/agent-pipeline/v1.0.3`、`--tools …,Skill`）。`modelUsage` に Haiku と Sonnet が出ており、やり取りの記録・判断の記録・`plan-writing` の形式どおりの `plan.md` まで書かれた — **skill と reference は CI でも効いた**
+    - **ただし planner が `error_max_turns`（`num_turns: 151`、上限 150）で止まった。** 完了時の点検まで書き終えたところで、19 分・$12.62。同じ本文のローカル実行は本体 62 ターン（サブエージェントを合わせて 105）・$5.7 で、CI で何にターンを使ったかは transcript が残らないため分からない（V-18 と同じ種類の未解決）
+    - 手当て: planner の `max_turns` を 150 → 300（developer と同じ）。実時間の縛り（120 分）は残る。`v1.0.3` を上書きし直し、PR #37 に `/agent retry`
+    - 残る候補: CI の `claude-execution-output.json` を artifact として上げ、何にターンを使ったかを測る（V-18 を閉じるため）
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

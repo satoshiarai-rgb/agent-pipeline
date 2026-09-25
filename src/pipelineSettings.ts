@@ -103,9 +103,16 @@ export const defaultSettings: PipelineSettings = {
    * **ファイルを 1 つ編集すれば 1 ターン、テストを 1 回回せば 1 ターン**消える。
    * 1 ターン 7 秒のペースなので、300 ターンでも 90 分の枠に収まる。
    * **planner は時間側、developer は回数側で上限が決まる**（V-18 の実測）。
+   *
+   * **planner も 150 では足りなくなった**（2026-09-25、compass-wiki issue #36、CI）。
+   * skill を段ごとに呼び、事実の読み込みを researcher に、問いを観点の 2 人に渡す構成
+   * （A-69〜A-72）で、完了時の点検まで書き終えたところで `num_turns: 151` の
+   * `error_max_turns` になり、完成しかけた計画ごと捨てられた（19 分・$12.6）。同じ本文の
+   * ローカル実行は本体 62 ターンで終わっており、CI で何にターンを使ったかは未測定（V-18）。
+   * 実時間の縛り（120 分）は残るので、developer と同じ 300 にする
    */
   agents: {
-    planner: { max_turns: 150, timeout_minutes: 120, tools: "plan" },
+    planner: { max_turns: 300, timeout_minutes: 120, tools: "plan" },
     "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
     developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
     "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
