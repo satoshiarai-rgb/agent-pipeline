@@ -34,6 +34,7 @@ bun run build         # dist/cli.js を作る。src を変えたらコミット�
 | `docs/customize-prompt.md` | 利用者向け: 規約とプロンプトの差し替え、守らせる決まり |
 | `docs/troubleshooting.md` | 利用者向け: `blocked` の理由と復旧、症状別の見どころ |
 | `agents/` | **フェーズの中のチームの定義**（レビューの観点 2 人、developer 用のリーダー、planner の事実の読み込み役 `researcher`。planner は観点を直接呼び、計画を詰める問いにも観点が答える / A-66・A-68・A-69）。Claude Code の plugin として配り、`claude_args` の `--plugin-dir` で読ませる。**配布先の上書きは想定しない**（K-32）。振る舞いをプロンプト側に書き戻すとリレーで薄まる |
+| `skills/` | **エージェントが呼ぶ形式の定義**（plugin 同梱の skill）。いまは planner の成果物の形式 `plan-format` だけで、`agent-pipeline:plan-format` として呼ばれる。進め方はプロンプト、形式は skill に分ける（A-70）。`agents/` と同じく配布先の上書きは想定しない |
 | `.claude-plugin/plugin.json` | このリポジトリを plugin として扱うための manifest。バージョンは git のタグから取られる |
 | `install/` | 配布先に置くファイルの原本（`agent-pipeline.yml` / `conventions.md` / `setup.sh` / `issue-template.yml`）と、まとめて置く `install.sh`。**配布先ワークフローの正は `install/agent-pipeline.yml`** — `docs/installation.md` も検証用リポジトリもこれを参照し、YAML を写さない（A-51）。`scripts/__tests__/workflows.test.ts` が中央のワークフローと一緒に検査する |
 

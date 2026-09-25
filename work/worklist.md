@@ -294,6 +294,13 @@
   - **`SessionStart` と `PreToolUse` のフックが発火する。** `PreToolUse` で `permissionDecision: deny` を返すと Write は実行されず、**モデルは拒否を受け取って続行した**（run は落ちない）。ファイルは作られていない
   - **親のツール制限が勝つ。** 定義側で `tools: Read, Bash` を要求しても、親が `--tools`（Bash 無し）と `--disallowed-tools Bash` で走っていれば、サブエージェントからは Bash が見えない（`tool_uses: 0` で「BASH-DENIED」が返った）。**planner のサブエージェントにコマンド実行が漏れない**ことが確認できた
   - 残る未確認: CI（`base-action` の `claude_args` 経由）でも同じか。`$GITHUB_ACTION_PATH` が中央の展開先なので `--plugin-dir $GITHUB_ACTION_PATH` で読めるはずだが未実測
+- [x] V-20: **plugin 同梱の skill もヘッドレス（`claude -p` + `--plugin-dir`）で効く。4 点を実測した（2026-09-25、ローカル、`claude` 2.1.282）。** 検証用の最小 plugin（skill 1 つ。本文に合言葉と約 1.2 万字の埋め草）で確かめた
+  - (1) 名前を指示すれば呼べる（Haiku。`Skill` の入力は `{"skill":"probe:plan-template"}` で、**plugin 名で修飾される**）
+  - (2) **親の `--tools` に `Skill` が無いと呼べない。** skill のファイルを `Read` で探しに行くこともなかった
+  - (3) 名前を言わなくても、「使える雛形があれば使って」だけで Opus 5 が自分から呼んだ（1 回だけの試行）
+  - (4) **呼ぶまでは説明文だけが文脈に載る。** plugin の有無で最初の入力トークンの差は 15 だった（本文は約 1.2 万字）
+  - 本物の中央（`--plugin-dir <agent-pipeline>`）でも `agent-pipeline:plan-format` を呼べることを確かめた
+  - 残る未確認: CI（`base-action` の `claude_args` 経由）でも同じか。手元の個人設定（メモリ・CLAUDE.md）が載った状態で測っている
 - [ ] V-18: **`num_turns` と `--max-turns` が数えているものを確かめる。** 2026-09-14 の creal/compass issue #276（live）で、**plan-reviewer は `--max-turns 25` で走りながら `num_turns: 40` を報告して `subtype: success` で終わった**（3 ラウンドとも 38〜40）。一方 developer は `--max-turns 60` に対し `num_turns: 61` で `error_max_turns` になっている。つまり結果 JSON の `num_turns` は `--max-turns` が強制している counter とは別物の可能性が高く、**役割ごとに上限値の意味が揃っていない**。上限を決める根拠に直結する（実測が「余裕あり」に見えていても実際は違う、またはその逆）。同じ run の実測は次のとおり:
 
   | 実行 | num_turns | 実時間 | 1 ターンあたり | 費用 |
@@ -441,6 +448,12 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - planner に「すべての問いを 2 人に同じ内容で渡す（振り分けない）」「割れた片方が事実の誤りなら researcher に確かめて問い直す」を足した（A-68 の測定で出た 2 つの外れ）
   - **プロンプトの削り方は行数ではなく重複で決めた**（553 行 → 397 行、37.4KB → 24.6KB）。削ったのは次の 3 種類: 点検の一覧と重なる本文（INVEST・対応表・前提の分け方・画面とユースケースの分け方・規模の数え方）/ ハーネスが全エージェントに付ける `WRITING_RULES` と同じ規則 / プロンプトの中で 2 回出てくる規則（`manual` の扱い、ID の issue 番号）。節の書き方の説明は 1 つの表（節 / 書くもの / 書かないもの）にまとめた。点検の一覧は plan-reviewer と一字一句同じでなければならないので、元のファイルから切り出して差し込んだ
   - 未測定: researcher に任せて本体の読み込みと cache read が実際に減るか。Haiku の事実の取りこぼしが、観点や plan-reviewer の差し戻しとして増えないか
+- [x] A-70: **planner の成果物の形式を plugin 同梱の skill `agent-pipeline:plan-format` に移した（2026-09-25。V-20）。**
+  - **目的は保守性。** プロンプトは「進め方」（読み方・researcher・問い・チーム・禁止・自己点検）、skill は「形式」（`plan.md` と `acceptance.json` の雛形、節ごとの書き方、分割の軸、規模判定の書き方）に分けた。planner のプロンプトは 397 行 → 248 行
+  - **判断の記録とやり取りの記録の形式はプロンプトに残した。** どちらも計画を詰める途中で毎ラウンド書くので、skill に入れると最初のラウンドで呼ぶことになり、形式が run の大半で文脈に載る
+  - planner は**書く直前に名前を指定して**呼ぶ（呼ぶかどうかを planner に任せない）。`plan` プロファイルに `Skill` を足した（親の `--tools` に無いと呼べない / V-20）
+  - `agents/` と同じく**配布先の上書きは想定しない**（K-32）。配布先が `.agent/prompts/planner.md` を差し替えても、形式は中央のものが使われる
+  - テストで「skill が雛形を持ち、planner のプロンプトは持たない」ことを検査する（写し戻すと片方だけが直って食い違う）
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

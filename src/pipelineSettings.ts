@@ -70,11 +70,15 @@ export const defaultSettings: PipelineSettings = {
      * planner は観点の 2 人を直接呼ぶ（問いのラウンド 3 回 + 完了時の点検 1 回。A-68）。
      * 事実の読み込みも `researcher` に任せて継続させる（本体が読むと履歴に残り、以降の
      * ターンのたびに再送される / A-69）。
+     *
+     * **planner だけ `Skill` を持つ。** 成果物の形式（`plan.md` / `acceptance.json`）を plugin 同梱の
+     * skill `agent-pipeline:plan-format` に置き、書く直前に呼ばせるため（A-70）。親の `--tools` に
+     * 無いと呼べないことを実測した（V-20）
      * developer は `reviewer-leader` を呼び（相談 3 回 + 点検 1 回）、リーダーが観点の 2 人を
      * 同じ理由で継続させる（`agents/reviewer-leader.md` の `tools:`。親のツール制限は plugin より
      * 強いので、ここに `SendMessage` が無いとリーダーも使えない / V-19）
      */
-    plan: "Read,Glob,Grep,Write,Task,SendMessage",
+    plan: "Read,Glob,Grep,Write,Task,SendMessage,Skill",
     exec: "Read,Glob,Grep,Write,Edit,Bash",
     build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage",
   },

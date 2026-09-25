@@ -329,6 +329,23 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
     }
   });
 
+  /**
+   * planner の成果物の形式は plugin 同梱の skill に置く（A-70）。進め方はプロンプト、形式は skill。
+   * プロンプトに雛形を写し戻すと、片方だけが直って食い違う
+   */
+  test("planner は成果物の形式を skill から読み、プロンプトに雛形を持たない", () => {
+    const skill = readFileSync(join(ROOT, "skills/plan-format/SKILL.md"), "utf8");
+    expect(skill).toContain("name: plan-format");
+    expect(skill).toContain("description:");
+    expect(skill).toContain("# 計画: <issue のタイトル>");
+    expect(skill).toContain('"criteria": [');
+
+    const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
+    expect(planner).toContain("agent-pipeline:plan-format");
+    expect(planner).not.toContain("# 計画: <issue のタイトル>");
+    expect(planner).not.toContain('"criteria": [');
+  });
+
   test("plugin の manifest がある（バージョンは git のタグから取られる）", () => {
     const manifest = JSON.parse(readFileSync(join(ROOT, ".claude-plugin/plugin.json"), "utf8"));
     expect(manifest.name).toBe("agent-pipeline");
