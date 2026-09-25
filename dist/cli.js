@@ -21,9 +21,9 @@ var defaultSettings = {
   },
   tool_profiles: {
     readonly: "Read,Glob,Grep,Write,Skill",
-    plan: "Read,Glob,Grep,Write,Task,SendMessage,Skill",
+    plan: "Read,Glob,Grep,Write,Task,Skill",
     exec: "Read,Glob,Grep,Write,Edit,Bash,Skill",
-    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage,Skill"
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task,Skill"
   },
   agents: {
     planner: { max_turns: 300, timeout_minutes: 120, tools: "plan" },

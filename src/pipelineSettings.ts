@@ -61,23 +61,24 @@ export const defaultSettings: PipelineSettings = {
      * **レビュアー（plan-reviewer / dev-reviewer / completion）には渡さない**。
      * 使わない道具を見せないため（A-30 の趣旨）で、プロファイルを分ける費用はこれで払う
      *
-     * **`Task` を持つ側は `SendMessage` も持つ。** `Task` は呼ぶたびに新しいサブエージェントを
-     * 作るので、2 回目以降が同じファイル（planner なら issue と既存コード、developer なら
-     * ブランチの差分）を読み直す。**1 回目だけ `Task` で起こし、以降は `SendMessage` で
-     * その相手に送る。** 読み直しが消えるので、キャッシュの書き込み・読み込みと所要時間の
-     * どれも減る。実測の起点は compass-wiki issue #104（grilling 4 本・直列・計 13 分）
+     * **`SendMessage` は渡さない**（A-73）。サブエージェントは毎回、前景の `Task` で呼ぶ。
+     * 以前は `SendMessage` で同じ相手を継続して読み直しを減らしていたが、継続した相手の答えは
+     * 後から届き、ヘッドレスの親には待つ手段が無い。実測（compass-wiki #38、CI の実行記録）で、
+     * planner は答えを待つあいだに無関係な `Glob` を約 40 回空打ちし、そのたびに長い履歴を
+     * 再送していた（#36 の 151 ターンの `error_max_turns` も同じ形と見ている）。観点を作り直して
+     * 読み直させるほうが安く、答えを取りこぼさない
      *
      * planner も developer も観点の 2 人を直接呼ぶ（相談 3 回 + 完了時の点検 1 回。A-68 / A-71）。
-     * planner は事実の読み込みも `researcher` に任せて継続させる（本体が読むと履歴に残り、以降の
+     * planner は事実の読み込みも `researcher` に任せる（本体が読むと履歴に残り、以降の
      * ターンのたびに再送される / A-69）。
      *
      * **`Skill` は全プロファイルが持つ。** コアな動作（計画の詰め方・チームの呼び方・判断の記録・
      * evidence・判定の書き方・点検の一覧）を plugin 同梱の skill に置き、どの役割も段の直前に呼ぶ
      * ため（A-70 / A-71）。親の `--tools` に無いと呼べないことを実測した（V-20）
      */
-    plan: "Read,Glob,Grep,Write,Task,SendMessage,Skill",
+    plan: "Read,Glob,Grep,Write,Task,Skill",
     exec: "Read,Glob,Grep,Write,Edit,Bash,Skill",
-    build: "Read,Glob,Grep,Write,Edit,Bash,Task,SendMessage,Skill",
+    build: "Read,Glob,Grep,Write,Edit,Bash,Task,Skill",
   },
 
   /**

@@ -45,6 +45,14 @@ describe("defaultSettings", () => {
     expect(withTask).toEqual(["planner", "developer"]);
   });
 
+  // サブエージェントは毎回、前景の Task で呼ぶ。SendMessage で継続した相手の答えは後から届き、
+  // ヘッドレスの親は待つあいだツールを空打ちしてターンを使った（compass-wiki #38 の実行記録 / A-73）
+  test("どのプロファイルも SendMessage を持たない", () => {
+    for (const [name, tools] of Object.entries(defaultSettings.tool_profiles)) {
+      expect(tools.split(","), name).not.toContain("SendMessage");
+    }
+  });
+
   test("エージェント 5 種すべてに上限とツールがある", () => {
     for (const [name, a] of Object.entries(defaultSettings.agents)) {
       expect(a.max_turns, name).toBeGreaterThan(0);

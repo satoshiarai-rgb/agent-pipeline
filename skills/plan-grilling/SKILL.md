@@ -22,8 +22,9 @@ description: planner が計画を詰める手順。事実を researcher に調�
 ターンのたびに送り直される（実測で、本体が 71 回読んで cache read が 10.6M に膨らんだ）。
 `researcher` が読んだものは、その短い履歴の中で 1 回だけ課金されて消える。
 
-- 問いは**まとめて 1 回で**渡す。足りなければ同じ相手に `SendMessage` で追加で聞く
-  （1 回目は `Task`・`run_in_background: false`、以降は `SendMessage`）
+- 問いは**まとめて 1 回で**、前景の `Task`（`run_in_background: false`）で渡す。足りなければ、
+  もう一度 `Task` で起こして聞く（`SendMessage` で継続しない。答えを待つ手段が無く、空打ちでターンを
+  使う — `agent-pipeline:shared-team` の「呼び方」と同じ理由）
 - 返ってくるのは事実とパス・行番号だけで、判断は含まれない。判断が要るものは次の問いにする
 - **同じ型の既存物は全部挙げさせる。** 1 つだけ見て「ここだけ違う」と書いた計画が差し戻された
 
