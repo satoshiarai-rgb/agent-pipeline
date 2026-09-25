@@ -35,9 +35,9 @@ issue に書かれたタスクを、実装可能な計画と検証可能な受�
 |---|---|---|
 | 1 | issue 本文を要件として解釈する | — |
 | 2 | 既存の事実を `researcher` に調べさせ、決まっていないことを問いにして観点の 2 人に答えさせる。答えがそろったラウンドのうちに記録を書く | `agent-pipeline:plan-grilling`（呼び方は `agent-pipeline:shared-team`、判断の記録は `agent-pipeline:shared-journal`） |
-| 3 | 計画と受け入れ条件を書く。書き先は `## 入力` の run ディレクトリ（例: `agent-work/issue-12/plan.md`） | `agent-pipeline:plan-format` |
+| 3 | 計画と受け入れ条件を書く。書き先は `## 入力` の run ディレクトリ（例: `agent-work/issue-12/plan.md`） | `agent-pipeline:plan-writing`（`references/format.md`） |
 | 4 | 書き終えたら、観点の 2 人に完了時の点検を依頼する。指摘は直すか、直さない理由を判断の記録に残す | `agent-pipeline:shared-team` |
-| 5 | 出す前に自己点検する。通っていないものは直すか、「未確認」として前提に出す | `agent-pipeline:plan-checklist` |
+| 5 | 出す前に自己点検する。通っていないものは直すか、「未確認」として前提に出す | `agent-pipeline:plan-writing`（`references/checklist.md`） |
 
 変更ファイル数が**テストを除いて 20 / テストを含めて 40 を超えると判断しても、作業は止めない。**
 規模判定にそう書き、分割案を添えて計画を完成させる（分けるかは人間が PR の警告を見て決める）。

@@ -475,6 +475,11 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - テストは `workflows.test.ts` の `SKILLS` 表（skill → 呼ぶ役割）と `MOVED` 表（skill に移した中身の目印は持ち主の skill にだけある）で見る
   - 確かめたこと: 本物の中央を `--plugin-dir` で渡した `claude -p` から、7 つとも名前で呼べた
   - 未測定: 実際の run で、各役割が段の直前に skill を毎回呼ぶか。呼ばなかったときに何が崩れるか
+  - **測った結果（2026-09-25、compass-wiki issue #110。#109 と同じ本文・同じ土台）**: planner は `plan-grilling`・`shared-team`・`shared-journal`・`plan-format`・`plan-checklist` を、plan-reviewer は `plan-checklist`・`shared-verdict` を、それぞれ段の直前に 1 回ずつ呼んだ。planner 本体の `Read` + `Grep` は 71 回 → 3 回、本体は $8.30 → $3.30、planner フェーズ全体（researcher と観点を含む）は $9.12 → $4.73。**差し戻しは続いた**が、理由は「Lender をどのコンテキストに置くか」で、`acquisition.md` も `counterparty.md` も Lender を含んでいない — issue に最初からある設計上の問いで、計画を何往復しても収束しない（#108 は counterparty、#109・#110 は acquisition を選んで、どちらも差し戻された）。計測には別の issue を使う
+- [x] A-72: **`plan-format` と `plan-checklist` を、skill `plan-writing` の reference にした（2026-09-25）。**
+  - 形式と点検の一覧は「手順」ではなく「必要な場面で開く資料」なので、skill の `references/` に置く。`plan-writing/SKILL.md` は「いつ、どの reference を読むか」だけを持つ（`references/format.md` は planner が書く直前に、`references/checklist.md` は planner の自己点検と plan-reviewer の審査で）。plan-reviewer は format を読まなくてよい
+  - reference はエージェントが `Read` で開く。**作業ディレクトリの外（plugin のディレクトリ）でも読める**ことを確かめた（skill を呼ぶと base directory が絶対パスで示され、そこから読んだ。権限の拒否は無し）。CI（`$GITHUB_ACTION_PATH`）では未確認
+  - テストの `MOVED` 表のキーを `skills/` からのファイルパスにし、`REFERENCES` 表で「SKILL.md が reference を名前で指し、reference が実在する」ことを見る
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

@@ -1,8 +1,3 @@
----
-name: plan-format
-description: planner が plan.md と acceptance.json を書くときの形式（雛形と、節ごとの書き方）。書く直前に呼ぶ
----
-
 # plan.md と acceptance.json の形式
 
 planner の成果物の形式はここが正である。**進め方（何を調べ、何を問い、誰に答えさせるか）は

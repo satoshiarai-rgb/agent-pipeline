@@ -22,7 +22,7 @@
 
 ## 見るところ
 
-**次の節の点検の一覧（`agent-pipeline:plan-checklist`）は planner の自己点検と同じものなので、
+**次の節の点検の一覧（`agent-pipeline:plan-writing` の `references/checklist.md`）は planner の自己点検と同じものなので、
 まずそれを当てる。** ここに挙げるのは**一覧に無い、レビュアーだけが見られること**である。
 
 - **issue が求めていないことを増やしていないか**（一覧は「求めたものが入っているか」しか見ない）
@@ -64,7 +64,7 @@ developer に届いて、直したことが判断の記録（`type: requirements
 
 ## 計画の点検（planner の自己点検と同じ一覧）
 
-**skill `agent-pipeline:plan-checklist` を呼び、その一覧を当てる。** planner も同じ一覧で自己点検している。
+**skill `agent-pipeline:plan-writing` を呼び、その `references/checklist.md` の一覧を当てる。** planner も同じ一覧で自己点検している。
 通っていないものは指摘する（planner が見落としたのか、判断が違うのかを本文で区別して書く）。
 **差し戻すか任意の指摘にするかは上の基準で決める** — 一覧に載っていることが、そのまま差し戻しの
 理由になるわけではない。

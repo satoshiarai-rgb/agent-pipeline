@@ -327,9 +327,8 @@ describe("plugin（agents/ と skills/ と .claude-plugin/）", () => {
    * **この表が「どの役割がどの skill を呼ぶか」の正**で、足すときは行を足す
    */
   const SKILLS: Record<string, string[]> = {
-    "plan-format": ["planner"],
     "plan-grilling": ["planner"],
-    "plan-checklist": ["planner", "plan-reviewer"],
+    "plan-writing": ["planner", "plan-reviewer"],
     "shared-team": ["planner", "developer"],
     "shared-journal": ["planner", "developer"],
     "shared-evidence": ["developer", "dev-reviewer", "completion"],
@@ -337,21 +336,28 @@ describe("plugin（agents/ と skills/ と .claude-plugin/）", () => {
   };
 
   /**
-   * skill に移した中身の目印。**目印は持ち主の skill にだけあり、どのプロンプトにも無い**ことを見る。
+   * skill に移した中身の目印。キーは `skills/` からのファイルパス（SKILL.md か reference）。
+   * **目印は持ち主のファイルにだけあり、どのプロンプトにも無い**ことを見る。
    * プロンプトに写し戻すと、片方だけが直って食い違う
    */
   const MOVED: Record<string, string[]> = {
-    "plan-format": ["# 計画: <issue のタイトル>", '"criteria": ['],
-    "plan-grilling": ["| 2 人の答え | 扱い |"],
-    "plan-checklist": ["<!-- checklist:start -->"],
-    "shared-team": ["to: reviewer-functional / reviewer-nonfunctional"],
-    "shared-journal": ["status: adopted\n---"],
-    "shared-evidence": ["| `manual` | 何をどう確かめたかを 1〜2 行"],
-    "shared-verdict": ["verdict: request_changes\nround: 2"],
+    "plan-grilling/SKILL.md": ["| 2 人の答え | 扱い |"],
+    "plan-writing/references/format.md": ["# 計画: <issue のタイトル>", '"criteria": ['],
+    "plan-writing/references/checklist.md": ["<!-- checklist:start -->"],
+    "shared-team/SKILL.md": ["to: reviewer-functional / reviewer-nonfunctional"],
+    "shared-journal/SKILL.md": ["status: adopted\n---"],
+    "shared-evidence/SKILL.md": ["| `manual` | 何をどう確かめたかを 1〜2 行"],
+    "shared-verdict/SKILL.md": ["verdict: request_changes\nround: 2"],
+  };
+
+  /** skill が持つ reference。SKILL.md は、いつどれを読むかを名前で指す（A-72） */
+  const REFERENCES: Record<string, string[]> = {
+    "plan-writing": ["references/format.md", "references/checklist.md"],
   };
 
   const prompt = (name: string) => readFileSync(join(ROOT, "prompts", `${name}.md`), "utf8");
   const skill = (name: string) => readFileSync(join(ROOT, "skills", name, "SKILL.md"), "utf8");
+  const skillFile = (rel: string) => readFileSync(join(ROOT, "skills", rel), "utf8");
   const ROLES = ["planner", "plan-reviewer", "developer", "dev-reviewer", "completion"];
 
   test("agent 定義が 3 つあり、name がファイル名と一致する", () => {
@@ -377,10 +383,10 @@ describe("plugin（agents/ と skills/ と .claude-plugin/）", () => {
     }
   });
 
-  test("skill に移した中身は、持ち主の skill にだけある", () => {
-    for (const [name, markers] of Object.entries(MOVED)) {
+  test("skill に移した中身は、持ち主のファイルにだけある", () => {
+    for (const [rel, markers] of Object.entries(MOVED)) {
       for (const marker of markers) {
-        expect(skill(name), `${name} に ${marker}`).toContain(marker);
+        expect(skillFile(rel), `${rel} に ${marker}`).toContain(marker);
         for (const role of ROLES) {
           expect(prompt(role), `${role} に ${marker}`).not.toContain(marker);
         }
@@ -402,8 +408,17 @@ describe("plugin（agents/ と skills/ と .claude-plugin/）", () => {
     }
   });
 
+  test("SKILL.md は reference を名前で指し、reference は実在する", () => {
+    for (const [name, refs] of Object.entries(REFERENCES)) {
+      for (const ref of refs) {
+        expect(skill(name), `${name} → ${ref}`).toContain(ref);
+        expect(skillFile(`${name}/${ref}`).length, `${name}/${ref}`).toBeGreaterThan(0);
+      }
+    }
+  });
+
   test("計画の点検の一覧は 12 項目ある（増減したらここも直す）", () => {
-    const text = skill("plan-checklist");
+    const text = skillFile("plan-writing/references/checklist.md");
     const start = text.indexOf("<!-- checklist:start -->");
     const end = text.indexOf("<!-- checklist:end -->");
     const list = text.slice(start, end);

@@ -1,14 +1,9 @@
----
-name: plan-checklist
-description: 計画（plan.md と acceptance.json）の点検の一覧。planner が出す前の自己点検に、plan-reviewer が審査に使う
----
-
 # 計画の点検の一覧
 
 planner は計画を出す前にこの一覧で自己点検し、plan-reviewer は同じ一覧で審査する。
 **同じ一覧を 2 つの役割が使うので、ここが唯一の置き場所である**（以前は 2 つのプロンプトに写していた）。
 
-**一覧が持つのは「満たすべき条件」だけで、直し方は書かない。** 直し方は `agent-pipeline:plan-format` と
+**一覧が持つのは「満たすべき条件」だけで、直し方は書かない。** 直し方は同じ skill の `references/format.md` と
 planner のプロンプトにある。ここに直し方を足すと、plan-reviewer には自分への指示に読めてしまう。
 
 <!-- checklist:start -->
