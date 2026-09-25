@@ -223,6 +223,21 @@ jobs:
           # K-7: Console 取得まではサブスクリプション認証。WIF への差し替え手順は A-29
           claude_code_oauth_token: ${{ secrets.CLAUDE_CODE_OAUTH_TOKEN }}
 
+      # ---- 実行記録を artifact として残す（V-18）
+      # base-action の実行記録（メッセージ列）はランナーの一時ディレクトリにしか残らず、
+      # CI の planner がローカルの何倍もターンを使った原因を追えなかった（compass-wiki #36）。
+      # 役割と run を名前に入れて上げる。**リポジトリには push しない**（run の成果物ではなく
+      # 調査用の記録なので、残すのは保持期間のあいだだけ）。中身は transcript なので、
+      # 配布先のリポジトリを読める人は読める。失敗・タイムアウトでも残したいので always()
+      - name: 実行記録を artifact に上げる
+        if: always() && needs.route.outputs.action == 'run' && steps.agent.outputs.execution_file != ''
+        uses: actions/upload-artifact@v7
+        with:
+          name: execution-${{ needs.route.outputs.agent }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: ${{ steps.agent.outputs.execution_file }}
+          retention-days: 14
+          if-no-files-found: ignore
+
       # ---- 実行の結末と、検証に必要な差分の一覧を集める
       - id: outcome
         if: always() && needs.route.outputs.action == 'run'

@@ -222,6 +222,22 @@ describe("ワークフローの YAML", () => {
     }
   });
 
+  /**
+   * CI の実行記録はランナーの一時ディレクトリにしか残らないので、artifact として上げる（V-18）。
+   * 失敗したときほど要るので always() で、名前で役割と run を区別する
+   */
+  test("エージェントの実行記録を、失敗しても artifact に上げる", () => {
+    const dispatch = all.find((w) => w.name === "agent-dispatch.yml");
+    const steps = Object.values(dispatch?.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
+    const step = steps.find((st) => st.uses?.startsWith("actions/upload-artifact@")) as
+      | { if?: string; with?: Record<string, string | number> }
+      | undefined;
+    expect(step?.if).toContain("always()");
+    expect(String(step?.with?.path)).toContain("steps.agent.outputs.execution_file");
+    expect(String(step?.with?.name)).toContain("needs.route.outputs.agent");
+    expect(String(step?.with?.name)).toContain("github.run_id");
+  });
+
   test("setup.sh の step は AGENT_NAME / AGENT_PHASE を渡す", () => {
     const dispatch = all.find((w) => w.name === "agent-dispatch.yml");
     const steps = Object.values(dispatch?.doc.jobs ?? {}).flatMap((j) => j.steps ?? []);
