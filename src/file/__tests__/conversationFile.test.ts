@@ -21,8 +21,8 @@ describe("やり取りの記録（conversations/）", () => {
   });
 
   test("同じ run の中で種類の違う往復を見分けられる", () => {
-    const consult = conversationPath("d", run, "planner", "01", "leader-consult");
-    const review = conversationPath("d", run, "planner", "02", "leader-review");
+    const consult = conversationPath("d", run, "planner", "01", "team-consult");
+    const review = conversationPath("d", run, "planner", "02", "team-review");
     expect(consult).not.toBe(review);
   });
 

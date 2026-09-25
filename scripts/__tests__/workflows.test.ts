@@ -337,14 +337,14 @@ describe("plugin（agents/ と .claude-plugin/）", () => {
   test("planner と developer は agent を名前で呼ぶ", () => {
     const planner = readFileSync(join(ROOT, "prompts/planner.md"), "utf8");
     const developer = readFileSync(join(ROOT, "prompts/developer.md"), "utf8");
-    // 計画を詰める問いもリーダーに渡す。問いを立てる役・答える役を別に起こさない
-    expect(planner).toContain("reviewer-leader");
-    expect(developer).toContain("reviewer-leader");
-    // 観点はリーダーが振り分ける。親が直接呼ばない
-    for (const text of [planner, developer]) {
-      expect(text).not.toContain("reviewer-functional");
-      expect(text).not.toContain("reviewer-nonfunctional");
+    // planner は観点の 2 人を直接呼ぶ（入れ子の中のリーダーが答えを待てなかった / A-68）
+    for (const name of ["reviewer-functional", "reviewer-nonfunctional"]) {
+      expect(planner, name).toContain(name);
     }
+    // developer はリーダー越しに呼ぶ。観点はリーダーが振り分けるので、developer が直接呼ばない
+    expect(developer).toContain("reviewer-leader");
+    expect(developer).not.toContain("reviewer-functional");
+    expect(developer).not.toContain("reviewer-nonfunctional");
   });
 });
 

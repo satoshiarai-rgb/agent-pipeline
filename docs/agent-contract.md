@@ -104,7 +104,7 @@ prefix がそれに当たる（§5）。developer に渡す `## 出力` は次�
 | 出力（必須） | `plan.md` — `## 規模判定` 節を含む |
 | 出力（推奨） | `plan.md` の `## ユーザーストーリー`（`US-<issue>-<n>`。誰の何が良くなるか）・`## 対象の画面`（`S-<issue>-<n>`。どこに出るか）・`## ユースケース`（`UC-<issue>-<n>`。操作するとどうなるか）の 3 節と、`## 受け入れ条件` の**ストーリーと `AC` の対応表**。**中央の既定プロンプトが書かせるが、ハーネスは検査しない** — プロンプトを差し替えるなら残すかどうかは配布先の判断 |
 | 出力（任意） | `journal/<run_id>-<attempt>-<slug>.md` — **計画を詰める過程で片付いた決定の記録**（planner が問いを立て、レビューチームが答える。planner は自分では答えを採らない）。書いたなら形式（1 ファイル 1 レコード、名前、frontmatter の 4 キー）を満たすこと |
-| 出力（任意） | `conversations/<run_id>-<attempt>-<agent>-<NN>-<slug>.md` — **エージェント同士のやり取りの生ログ**（1 往復につき 1 ファイル。`<slug>` が相手を表す: `leader-consult`（planner の問い・developer の相談）/ `leader-review`（完了時の点検））。**ハーネスは名前を渡すだけで、中身は読まないし検査もしない**（遷移に関わらない保管） |
+| 出力（任意） | `conversations/<run_id>-<attempt>-<agent>-<NN>-<slug>.md` — **エージェント同士のやり取りの生ログ**（1 往復につき 1 ファイル。`<slug>` が相手を表す: planner は `team-consult`（計画を詰める問い）/ `team-review`（完了時の点検）、developer は `leader-consult`（相談）/ `leader-review`（完了時の点検）。planner の記録は planner 自身が、developer の記録はリーダーが書く）。**ハーネスは名前を渡すだけで、中身は読まないし検査もしない**（遷移に関わらない保管） |
 | 出力（必須） | `acceptance.json` — `criteria[]`、各要素に `id` / `description` / `verification` / `status` |
 | 出力（任意） | なし |
 | 検証 | `plan.md` が存在し空でない。`## 規模判定` を含む。`acceptance.json` がスキーマを満たす |
@@ -274,7 +274,7 @@ refresh token に揃えて 24h にした。
 | レビュー番号 | `reviews/<kind>-NN.md` の NN はハーネスが決め、入力に含める。エージェントは `rounds` を知らない |
 | 判断の記録の名前と置き場 | ファイル名の prefix（`<run_id>-<attempt>`）はハーネスが決め、`## 出力` で渡す。エージェントが決めるのは `<slug>` だけ。**置き場もハーネスが `reversibility` から導く**（`hard` は `decision-records/`、それ以外は `journal/`） |
 | 契約外の入力 | **配布先の `CLAUDE.md` と `.claude/skills/` は、ハーネスを通さず Claude Code が自動で読み込む。** 全エージェントに載り、**サブエージェントにも同一内容が引き継がれる**（実測。`instructions` attachment が親子で一致）。止める手段は無い（`--bare` は認証が壊れる）。したがって**規約をここに書くと、ハーネスの管理外で全実行の文脈に乗り続ける**。パイプラインに守らせたいことは `.agent/conventions.md` に書き、`CLAUDE.md` と重複させないこと |
-| ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**`Task` を持つのは planner と developer だけ**で、相手はどちらもレビューチームの窓口 `reviewer-leader`（planner は計画を詰める問いと完了時の点検、developer は相談と完了時の点検 / A-58・A-66）。レビュアーには渡さない。**`SendMessage` も同じ 2 つが持ち**、リーダーを呼び出しをまたいで継続するために使う（`Task` で作り直すと同じファイルを読み直す）。**リーダー自身も `SendMessage` を持ち**、観点の 2 人を同じ形で継続する（A-67）。サブエージェントも親と同じ許可の下で動くので、planner のサブエージェントはコマンドを実行できない |
+| ツール | `--tools` でエージェントごとに絞る。planner と plan-reviewer に `Bash` は渡さない（A-30）。**`Task` を持つのは planner と developer だけ**。planner は観点の 2 人（`reviewer-functional` / `reviewer-nonfunctional`）を直接呼び（計画を詰める問いと完了時の点検 / A-66・A-68）、developer は窓口の `reviewer-leader` を呼ぶ（相談と完了時の点検）。レビュアーには渡さない。**`SendMessage` も同じ 2 つが持ち**、呼んだ相手を呼び出しをまたいで継続するために使う（`Task` で作り直すと同じファイルを読み直す）。**リーダー自身も `SendMessage` を持ち**、観点の 2 人を同じ形で継続する（A-67）。サブエージェントも親と同じ許可の下で動くので、planner のサブエージェントはコマンドを実行できない |
 | 実行環境 | 配布先の `.agent/setup.sh` が用意する（中央はツールチェーンを知らない）。**`AGENT_NAME` / `AGENT_PHASE` / `AGENT_RUN_DIR` が環境変数で渡る**ので、重い準備は必要なフェーズだけに絞れる。サービスコンテナ（DB など）はジョブ定義側にしか書けないため、**必要なら `setup.sh` の中で `docker compose` などで自前に立てる** |
 | 上限 | `max_turns` と `timeout_minutes` はハーネスが渡す。エージェントは変更できない |
 | 失敗の分類 | 実行の失敗（`agent_failed`）、API エラー（`api_error` + ステータス）、検証の失敗（`invalid_artifacts`）を区別して `blocked_reason` に残す（A-31） |

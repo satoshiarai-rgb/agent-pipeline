@@ -422,7 +422,14 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 - [x] A-67: **リーダーにも `SendMessage` を持たせ、観点の 2 人を呼び出しをまたいで継続させる（2026-09-24）。**
   - A-66 で grilling をリーダーへの問いに統合したので、リーダーは 1 回の planner 実行で最大 4 回呼ばれる。`Task` で観点を毎回作り直すと、そのたびに同じファイルを読み直す
   - 初回は `Task`（`run_in_background: false` を明示。既定は background）、2 回目以降は `SendMessage`。**`SendMessage` の答えは後から届くので、揃うまで依頼元に返さない**と定義に書いた — compass-wiki issue #108 の planner（2026-09-18）でリーダーが「まだ届いていない」と 3 回返し、依頼元が催促してようやく束ねた結果が出た。同じ失敗を `SendMessage` で再現しやすくなる
-  - 未測定: サブエージェントの中から `SendMessage` で孫を再開したとき、答えが届くまでリーダーが待てるか。判別は `conversations/*-leader-*.md` が揃っているのに、観点の transcript がラウンドごとに増えていないこと
+  - **測った結果（2026-09-24、compass-wiki issue #108 の planner 2 ラウンド目）: 継続はできたが、待てなかった。** 観点の transcript は 2 本のままで作り直しは起きなかった。しかし完了時の点検で、リーダーが観点へ `SendMessage` した 20 秒後に planner の催促を受け、「両観点とも未着のため leader 自身が確認した」として**自分で判断して「指摘なし」を返した**（`conversations/20260924013307-1-planner-02-leader-review.md`）。観点の 2 人はその 1〜2 分後に答え終えていたが、誰も受け取っていない → A-68
+- [x] A-68: **planner は観点の 2 人を直接呼ぶ。観点は計画の中身を見る。記録は planner がラウンドごとに書く（2026-09-25）。**
+  - **直接呼ぶ理由は A-67 の結果。** 入れ子（planner → リーダー → 観点）の中では、リーダーが観点の答えを待てなかった。最上位の `claude -p` はリーダーの答えを受け取れていたので、**待つ側を最上位に上げる**。リーダーは developer 用に残す（developer にも同じ穴があるが、まだ測っていない）
+  - **観点が見るものを計画の中身に寄せた。** 完了時の点検が plan-reviewer の差し戻しを防いだかを、過去の run で突き合わせた（#101 R1・R2、#106 R2、#107 R1、#108 R1）。**防いだラウンドは 0 回**で、差し戻しの理由 11 件のうち 8 件をチームは挙げておらず、3 件は挙げたが防げなかった。チームの指摘は受け入れ条件の形式（コマンドの形、`--strict`、grep が行に結び付くか）に寄っていた。差し戻しの理由は計画の中身に寄っており、内訳は次のとおり: 主張の根拠が `sources` に無い（6 件）/ 宣言した所属先の定義との矛盾 / 同じ型の画面との比べ漏れ。そこで `reviewer-functional` の「計画を見るとき」に、この 3 つを毎回当てる項目として置き、受け入れ条件の形式は planner の自己点検と plan-reviewer に任せた（`reviewer-nonfunctional` も同じく、形式の項目を「実装を見るとき」へ移した）
+  - **記録はラウンドごとにその場で書く。** 判断の記録は元から planner が書くが、最後にまとめて書く手順だったので、途中で止まると片付いた決定が失われた。やり取りの記録は書き手（リーダー）がいなくなるので planner が書く（`<slug>` は `team-consult` / `team-review`）
+  - 2 人の答えの合わせ方は planner のプロンプトに表で持たせた（一致なら採る / 片方が観点外・未確認なら根拠つきの方を採る / 食い違えば「割れた」で open / どちらも根拠なしなら「未確認」で open）。**表に無い判断を planner が足さない**
+  - 割り引いて読むこと: plan-reviewer の判定自体がばらつく。#108 R1 の同じ計画を 5 回審査すると approve 1 回・差し戻し 4 回で、理由も回ごとに違った
+  - 未測定: 観点を最上位から `SendMessage` で継続したとき、答えを待てるか（リーダーでは待てなかった）。中身を見るようにした点検が、差し戻しを実際に減らすか
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）
