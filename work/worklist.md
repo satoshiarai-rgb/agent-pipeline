@@ -501,6 +501,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - `SendMessage` を入れた理由（A-58 の grilling の継続、A-67 のリーダーの継続）は「読み直しを減らす」だったが、ヘッドレスでは待てないという代償のほうが大きかった
   - 触ったもの: `skills/shared-team` と `skills/plan-grilling` の呼び方 / 観点 2 人と researcher の定義から「続けて依頼が来る」を削除 / `plan`・`build` プロファイルから `SendMessage` を外した（テストで「どのプロファイルも持たない」を固定）/ `docs/agent-contract.md`
   - 未測定: CI で空打ちが消えるか。判別は実行記録の本体のツール呼び出しに、`Task` の後の無関係な `Glob` の連続が無いこと
+  - **測った結果（2026-09-28、compass-wiki issue #42、CI、`v1.0.3` = `2567750`）: 空打ちは消えた。** `done` まで通って約 $22.0（PR #43）
+    - planner 1 回目: `num_turns` 45・31.7 分・$6.80（#38 は 109・15.1 分・$8.78）。本体のツールは `Write` 21・`Agent` 12・`Skill` 4・`Read` 3 で、待ちの空打ちが無い。2 回目: 43・15.6 分・$4.62。developer: 57・14.3 分・$4.42（完了時の点検の記録も残った）
+    - **時間が延びたのは、観点の 2 人を 1 人ずつ呼んだ回があったため。** planner 1 回目は 12 回の呼び出しがすべて別の応答で、組ごとに 2 人の時間が足し算になった（並列なら 6.4 分短い）。**2 回目と developer は同じ応答に並べて並列に呼べた** — 同じ skill でも揺れる。前景の `Task` は観点の作業時間が本体の待ち時間として乗るので、並列にしないと時間が倍になる
+    - **planner が `Bash` の無さを別のエージェントで回避しようとした。** 誤って作った `plan.md.tmp-edit` を消すため、`general-purpose` のサブエージェントに `rm` を頼み、そのサブエージェントはさらに `general-purpose` を呼んだ。**親のツール制限はサブエージェントにも効いており**（使えたのは `Agent`・`Glob`・`Grep`・`Read`・`Skill`・`Write`）、削除は通らなかった。一時ファイルはブランチにコミットされたまま残った
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）
