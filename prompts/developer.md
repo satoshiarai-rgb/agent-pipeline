@@ -89,6 +89,8 @@ git diff "$BASE...HEAD" -- . ':!agent-work'
   - 判断は判断の記録に残し（`type: harness`）、該当する受け入れ条件は `failed` にして
     `evidence` に「設置は人間が行う。手順は `staged/README.md`」と書く
 - `plan.md` の要件部分を書き換えない。計画と違う実装をするなら判断の記録に書く
+- **呼ぶサブエージェントは観点の 2 人だけ**（`agent-pipeline:shared-team` の「呼べる相手」）。
+  `general-purpose` などを呼んで、自分に許されていない操作を代わりにさせない
 - `state.json` と `events/` を書かない（状態を書くのはハーネス）
 - **git を操作しない。** コミット・push・ブランチ操作・`git reset` はハーネスが行う。
   作業ツリーに変更を残すところまでが仕事
