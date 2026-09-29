@@ -550,6 +550,7 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
     - 計画は 3 回目で承認。差し戻しの 2 回はどちらも `automated` とは無関係で、planner（Sonnet 5.5）の判断の記録の根拠が実ファイルと食い違っていたもの。ゲート（Opus 5.5）が 2 回とも拾った。2 回目以降の planner は 1 回 $0.3〜0.4 と安いが、plan-reviewer が 1 回 $0.7 かかる
     - `command` は長い 1 行のシェルになる（旧版との出力比較は 1 件で 400 字を超える）。読みにくいが、developer と dev-reviewer はそのまま走らせられた
     - **配布先の準備の不足が見えた**: `bin/validate` は `uv run --script` の shebang を持つが、実行環境に `uv` が無い。developer は `python3` に渡すだけの代用の `uv` を `/tmp` に置いて `PATH` に足して走らせた（evidence にそう書いている）。compass-wiki の `.agent/setup.sh` で `uv` を入れるのが筋
+    - **→ 入れた（2026-09-29、compass-wiki `1418da6`）。** `pipx install uv==0.12.20`、planner と plan-reviewer では入れない、失敗しても `exit 0`。#52 で確かめた: developer の準備で「uv を入れた（uv 0.12.20）」、planner では「uv を入れない」。developer は代わりの `uv` を作らず `bin/validate` をそのまま走らせた。`done` まで $4.27（計画は 1 回で承認、受け入れ条件は 9 件中 7 件が `automated`）
   - **採らなかった案: completion でハーネスが `automated` の `command` を走らせる。** completion は最後のフェーズでコードを直せないので、落ちても `blocked` にして developer へ戻すしかなく、手戻りが大きい
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
