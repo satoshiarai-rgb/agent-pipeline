@@ -513,6 +513,19 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
       - **決定（2026-09-28）: 1 人ずつ呼ぶことは受け入れる。** 並列にならなくても費用は変わらず、延びるのは planner の時間（1 回 3〜6 分）だけ。2 人を必ず並列で呼ぶ役を間に置く案は、仕組みが 1 段増えるわりに、その役も同じモデルなので並列になる保証が無いため採らない。`shared-team` の「2 人は同じ応答で呼ぶ」は、並列に呼べた回もあり害も無いので残す
     - **仕組みで止められるかを試した（手元、`claude` 2.1.282）**: `--allowed-tools` に `Agent(<種類>)` / `Task(<種類>)` を書いても絞れない（`general-purpose` も呼べた）。`--disallowed-tools` の `Task(general-purpose)` は止まる（「Agent type 'general-purpose' has been denied by permission rule」）が、`Agent(general-purpose)` は止まらず、しかも別の種類が代わりに呼ばれた。止めるには組み込みの種類を 1 つずつ拒否の一覧に並べる必要があり、Claude Code の版で種類が増えるたびに漏れるので採らなかった。権限の抜け道（`Bash`）は親のツール制限の継承で塞がっており、拒否の一覧で防げるのは無駄な呼び出しの費用だけ
     - **planner が `Bash` の無さを別のエージェントで回避しようとした。** 誤って作った `plan.md.tmp-edit` を消すため、`general-purpose` のサブエージェントに `rm` を頼み、そのサブエージェントはさらに `general-purpose` を呼んだ。**親のツール制限はサブエージェントにも効いており**（使えたのは `Agent`・`Glob`・`Grep`・`Read`・`Skill`・`Write`）、削除は通らなかった。一時ファイルはブランチにコミットされたまま残った
+- [ ] A-75: **生成を Sonnet 5.5、ゲートを Opus 5.5 に分け、effort は全エージェント `high` に固定する（2026-09-29 に決定。CI での計測は未了）。**
+  - 分け方（中央の既定は変えず、compass-wiki の `.agent/config.json` の `models` で試す）:
+
+    | 役割 | モデル | 理由 |
+    |---|---|---|
+    | planner / developer / completion | `claude-sonnet-5-5` | 費用の大半を占める。出来はゲートが見る |
+    | plan-reviewer / dev-reviewer | `claude-opus-5-5` | 通すか差し戻すかを決めるゲートなので落とさない |
+    | 観点の 2 人（`agents/reviewer-*.md`） | `claude-sonnet-5-5` | Sonnet 5 と同じ価格で新しい |
+    | `researcher` | Haiku 4.5（変えない） | 事実を読むだけ |
+
+  - **effort は `resolveAgent` が `--effort high` を常に渡す。設定の口は設けない。** モデルの既定に任せると、モデルを替えたときに黙って変わる（Opus 5 は high、Opus 5.5 は medium）。配布先ごとに変える必要は今のところ無い
+  - 見込み（#44 の実行記録を価格だけ置き換えた試算。サブエージェントの費用はそのまま）: Opus 5 のまま $11.63 → Opus 5.5 だけ $8.54 → 分けた構成 ≈ $6.70。effort の差とモデルの振る舞いの差は入っていないので、CI で測る
+  - 計測で見ること: フェーズごとのモデルと `--effort`、ターン数、費用、**ゲートが差し戻すべきものを差し戻せているか**
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

@@ -1,7 +1,7 @@
 ---
 name: reviewer-nonfunctional
 description: 非機能面を見るレビュアー。計画では後から変えにくい選択とリスクの見落とし、実装では実行可能性とデータアクセス・性能・セキュリティのアンチパターンを見る
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 tools: Read, Glob, Grep
 ---
 

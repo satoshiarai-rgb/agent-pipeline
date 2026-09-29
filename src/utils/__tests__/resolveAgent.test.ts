@@ -41,10 +41,16 @@ describe("resolveAgent", () => {
     // --tools（使える状態にする）と --allowed-tools（確認を求めない）は別の指定で、
     // 後者が無いと非対話実行では書き込みが拒否される（実機で確認 / A-24）
     expect(resolveAgent(c, "developer").claude_args).toBe(
-      `--model claude-opus-5 --max-turns ${c.agents.developer.max_turns}` +
+      `--model claude-opus-5 --effort high --max-turns ${c.agents.developer.max_turns}` +
         " --tools Read,Glob,Grep,Write,Edit,Bash,Task,Skill" +
         " --allowed-tools Read,Glob,Grep,Write,Edit,Bash,Task,Skill",
     );
+  });
+
+  test("effort は全エージェント high に固定する（モデルの既定に任せない / A-75）", () => {
+    for (const n of AGENTS) {
+      expect(resolveAgent(c, n).claude_args, n).toContain("--effort high");
+    }
   });
 
   test("使えるツールと確認を免除するツールは同じ集合", () => {

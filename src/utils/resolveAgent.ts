@@ -60,6 +60,9 @@ function claudeArgs(a: {
   const denied = a.tools.split(",").includes("Bash") ? [] : ["Bash"];
   return [
     `--model ${a.model}`,
+    // 全エージェント high に固定する。モデルの既定に任せると、モデルを替えたときに黙って
+    // 変わる（Opus 5 は high、Opus 5.5 は medium / A-75）。配布先から変える口は設けない
+    "--effort high",
     `--max-turns ${a.max_turns}`,
     `--tools ${a.tools}`,
     `--allowed-tools ${a.tools}`,

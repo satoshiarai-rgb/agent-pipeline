@@ -722,6 +722,7 @@ function claudeArgs(a) {
   const denied = a.tools.split(",").includes("Bash") ? [] : ["Bash"];
   return [
     `--model ${a.model}`,
+    "--effort high",
     `--max-turns ${a.max_turns}`,
     `--tools ${a.tools}`,
     `--allowed-tools ${a.tools}`,

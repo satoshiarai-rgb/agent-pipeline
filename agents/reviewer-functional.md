@@ -1,7 +1,7 @@
 ---
 name: reviewer-functional
 description: 機能面を見るレビュアー。計画の中身（根拠・所属先の定義・同じ型の既存物との比較・issue の完了条件の網羅）と、既存実装との整合を突く
-model: claude-sonnet-5
+model: claude-sonnet-5-5
 tools: Read, Glob, Grep
 ---
 
