@@ -87,7 +87,7 @@ GitHub issue を起点に、複数の Claude Code 実行（planner → plan-revi
 
 閉じた:
 
-- `claude-code-action/base-action` の入力名（`prompt` / `prompt_file` / `claude_args` / `settings` / `anthropic_federation_rule_id` / `anthropic_organization_id` / `anthropic_service_account_id` / `anthropic_workspace_id` / `anthropic_oidc_audience`）。**`github_token` 入力は存在しない**。`v1.0.215` に固定して使う
+- `claude-code-action/base-action` の入力名（`prompt` / `prompt_file` / `claude_args` / `settings` / `anthropic_federation_rule_id` / `anthropic_organization_id` / `anthropic_service_account_id` / `anthropic_workspace_id` / `anthropic_oidc_audience`）。**`github_token` 入力は存在しない**。`v1.0.236`（Claude Code 2.1.284）に固定して使う。**モデルを新しくするときは、そのモデルが要る Claude Code を入れるバージョンまで上げる**（Opus 5.5 は 2.1.280 以降。古いと API が 400 を返す / A-75）
 - WIF フェデレーションルールの `match` は `subject_prefix` / `audience` / `claims`（完全一致マップ）/ CEL `condition` の組み合わせ。**ルールは交換要求で ID を指定して評価される**ため「複数ルール一致時の優先順位」という問題は存在しない
 - 長時間実行でのトークン更新。base-action が OIDC トークンを 4 分間隔でバックグラウンド更新するため、`developer: 45` 分の上限でも問題ない
 

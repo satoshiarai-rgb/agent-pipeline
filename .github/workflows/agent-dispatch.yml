@@ -211,11 +211,13 @@ jobs:
       # continue-on-error: true と step の timeout-minutes。失敗・タイムアウトでも
       # validate と finish を必ず通す（state を書かずに終わると run が無音で止まる）。
       # エージェントには GH_TOKEN を渡さない。GitHub の操作はハーネスが行う（A-25）
+      # base-action のバージョンが Claude Code のバージョンを決める（v1.0.236 は 2.1.284）。
+      # 新しいモデルは古い Claude Code で 400 になる（Opus 5.5 は 2.1.280 以降 / A-75）
       - id: agent
         if: needs.route.outputs.action == 'run' && !inputs.dry_run
         continue-on-error: true
         timeout-minutes: ${{ fromJSON(needs.route.outputs.timeout_minutes || '10') }}
-        uses: anthropics/claude-code-action/base-action@v1.0.215
+        uses: anthropics/claude-code-action/base-action@v1.0.236
         with:
           prompt_file: ${{ steps.compose.outputs.prompt_path }}
           # 上限とツールはハーネスが決める（契約 §5）。組み立ては src/utils/resolveAgent.ts
