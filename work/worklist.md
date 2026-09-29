@@ -527,6 +527,21 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - 見込み（#44 の実行記録を価格だけ置き換えた試算。サブエージェントの費用はそのまま）: Opus 5 のまま $11.63 → Opus 5.5 だけ $8.54 → 分けた構成 ≈ $6.70。effort の差とモデルの振る舞いの差は入っていないので、CI で測る
   - 計測で見ること: フェーズごとのモデルと `--effort`、ターン数、費用、**ゲートが差し戻すべきものを差し戻せているか**
   - **1 回目（compass-wiki issue #46）は plan-reviewer が `api_error:400` で止まった。** 本文は「Claude Code 2.1.260 does not support this model; version 2.1.280 or newer is required」。Claude Code のバージョンは `base-action` のバージョンが決めており（`v1.0.215` は 2.1.260）、Opus 5.5 には足りない。planner（Sonnet 5.5）は同じ 2.1.260 で通った。`base-action` を `v1.0.236`（2.1.284）に上げた。入力と出力の名前は `v1.0.215` と同じ
+  - **結果（2026-09-29、#46 を `/agent retry` で続行、`v1.0.5` = `40fce60`）: `done` まで通って $3.50（PR #47）。#44 の $11.63 の 3 割。** 計画もコードもレビューも 1 回で承認
+
+    | フェーズ | モデル | #46 ターン / 時間 / 費用 | #44 ターン / 時間 / 費用 |
+    |---|---|---|---|
+    | planner | Sonnet 5.5 | 27 / 4.1 分 / $1.26 | 34 / 25.1 分 / $4.90 |
+    | plan-reviewer | Opus 5.5 | 20 / 2.0 分 / $0.78 | — / — / $1.32 |
+    | developer | Sonnet 5.5 | 18 / 1.7 分 / $0.68 | 49 / 10.1 分 / $3.49 |
+    | dev-reviewer | Opus 5.5 | 14 / 1.1 分 / $0.53 | — / — / $1.17 |
+    | completion | Sonnet 5.5 | 8 / 0.6 分 / $0.24 | — / — / $0.75 |
+
+    - **試算（≈ $6.70）より安い。** 価格の差に加えて、ターン数と出力が減った。planner は観点をそれぞれ 2 回（相談 1 回と完了時の点検 1 回）、developer は 1 回（完了時の点検だけ）呼んだ。#44 より呼ぶ回数が少ない
+    - **ゲートは中身を見ている。** plan-reviewer は任意の指摘を 5 件（「使い方」の範囲、`prog`、`-` だけの引数、US の書き方、evidence の引き方）、いずれも行番号と argparse の実際の挙動を根拠に挙げた。dev-reviewer は `bin/validate` を 9 通りの呼び方で実際に走らせ、正常系の 5 通りを `origin/main` 版と突き合わせた
+    - **生成側の手抜きが 1 つ見つかった。** developer は「`bin/validate` は実行していない」と PR 本文に書き、evidence を「parser を単体で組んで確認」にとどめた。実際には実行できる環境だった。dev-reviewer が任意の指摘として拾った（差し戻しにはしていない）
+    - 観点の 2 人と `researcher` が effort high で動いたかは、記録からは分からない（subagent の frontmatter に effort は無く、親の `--effort` を継ぐかも文書に無い）
+    - **まだ決めていないこと**: この構成を中央の既定（`models.default` / `models.reviewer`）にするか。実装が小さい issue 1 件の結果なので、大きめの issue でも測ってから決める
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）
