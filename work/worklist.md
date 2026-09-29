@@ -545,6 +545,11 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
 - [ ] A-76: **コマンドの結果で判定できる受け入れ条件は `automated` にする、を planner の決まりにした（2026-09-29。CI での計測は未了）。**
   - きっかけ: #46 の受け入れ条件は 5 件すべて `manual` で、`bin/validate --help` の終了コードのように 1 行で確かめられるものも `manual` だった。そのため実物を走らせる決まりが働かず、developer はコードを読んだだけで `passed` にした（走らせたのは dev-reviewer と completion）。planner は Bash を持たず、コマンドが動くかを自分で確かめられないので `manual` に倒したと見ている
   - 手当て: `plan-writing` の `format.md` に「コマンドの結果で判定できる条件は `automated`。テストに限らない。planner 自身が走らせられないことは `manual` の理由にならない」を、`checklist.md` に同じ趣旨の点検を足した（点検は 13 項目になった）。**コマンドの名前は中央が持たない** — planner が規約・`bin/`・配布先の CI から拾う
+  - **計測の 1 回目（compass-wiki #48）は測れなかった。** #13 の本文に「CI では `bin/validate` を実行できないので `manual` にすること」という節があり、planner はその指定に従った（判断の記録にも「issue の指定」）。前提は誤りで、#46 では dev-reviewer と completion が実際に走らせている。#46 が全件 `manual` だったのも、planner の癖ではなくこの節のためだった可能性が高い
+  - **結果（2026-09-29、compass-wiki #50 = #13 からその節を除いた本文、`v1.0.5` = `3617250`）: 受け入れ条件は 8 件すべて `automated` になり、developer は 8 件の `command` を走らせた結果を evidence にした。`done` まで $6.16（PR #51）**
+    - 計画は 3 回目で承認。差し戻しの 2 回はどちらも `automated` とは無関係で、planner（Sonnet 5.5）の判断の記録の根拠が実ファイルと食い違っていたもの。ゲート（Opus 5.5）が 2 回とも拾った。2 回目以降の planner は 1 回 $0.3〜0.4 と安いが、plan-reviewer が 1 回 $0.7 かかる
+    - `command` は長い 1 行のシェルになる（旧版との出力比較は 1 件で 400 字を超える）。読みにくいが、developer と dev-reviewer はそのまま走らせられた
+    - **配布先の準備の不足が見えた**: `bin/validate` は `uv run --script` の shebang を持つが、実行環境に `uv` が無い。developer は `python3` に渡すだけの代用の `uv` を `/tmp` に置いて `PATH` に足して走らせた（evidence にそう書いている）。compass-wiki の `.agent/setup.sh` で `uv` を入れるのが筋
   - **採らなかった案: completion でハーネスが `automated` の `command` を走らせる。** completion は最後のフェーズでコードを直せないので、落ちても `blocked` にして developer へ戻すしかなく、手戻りが大きい
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
