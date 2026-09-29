@@ -542,6 +542,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
     - **生成側の手抜きが 1 つ見つかった。** developer は「`bin/validate` は実行していない」と PR 本文に書き、evidence を「parser を単体で組んで確認」にとどめた。実際には実行できる環境だった。dev-reviewer が任意の指摘として拾った（差し戻しにはしていない）
     - 観点の 2 人と `researcher` が effort high で動いたかは、記録からは分からない（subagent の frontmatter に effort は無く、親の `--effort` を継ぐかも文書に無い）
     - **まだ決めていないこと**: この構成を中央の既定（`models.default` / `models.reviewer`）にするか。実装が小さい issue 1 件の結果なので、大きめの issue でも測ってから決める
+- [ ] A-76: **コマンドの結果で判定できる受け入れ条件は `automated` にする、を planner の決まりにした（2026-09-29。CI での計測は未了）。**
+  - きっかけ: #46 の受け入れ条件は 5 件すべて `manual` で、`bin/validate --help` の終了コードのように 1 行で確かめられるものも `manual` だった。そのため実物を走らせる決まりが働かず、developer はコードを読んだだけで `passed` にした（走らせたのは dev-reviewer と completion）。planner は Bash を持たず、コマンドが動くかを自分で確かめられないので `manual` に倒したと見ている
+  - 手当て: `plan-writing` の `format.md` に「コマンドの結果で判定できる条件は `automated`。テストに限らない。planner 自身が走らせられないことは `manual` の理由にならない」を、`checklist.md` に同じ趣旨の点検を足した（点検は 13 項目になった）。**コマンドの名前は中央が持たない** — planner が規約・`bin/`・配布先の CI から拾う
+  - **採らなかった案: completion でハーネスが `automated` の `command` を走らせる。** completion は最後のフェーズでコードを直せないので、落ちても `blocked` にして developer へ戻すしかなく、手戻りが大きい
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

@@ -151,6 +151,11 @@ id は、PR や判断の記録に引用されたときにアプリ共通の通�
   では、緑でもその条件を検証したとは言えない。規約（`.agent/conventions.md`）の「テスト」節と
   食い違う形にしない
 - **テストはまだ存在しない。** `command` は予言で、名前が変わったら developer が直して判断の記録に残す
+- **コマンドの結果で判定できる条件は `automated` にする。** テストに限らない — CLI の出力と終了コード、
+  生成物の有無、検証スクリプトの結果も `command` になる（例: `bin/validate --help >/dev/null; test $? -eq 0`）。
+  **planner 自身が走らせて確かめられないことは `manual` の理由にならない** — `command` を走らせるのは
+  Bash を持つ developer と dev-reviewer である。コマンドは規約・`bin/` などの実在するファイル・配布先の
+  CI から拾い、推測で作らない
 - **走らせられないなら `manual`。** このパイプラインは `automated` を自分で実行しないので、DB や
   サービスが要るテストは `manual` になる。**その前に配布先の CI（`.github/workflows/*.yml`）を読む** —
   system test・E2E が走っているなら、テストは書いたうえで `manual` にし、`evidence` に引くジョブ名を書く

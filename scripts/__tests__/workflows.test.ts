@@ -433,12 +433,12 @@ describe("plugin（agents/ と skills/ と .claude-plugin/）", () => {
     }
   });
 
-  test("計画の点検の一覧は 12 項目ある（増減したらここも直す）", () => {
+  test("計画の点検の一覧は 13 項目ある（増減したらここも直す）", () => {
     const text = skillFile("plan-writing/references/checklist.md");
     const start = text.indexOf("<!-- checklist:start -->");
     const end = text.indexOf("<!-- checklist:end -->");
     const list = text.slice(start, end);
-    expect(list.match(/^- \[ \] /gm)?.length).toBe(12);
+    expect(list.match(/^- \[ \] /gm)?.length).toBe(13);
   });
 
   test("plugin の manifest がある（バージョンは git のタグから取られる）", () => {
