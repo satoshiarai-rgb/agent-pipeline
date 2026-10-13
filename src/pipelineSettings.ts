@@ -116,14 +116,16 @@ export const defaultSettings: PipelineSettings = {
    * テスト・rubocop・brakeman を流し終えて判定を書く直前に `num_turns: 31` の `error_max_turns`
    * になった（5 分・$2.17）。developer と同じく、実アプリではコマンドを 1 回流すたびに 1 ターン
    * 消える。plan-reviewer は compass-wiki #50 で 25 の上限に 24〜25 を使っていた。
-   * どちらも 1 ターン 10 秒前後なので、時間の上限も合わせて上げる
+   * どちらも 1 ターン 10 秒前後なので、時間の上限も合わせて上げる。
+   * **completion も同じ PR で、`/agent retry` の後に `num_turns: 21` の `error_max_turns` に
+   * なった**（2.8 分・$1.17）。受け入れ条件の再確認でコマンドを流すので、同じ理由で足りない
    */
   agents: {
     planner: { max_turns: 300, timeout_minutes: 120, tools: "plan" },
     "plan-reviewer": { max_turns: 60, timeout_minutes: 20, tools: "readonly" },
     developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
     "dev-reviewer": { max_turns: 100, timeout_minutes: 30, tools: "exec" },
-    completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" },
+    completion: { max_turns: 60, timeout_minutes: 20, tools: "exec" },
   },
 
   /**
