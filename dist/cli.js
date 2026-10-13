@@ -265,6 +265,7 @@ var STATE_KEYS = [
   "pipeline_version",
   "issue",
   "branch",
+  "actor",
   "phase",
   "blocked_reason",
   "updated_at"
@@ -1016,6 +1017,7 @@ var selectSnapshot = (root, settings, config_error = null) => ({
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
+  actor: root.info.actor,
   ...selectStatus(root, settings, config_error)
 });
 function selectNextAction(root, settings, config_error = null, central = null) {
@@ -1115,6 +1117,13 @@ var GUIDE = {
 判断の記録には**計画と違えた理由**が残っています。`
   }
 };
+function mention(actor) {
+  if (!actor)
+    return "";
+  return `@${actor}
+
+`;
+}
 var retryLine = "PR に `/agent retry` とコメントする（直前のフェーズからやり直します）";
 var ADVICE = [
   {
@@ -1206,6 +1215,7 @@ var FALLBACK = {
 function explainRun(root, dir, settings, config_error = null, repo_slug = null) {
   const status = selectStatus(root, settings, config_error);
   const branch = root.info.branch;
+  const to = mention(root.info.actor);
   if (status.blocked_reason === null) {
     const guide = GUIDE[status.phase];
     if (!guide)
@@ -1213,7 +1223,7 @@ function explainRun(root, dir, settings, config_error = null, repo_slug = null) 
     const links = artifacts(guide.files(dir), dir, branch, repo_slug);
     return {
       reason: status.phase,
-      markdown: `## ${guide.title}
+      markdown: `${to}## ${guide.title}
 
 ${guide.body}
 ${links}`
@@ -1223,7 +1233,7 @@ ${links}`
   const advice = ADVICE.find((a) => reason.includes(a.when)) ?? FALLBACK;
   return {
     reason,
-    markdown: `## 止まりました: ${advice.title}
+    markdown: `${to}## 止まりました: ${advice.title}
 
 \`\`\`
 blocked_reason: ${reason}
@@ -1727,6 +1737,7 @@ var configure = create3("CONFIGURE");
 var initialInfo = {
   issue: null,
   branch: null,
+  actor: null,
   pipeline_version: null,
   dir: "",
   run_id: null,
@@ -1736,6 +1747,7 @@ var infoReducer = reducerWithInitialState(initialInfo).case(configure, (state, p
   ...state,
   issue: payload.issue,
   branch: payload.branch,
+  actor: payload.actor ?? null,
   pipeline_version: payload.pipeline_version
 })).build();
 
@@ -1905,6 +1917,7 @@ var CLI_OPTIONS = {
   dir: { type: "string" },
   issue: { type: "string" },
   branch: { type: "string" },
+  actor: { type: "string" },
   agent: { type: "string" },
   "run-id": { type: "string" },
   attempt: { type: "string", default: "1" },
@@ -1991,6 +2004,7 @@ function runCommand(command, args, settings, configError = null) {
       by: "harness",
       issue: Number(issue),
       branch: need(args.branch, "branch"),
+      actor: args.actor ?? null,
       pipeline_version: settings.pipeline_version
     });
     store.dispatch(action);
@@ -2090,7 +2104,7 @@ function runCommand(command, args, settings, configError = null) {
 var USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 
 状態を変える（action を 1 つ dispatch する）:
-  bootstrap run の最初のイベントを書く              --issue --branch
+  bootstrap run の最初のイベントを書く              --issue --branch [--actor]
   start    エージェント実行の開始を記録する   --agent --run-id --attempt [--model]
   finish   成果物を契約に照らし、結末を書いて次の phase を決める --run-id --attempt
                                               [--agent-failed] [--execution-file <path>]

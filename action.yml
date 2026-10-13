@@ -20,6 +20,7 @@ inputs:
   # bootstrap
   issue: { description: "bootstrap: issue 番号", required: false }
   branch: { description: "bootstrap: 作業ブランチ（claude/issue-<n>）", required: false }
+  actor: { description: "bootstrap: 起動した人（agent:go を付けた人）の login。人間に手番が回ったときの案内でメンションする", required: false }
   # start
   agent: { description: "start: 実行するエージェント（finish / compose は state から取るので不要）", required: false }
   run-id: { description: "start / finish / compose: GitHub Actions のラン ID", required: false }
@@ -102,6 +103,7 @@ runs:
         CLI_DIR: ${{ inputs.dir }}
         CLI_ISSUE: ${{ inputs.issue }}
         CLI_BRANCH: ${{ inputs.branch }}
+        CLI_ACTOR: ${{ inputs.actor }}
         CLI_AGENT: ${{ inputs.agent }}
         CLI_RUN_ID: ${{ inputs.run-id }}
         CLI_ATTEMPT: ${{ inputs.attempt }}

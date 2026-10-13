@@ -7,6 +7,7 @@ import {
   cli,
   makeBlocked,
   makeRun,
+  markBlocked,
   runOnce,
 } from "../../../__tests__/runDirFixture.ts";
 
@@ -35,6 +36,20 @@ describe("人間に手番が回ったときだけ案内を返す", () => {
     const r = explain(blocked("agent_failed"));
     expect(r?.reason).toBe("agent_failed");
     expect(r?.markdown).toContain("blocked_reason: agent_failed");
+  });
+});
+
+describe("起動した人（agent:go を付けた人）にメンションする", () => {
+  test("手番が回る 3 つの案内はどれも先頭でメンションする", () => {
+    expect(explain(makeRun("awaiting_human", "alice"))?.markdown).toStartWith("@alice\n\n## ");
+    expect(explain(makeRun("done", "alice"))?.markdown).toStartWith("@alice\n\n## ");
+    const stopped = markBlocked(makeRun("planning", "alice"), "agent_failed");
+    expect(explain(stopped)?.markdown).toStartWith("@alice\n\n## 止まりました");
+  });
+
+  test("記録の無い run（actor を足す前に始まったもの）ではメンションしない", () => {
+    expect(explain(makeRun("awaiting_human"))?.markdown).toStartWith("## ");
+    expect(explain(blocked("agent_failed"))?.markdown).toStartWith("## 止まりました");
   });
 });
 

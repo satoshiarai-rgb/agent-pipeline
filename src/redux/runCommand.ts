@@ -36,6 +36,7 @@ export const CLI_OPTIONS = {
   dir: { type: "string" },
   issue: { type: "string" },
   branch: { type: "string" },
+  actor: { type: "string" },
   agent: { type: "string" },
   "run-id": { type: "string" },
   attempt: { type: "string", default: "1" },
@@ -159,6 +160,8 @@ export function runCommand(
       by: "harness",
       issue: Number(issue),
       branch: need(args.branch, "branch"),
+      // ラベルを付けた人。人間に手番が回ったときの案内でメンションする（古い呼び出しには無い）
+      actor: args.actor ?? null,
       pipeline_version: settings.pipeline_version,
     });
     store.dispatch(action);

@@ -17,7 +17,12 @@ describe("readStateFile", () => {
       pipeline_version: 3,
       issue: 123,
       branch: "claude/issue-123",
+      actor: null,
     });
+  });
+
+  test("起動した人は bootstrap のイベントから state.json に載る", () => {
+    expect(readStateFile(makeRun("planning", "alice")).meta.actor).toBe("alice");
   });
 
   test("issue か phase が無ければエラー", () => {
@@ -48,6 +53,7 @@ describe("writeStateFile", () => {
       pipeline_version: 3,
       issue: 123,
       branch: "claude/issue-123",
+      actor: null,
       phase: "plan_review",
       blocked_reason: null,
       updated_at: "2026-09-04T10:22:00Z",
@@ -57,6 +63,7 @@ describe("writeStateFile", () => {
       "pipeline_version",
       "issue",
       "branch",
+      "actor",
       "phase",
       "blocked_reason",
       "updated_at",

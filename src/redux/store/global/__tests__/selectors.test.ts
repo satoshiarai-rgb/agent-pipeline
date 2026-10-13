@@ -153,6 +153,7 @@ describe("selectContinueChain / selectSnapshot", () => {
       pipeline_version: 3,
       issue: 123,
       branch: "claude/issue-123",
+      actor: null,
       phase: "blocked",
       blocked_reason: "agent_failed",
     });

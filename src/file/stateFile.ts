@@ -10,6 +10,8 @@ interface RunMeta {
   pipeline_version: number;
   issue: number;
   branch: string;
+  /** 起動した人の login（古い run には無い） */
+  actor: string | null;
 }
 
 export interface StateFile {
@@ -31,6 +33,7 @@ function parseStateFile(text: string): StateFile {
       pipeline_version: Number(raw.pipeline_version ?? 0),
       issue: raw.issue,
       branch: typeof raw.branch === "string" ? raw.branch : "",
+      actor: typeof raw.actor === "string" ? raw.actor : null,
     },
     phase: raw.phase,
     blocked_reason: typeof raw.blocked_reason === "string" ? raw.blocked_reason : null,
@@ -42,6 +45,7 @@ const STATE_KEYS = [
   "pipeline_version",
   "issue",
   "branch",
+  "actor",
   "phase",
   "blocked_reason",
   "updated_at",

@@ -26,6 +26,11 @@ export const init = create<undefined>("INIT", { hydrate: true });
 export interface BootstrapPayload extends Origin {
   issue: number;
   branch: string;
+  /**
+   * 起動した人（`agent:go` を付けた人）の login。人間に手番が回ったときの案内でメンションする。
+   * **任意** — これを足す前に書かれたイベントには無く、そのときはメンションしない
+   */
+  actor?: string | null;
   pipeline_version: number;
 }
 

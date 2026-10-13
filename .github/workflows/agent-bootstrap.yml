@@ -111,6 +111,7 @@ jobs:
           dir: agent-work/issue-${{ inputs.issue }}
           issue: ${{ inputs.issue }}
           branch: ${{ steps.branch.outputs.branch }}
+          actor: ${{ inputs.actor }}
           run-id: ${{ github.run_id }}
           attempt: ${{ github.run_attempt }}
 

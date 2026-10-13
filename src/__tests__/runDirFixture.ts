@@ -171,13 +171,15 @@ const ENTER: [Phase, (dir: string) => void][] = [
   ["done", (dir) => runOnce(dir, "completion", { result: "ok", acceptance_passed: true })],
 ];
 
-export function makeRun(target: Phase | string = "planning"): string {
+/** `actor` はラベルを付けた人。渡さなければ記録の無い run（古い run と同じ）になる */
+export function makeRun(target: Phase | string = "planning", actor?: string): string {
   const dir = mkdtempSync(join(tmpdir(), "agent-run-"));
   dirs.push(dir);
   cli("bootstrap", {
     dir,
     issue: "123",
     branch: "claude/issue-123",
+    actor,
     "run-id": nextRun(),
   });
   for (const [phase, enter] of ENTER) {

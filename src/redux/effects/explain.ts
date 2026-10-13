@@ -125,6 +125,15 @@ const GUIDE: Partial<Record<Phase, Guide>> = {
   },
 };
 
+/**
+ * 起動した人（`agent:go` を付けた人）へのメンション。案内はどれも人間に手番が回ったときだけ
+ * 出るので、出すときは必ず付ける。記録の無い古い run では付けない
+ */
+function mention(actor: string | null): string {
+  if (!actor) return "";
+  return `@${actor}\n\n`;
+}
+
 const retryLine = "PR に `/agent retry` とコメントする（直前のフェーズからやり直します）";
 
 const ADVICE: Advice[] = [
@@ -238,6 +247,7 @@ export function explainRun(
 ): { markdown: string; reason: string } | null {
   const status = selectStatus(root, settings, config_error);
   const branch = root.info.branch;
+  const to = mention(root.info.actor);
 
   if (status.blocked_reason === null) {
     const guide = GUIDE[status.phase];
@@ -245,7 +255,7 @@ export function explainRun(
     const links = artifacts(guide.files(dir), dir, branch, repo_slug);
     return {
       reason: status.phase,
-      markdown: `## ${guide.title}
+      markdown: `${to}## ${guide.title}
 
 ${guide.body}
 ${links}`,
@@ -257,7 +267,7 @@ ${links}`,
 
   return {
     reason,
-    markdown: `## 止まりました: ${advice.title}
+    markdown: `${to}## 止まりました: ${advice.title}
 
 \`\`\`
 blocked_reason: ${reason}

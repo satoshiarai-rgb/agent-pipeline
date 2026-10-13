@@ -10,7 +10,7 @@ import { type Args, CLI_OPTIONS, MissingArg, runCommand } from "./redux/runComma
 const USAGE = `使い方: cli.ts <command> --dir <agent-work/issue-N> [options]
 
 状態を変える（action を 1 つ dispatch する）:
-  bootstrap run の最初のイベントを書く              --issue --branch
+  bootstrap run の最初のイベントを書く              --issue --branch [--actor]
   start    エージェント実行の開始を記録する   --agent --run-id --attempt [--model]
   finish   成果物を契約に照らし、結末を書いて次の phase を決める --run-id --attempt
                                               [--agent-failed] [--execution-file <path>]

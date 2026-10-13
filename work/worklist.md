@@ -557,6 +557,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
   - plan-reviewer は compass-wiki #50 で、25 の上限に対して 24〜25 ターンを使っていた。読むだけでも、大きいリポジトリでは足りなくなる
   - **completion も 20 → 60（15 → 20 分）に上げた。** 同じ PR #325 で、dev-reviewer を `/agent retry` で通した後の completion が `num_turns: 21` の `error_max_turns` で止まった（2.8 分・$1.17、run 38348368750）
   - ターン数は停止条件ではなく安全弁（自走ループは `total_steps` が止める）。足りないと完成しかけた判定ごと捨てられるので、余裕を持たせる
+- [ ] A-78: **人間に手番が回ったときの案内で、`agent:go` を付けた人にメンションする（2026-10-13。CI での確認は未了）。**
+  - 対象は `explain` が出す 3 つ（計画の承認待ち・`done`・`blocked`）。規模超過の警告と `/agent` のコマンドへの返事にはメンションしない（人の手が要らない、または本人がいま打ったばかり）
+  - bootstrap のイベントに `actor`（ラッパーが渡す `github.actor`）を記録し、`state.json` にも載せる。**任意のフィールド**なので、記録の無い古い run はメンションせずに動く（`pipeline_version` は上げない）
+  - コメントは `GITHUB_TOKEN` で投稿しているが、メンションの通知は届く見込み。CI で確かめる
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）

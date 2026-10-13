@@ -11,6 +11,7 @@ add() { # add <flag> <value>: 値が空なら渡さない
 }
 add --issue "${CLI_ISSUE:-}"
 add --branch "${CLI_BRANCH:-}"
+add --actor "${CLI_ACTOR:-}"
 add --agent "${CLI_AGENT:-}"
 add --run-id "${CLI_RUN_ID:-}"
 add --attempt "${CLI_ATTEMPT:-}"

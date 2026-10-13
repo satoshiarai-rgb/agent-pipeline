@@ -131,6 +131,7 @@ export const selectSnapshot = (
   pipeline_version: root.info.pipeline_version ?? 0,
   issue: root.info.issue ?? 0,
   branch: root.info.branch ?? "",
+  actor: root.info.actor,
   ...selectStatus(root, settings, config_error),
 });
 
