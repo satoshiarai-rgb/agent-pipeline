@@ -27,9 +27,9 @@ var defaultSettings = {
   },
   agents: {
     planner: { max_turns: 300, timeout_minutes: 120, tools: "plan" },
-    "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
+    "plan-reviewer": { max_turns: 60, timeout_minutes: 20, tools: "readonly" },
     developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
-    "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
+    "dev-reviewer": { max_turns: 100, timeout_minutes: 30, tools: "exec" },
     completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" }
   },
   approvers: ["OWNER", "COLLABORATOR"],

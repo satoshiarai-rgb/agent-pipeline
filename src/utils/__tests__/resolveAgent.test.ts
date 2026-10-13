@@ -26,7 +26,7 @@ describe("resolveAgent", () => {
   test("job のタイムアウトはエージェントの上限 + 10 分（式で加算できないため）", () => {
     // GitHub の式には算術演算子が無いので、ワークフロー側では計算しない
     expect(resolveAgent(c, "developer").job_timeout_minutes).toBe(100);
-    expect(resolveAgent(c, "plan-reviewer").job_timeout_minutes).toBe(25);
+    expect(resolveAgent(c, "plan-reviewer").job_timeout_minutes).toBe(30);
   });
 
   test("central を渡すと中央を plugin として読ませる（agent 定義と hooks / K-32）", () => {

@@ -111,12 +111,18 @@ export const defaultSettings: PipelineSettings = {
    * `error_max_turns` になり、完成しかけた計画ごと捨てられた（19 分・$12.6）。同じ本文の
    * ローカル実行は本体 62 ターンで終わっており、CI で何にターンを使ったかは未測定（V-18）。
    * 実時間の縛り（120 分）は残るので、developer と同じ 300 にする
+   *
+   * **レビュアーの 2 人も足りなくなった**（A-77）。dev-reviewer は creal/compass PR #325 で、
+   * テスト・rubocop・brakeman を流し終えて判定を書く直前に `num_turns: 31` の `error_max_turns`
+   * になった（5 分・$2.17）。developer と同じく、実アプリではコマンドを 1 回流すたびに 1 ターン
+   * 消える。plan-reviewer は compass-wiki #50 で 25 の上限に 24〜25 を使っていた。
+   * どちらも 1 ターン 10 秒前後なので、時間の上限も合わせて上げる
    */
   agents: {
     planner: { max_turns: 300, timeout_minutes: 120, tools: "plan" },
-    "plan-reviewer": { max_turns: 25, timeout_minutes: 15, tools: "readonly" },
+    "plan-reviewer": { max_turns: 60, timeout_minutes: 20, tools: "readonly" },
     developer: { max_turns: 300, timeout_minutes: 90, tools: "build" },
-    "dev-reviewer": { max_turns: 30, timeout_minutes: 20, tools: "exec" },
+    "dev-reviewer": { max_turns: 100, timeout_minutes: 30, tools: "exec" },
     completion: { max_turns: 20, timeout_minutes: 15, tools: "exec" },
   },
 

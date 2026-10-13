@@ -552,6 +552,10 @@ Anthropic Console のアカウントを取るまで着手できないもの（K-
     - **配布先の準備の不足が見えた**: `bin/validate` は `uv run --script` の shebang を持つが、実行環境に `uv` が無い。developer は `python3` に渡すだけの代用の `uv` を `/tmp` に置いて `PATH` に足して走らせた（evidence にそう書いている）。compass-wiki の `.agent/setup.sh` で `uv` を入れるのが筋
     - **→ 入れた（2026-09-29、compass-wiki `1418da6`）。** `pipx install uv==0.12.20`、planner と plan-reviewer では入れない、失敗しても `exit 0`。#52 で確かめた: developer の準備で「uv を入れた（uv 0.12.20）」、planner では「uv を入れない」。developer は代わりの `uv` を作らず `bin/validate` をそのまま走らせた。`done` まで $4.27（計画は 1 回で承認、受け入れ条件は 9 件中 7 件が `automated`）
   - **採らなかった案: completion でハーネスが `automated` の `command` を走らせる。** completion は最後のフェーズでコードを直せないので、落ちても `blocked` にして developer へ戻すしかなく、手戻りが大きい
+- [ ] A-77: **レビュアーのターンの上限を上げた。dev-reviewer は 30 → 100（時間 20 → 30 分）、plan-reviewer は 25 → 60（15 → 20 分）（2026-10-13）。**
+  - きっかけ: creal/compass PR #325（issue #324）の dev-reviewer が、テスト・rubocop・brakeman を流し終え、判定（`shared-verdict`）を書く直前に `num_turns: 31` の `error_max_turns` で止まった（`agent_failed`、5 分・$2.17、run 37728340220）。実アプリではコマンドを 1 回流すたびに 1 ターン消える（developer を 300 にしたのと同じ理由）
+  - plan-reviewer は compass-wiki #50 で、25 の上限に対して 24〜25 ターンを使っていた。読むだけでも、大きいリポジトリでは足りなくなる
+  - ターン数は停止条件ではなく安全弁（自走ループは `total_steps` が止める）。足りないと完成しかけた判定ごと捨てられるので、余裕を持たせる
 - [ ] R-2: **配布先 2 つ目 = `creal/compass`（Rails 8.1 / MySQL）。導入 PR は出した（2026-09-10。creal/compass#263）。**
   - 置いたもの: `.github/workflows/agent-pipeline.yml`（中央の **`@v1.0.3`** 固定）/ `.agent/conventions.md`（Rails omakase、`db/schema.rb` は生成物、UI は日本語、外部 API は `app/clients/` に閉じる、権限とスキーマ変更は前提に書き出す）/ `.agent/setup.sh`（**何もしない**。下記）/ `.agent/config.json`（`approvers` に `MEMBER`）/ ISSUE テンプレート。`dependabot.yml` は既にあるので `install.sh` が skip した（`github-actions` の ecosystem も既に有効なので、バージョンを上げる PR は自動で来る）
   - **洗い出せた過不足（R-2 の狙い）**: 実行環境に **Ruby も MySQL も無く**（`ruby/setup-ruby` は CI 側のステップ）、`services:` はジョブ定義側にしか書けないので配布先からは足せない。**対処は `docker compose` を `setup.sh` の中で使うこと** — compass はローカル開発用の `compose.yaml`（web + mysql:8.4）を持っているので、それをそのまま使って **developer 以降でテストを走らせられる状態**にした（`docker compose run --rm -e RAILS_ENV=test web bin/rails test`）。**中央に `services` を注入する機構は足さない**（GitHub の仕様上きれいに書けないし、compose を持つ配布先ならこれで足りる）
